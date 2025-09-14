@@ -1,0 +1,2 @@
+export theme=$(yq -r '.color' /xrk/system.yaml)
+source /xrk/body/theme/${theme}

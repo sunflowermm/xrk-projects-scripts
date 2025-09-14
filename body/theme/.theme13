@@ -1,0 +1,3 @@
+export caidan1="\033[38;5;250m" # 银灰色
+export caidan2="\033[38;5;255m" # 亮白色
+export caidan3="\033[38;5;244m" # 深灰色

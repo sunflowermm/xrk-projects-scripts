@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if ! command -v yq &>/dev/null; then
+    source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/github.sh")
+    install_yq() {
+        local architecture=$1
+        local version=$2
+        cd "$HOME" || { echo -e "${RED}无法进入HOME目录${NC}"; exit 1; }
+        
+        local version="v4.45.1"
+        local arch=$(uname -m)
+        local binary_name
+        
+        case "$arch" in
+            x86_64)
+                binary_name="yq_linux_amd64"
+                ;;
+            aarch64)
+                binary_name="yq_linux_arm64"
+                ;;
+            *)
+                echo -e "${RED}不支持的架构: $arch${NC}"
+                exit 1
+                ;;
+        esac
+
+        local url="https://github.com/mikefarah/yq/releases/download/$version/$binary_name"
+
+        getgh url || url="https://github.moeyy.xyz/$url"
+        echo -e "开始安装 yq..."
+        echo "下载地址: $url"
+        wget --tries=3 --timeout=30 -O "$binary_name" "$url"
+        if [ $? -ne 0 ]; then
+            echo "下载失败，请检查网络或下载链接。"
+            exit 1
+        fi
+        sudo mv "$HOME/$binary_name" /usr/local/bin/yq || { echo "权限不足，无法移动文件"; exit 1; }
+        sudo chmod 755 /usr/local/bin/yq
+        if yq --version &>/dev/null; then
+            echo -e "${GREEN}yq $(yq --version) 安装成功${NC}"
+        else
+            echo -e "${RED}yq 安装失败${NC}"
+            exit 1
+        fi
+
+    }
+    install_yq "$architecture" "$latest_version"
+fi

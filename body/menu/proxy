@@ -1,0 +1,287 @@
+#!/bin/bash
+
+# 设置颜色变量
+red="\033[31m"
+green="\033[32m"
+yellow="\033[33m"
+bg="\033[0m"
+caidan1="\033[36m"
+caidan2="\033[33m"
+caidan3="\033[32m"
+
+# 代理列表
+PROXIES=(
+    "http://124.156.150.245:10086"
+    "http://140.83.60.48:8081"
+    "https://gh-proxy.com"
+    "http://43.154.105.8:8888"
+    "http://8.210.153.246:9000"
+    "http://gh.smiek.top:8080"
+    "https://cf2.algin.cn"
+    "https://dl.fastconnect.cc"
+    "https://dl.nzjk.cf"
+    "https://fast.zhaishis.cn"
+    "https://fastgh.lainbo.com"
+    "https://file.sweatent.top"
+    "https://firewall.lxstd.org"
+    "https://g.blfrp.cn"
+    "https://g.in0.re"
+    "https://get.2sb.org"
+    "https://gh-proxy.llyke.com"
+    "https://gh.222322.xyz"
+    "https://gh.b52m.cn"
+    "https://gh.chjina.com"
+    "https://gh.gpuminer.org"
+    "https://gh.hoa.moe"
+    "https://gh.idayer.com"
+    "https://gh.llkk.cc"
+    "https://gh.meiqiu.net.cn"
+    "https://gh.pylogmon.com"
+    "https://gh.tangyuewei.com"
+    "https://gh.tlhub.cn"
+    "https://gh.tryxd.cn"
+    "https://gh.whjpd.top/gh"
+    "https://ghjs.us.kg"
+    "https://ghp.aaaaaaaaaaaaaa.top"
+    "https://ghp.ci"
+    "https://ghp.miaostay.com"
+    "https://ghpr.cc"
+    "https://ghproxy.homeboyc.cn"
+    "https://ghproxy.imciel.com"
+    "https://ghproxy.kokomi0728.eu.org"
+    "https://ghproxy.lyln.us.kg"
+    "https://git.669966.xyz"
+    "https://git.886.be"
+    "https://git.ikxiuxin.com"
+    "https://git.linrol.cn"
+    "https://git.smartapi.com.cn"
+    "https://git.snoweven.com"
+    "https://git.speed-ssr.tech"
+    "https://git.xiandan.uk"
+    "https://git.xkii.cc"
+    "https://git.z23.cc"
+    "https://gitcdn.uiisc.org"
+    "https://github.aci1.com"
+    "https://github.bachang.org"
+    "https://github.bef841ca.cn"
+    "https://github.blogonly.cn"
+    "https://github.codecho.cc"
+    "https://github.cutemic.cn"
+    "https://github.ffffffff0x.com"
+    "https://github.jianrry.plus"
+    "https://github.moeyy.xyz"
+    "https://github.ur1.fun"
+    "https://github.wper.club"
+    "https://github.wuzhij.com"
+    "https://github.xiaoning223.top"
+    "https://github.xxlab.tech"
+    "https://githubacc.caiaiwan.com"
+    "https://githubapi.jjchizha.com"
+    "https://jisuan.xyz"
+    "https://ken.canaan.io"
+    "https://mirror.ghproxy.com"
+    "https://moeyy.cn/gh-proxy"
+    "https://static.yiwangmeng.com"
+    "https://www.ghproxy.cn"
+    ""
+)
+
+# 要过滤的目录
+FILTER_DIRS=('example' 'other' 'system' 'adapter')
+
+function clear_lines() {
+    local lines=$1
+    for ((i = 0; i < lines; i++)); do
+        printf "\e[1A\e[K"
+    done
+}
+
+# 检测代理速度
+function test_proxy() {
+    local proxy=$1
+    local check_path="NapNeko/NapCatQQ/main/package.json"
+    local speed_threshold=2
+    local curl_timeout=3
+
+    local proxied_check_url="${proxy}/https://raw.githubusercontent.com/${check_path}"
+    local result
+    result=$(curl --silent --fail --max-time $curl_timeout -w "%{http_code} %{time_total}" -o /dev/null "$proxied_check_url")
+    local http_code=$(echo "$result" | awk '{print $1}')
+    local time_total=$(echo "$result" | awk '{print $2}')
+
+    if [ "$http_code" = "200" ]; then
+        if awk "BEGIN{exit($time_total<$speed_threshold?0:1)}"; then
+            echo -e "${green}✅ 代理可用: ${proxy}, 响应时间: ${time_total}s${bg}"
+            return 0
+        else
+            echo -e "${yellow}⚠️ 代理可用但响应偏慢(${time_total}s): ${proxy}${bg}"
+            return 1
+        fi
+    else
+        echo -e "${red}❌ 代理不可用: ${proxy}${bg}"
+        return 2
+    fi
+}
+
+# 选择代理并应用到指定目录
+function change_proxy() {
+    local target_dir=$1
+    local plugin_name=$2
+    
+    if [ ! -d "$target_dir/.git" ]; then
+        echo -e "${red}错误: $target_dir 不是Git仓库${bg}"
+        read -p "按回车键继续..." 
+        return 1
+    }
+    
+    # 获取当前远程URL
+    local current_url=$(cd "$target_dir" && git config --get remote.origin.url)
+    if [ -z "$current_url" ]; then
+        echo -e "${red}错误: 无法获取远程URL${bg}"
+        read -p "按回车键继续..." 
+        return 1
+    }
+    
+    echo -e "${yellow}当前远程URL: $current_url${bg}"
+    
+    # 随机化代理列表并测试
+    local shuffled_proxies=($(printf "%s\n" "${PROXIES[@]}" | shuf))
+    local fast_proxies=()
+    
+    echo -e "${yellow}正在测试代理速度...${bg}"
+    for proxy in "${shuffled_proxies[@]}"; do
+        if [ -z "$proxy" ]; then
+            continue
+        }
+        
+        if test_proxy "$proxy"; then
+            fast_proxies+=("$proxy")
+            if [ ${#fast_proxies[@]} -ge 5 ]; then
+                break
+            fi
+        fi
+    done
+    
+    if [ ${#fast_proxies[@]} -eq 0 ]; then
+        echo -e "${red}没有找到可用的快速代理${bg}"
+        read -p "按回车键继续..." 
+        return 1
+    }
+    
+    # 显示可用代理列表
+    echo -e "${caidan3}为 $plugin_name 选择代理:${bg}"
+    echo -e "${caidan1}╭──────────────────────────╮${bg}"
+    for i in "${!fast_proxies[@]}"; do
+        echo -e "${caidan2} $((i+1)). ${fast_proxies[i]} ${bg}"
+    done
+    echo -e "${caidan2} $((${#fast_proxies[@]}+1)). 不修改代理 ${bg}"
+    echo -e "${caidan1}╰──────────────────────────╯${bg}"
+    
+    read -p "请选择代理 (1-$((${#fast_proxies[@]}+1))): " choice
+    
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#fast_proxies[@]} ]; then
+        local selected_proxy=${fast_proxies[$((choice-1))]}
+        
+        if [[ "$current_url" == https://github.com/* ]]; then
+            local new_url="${selected_proxy}/${current_url}"
+            if (cd "$target_dir" && git config remote.origin.url "$new_url"); then
+                echo -e "${green}成功更新代理为: $selected_proxy${bg}"
+                echo -e "${green}新的远程URL: $new_url${bg}"
+                echo -e "${yellow}正在尝试更新插件...${bg}"
+                if (cd "$target_dir" && git pull); then
+                    echo -e "${green}插件更新成功！${bg}"
+                else
+                    echo -e "${red}插件更新失败，请手动检查${bg}"
+                fi
+            else
+                echo -e "${red}更新代理失败${bg}"
+            fi
+        else
+            echo -e "${yellow}当前URL不是GitHub URL，无法应用代理${bg}"
+        fi
+    elif [ "$choice" -eq $((${#fast_proxies[@]}+1)) ]; then
+        echo -e "${yellow}保持原有URL不变${bg}"
+    else
+        echo -e "${red}无效的选择${bg}"
+    fi
+    
+    read -p "按回车键继续..." 
+}
+
+# 管理插件包目录
+function manage_plugins() {
+    local plugins_path="$yz/plugins"
+    
+    while true; do
+        if [ ! -d "$plugins_path" ]; then
+            echo -e "${red}错误: 插件包目录不存在${bg}"
+            exit 1
+        }
+        
+        # 获取并过滤插件目录
+        IFS=$'\n'
+        local all_dirs=($(find "$plugins_path" -mindepth 1 -maxdepth 1 -type d 2>/dev/null))
+        local filtered_dirs=()
+        
+        for dir in "${all_dirs[@]}"; do
+            local base_name=$(basename "$dir")
+            local should_filter=false
+            
+            for filter in "${FILTER_DIRS[@]}"; do
+                if [ "$base_name" = "$filter" ]; then
+                    should_filter=true
+                    break
+                fi
+            done
+            
+            if [ "$should_filter" = false ]; then
+                filtered_dirs+=("$dir")
+            fi
+        done
+        
+        if [ ${#filtered_dirs[@]} -eq 0 ]; then
+            echo -e "${yellow}没有找到可以管理的插件${bg}"
+            exit 1
+        }
+
+        # 显示插件列表
+        local plugin_names=()
+        for dir in "${filtered_dirs[@]}"; do
+            plugin_names+=($(basename "$dir"))
+        done
+        
+        echo -e "${caidan3}插件包目录：${bg}"
+        echo -e "${caidan1}╭──────────────────────────╮${bg}"
+        for i in "${!plugin_names[@]}"; do
+            echo -e "${caidan2} $((i+1)). 📁 ${plugin_names[i]} ${bg}"
+        done
+        echo -e "${caidan1}╰──────────────────────────╯${bg}"
+        echo -e "${caidan3}按q键退出程序${bg}"
+        
+        read -p "输入要切换代理的插件序号: " input
+        
+        [[ "$input" =~ [qQ] ]] && {
+            echo "程序已退出"
+            exit 0
+        }
+        
+        if [[ "$input" =~ ^[0-9]+$ ]]; then
+            index=$((input - 1))
+            if [ "$index" -ge 0 ] && [ "$index" -lt ${#plugin_names[@]} ]; then
+                change_proxy "${filtered_dirs[index]}" "${plugin_names[index]}"
+                clear_lines $((${#plugin_names[@]} + 7))
+            else
+                echo -e "${red}错误: 序号 $input 超出范围${bg}"
+                read -p "按回车键继续..." 
+                clear_lines $((${#plugin_names[@]} + 7))
+            fi
+        else
+            echo -e "${red}错误: 无效的输入 '$input'${bg}"
+            read -p "按回车键继续..." 
+            clear_lines $((${#plugin_names[@]} + 7))
+        fi
+    done
+}
+
+# 主程序
+manage_plugins

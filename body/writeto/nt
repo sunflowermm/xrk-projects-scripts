@@ -1,0 +1,351 @@
+#!/bin/bash
+
+# 定义配置文件路径
+BASE_DIR="/xrk/body"
+CONFIG_DIR="/opt/QQ/resources/app/app_launcher/napcat/config"
+
+# 检查是否安装了必要的软件包
+check_dependencies() {
+    local missing_pkgs=""
+    for pkg in jq dialog xvfb-run; do
+        if ! command -v $pkg &> /dev/null; then
+            missing_pkgs="$missing_pkgs $pkg"
+        fi
+    done
+    
+    if [ -n "$missing_pkgs" ]; then
+        echo "缺少必要的软件包:$missing_pkgs"
+        echo "请安装缺少的软件包后再运行此脚本。"
+        exit 1
+    fi
+}
+
+# 启动QQ并完全退出dialog
+start_qq() {
+    local qq_num="$1"
+    local config_file="${BASE_DIR}/qq_${qq_num}.json"
+    
+    if [[ -f "$config_file" ]]; then
+        local port=$(jq -r '.port // 2537' "$config_file")
+        
+        # 生成napcat配置文件
+        local napcat_config_file="${CONFIG_DIR}/napcat_${qq_num}.json"
+        cat << EOF > "$napcat_config_file"
+{
+    "fileLog": false,
+    "consoleLog": true,
+    "fileLogLevel": "debug",
+    "consoleLogLevel": "info",
+    "packetBackend": "auto",
+    "packetServer": ""
+}
+EOF
+        
+        # 生成onebot配置文件
+        local onebot_config_file="${CONFIG_DIR}/onebot11_${qq_num}.json"
+        local reverse_ws_url="ws://127.0.0.1:${port}/OneBotv11"
+        cat << EOF > "$onebot_config_file"
+{
+  "network": {
+    "httpServers": [
+      {
+        "name": "http-server",
+        "enable": false,
+        "port": 3000,
+        "host": "",
+        "enableCors": true,
+        "enableWebsocket": true,
+        "messagePostFormat": "array",
+        "token": "",
+        "debug": false
+      }
+    ],
+    "httpClients": [],
+    "websocketServers": [
+      {
+        "name": "websocket-server",
+        "enable": false,
+        "host": "",
+        "port": 3001,
+        "messagePostFormat": "array",
+        "reportSelfMessage": true,
+        "token": "",
+        "enableForcePushEvent": true,
+        "debug": false,
+        "heartInterval": 30000
+      }
+    ],
+    "websocketClients": [
+      {
+        "name": "websocket-client",
+        "enable": true,
+        "url": "${reverse_ws_url}",
+        "messagePostFormat": "array",
+        "reportSelfMessage": true,
+        "reconnectInterval": 5000,
+        "token": "",
+        "debug": false,
+        "heartInterval": 30000
+      }
+    ]
+  },
+  "musicSignUrl": "",
+  "enableLocalFile2Url": true
+}
+EOF
+        
+        # 清除所有dialog显示并关闭所有dialog进程
+        clear
+        killall dialog 2>/dev/null
+
+        # 启动QQ
+        echo "正在启动QQ: $qq_num (端口: $port)..."
+        xvfb-run -a qq --no-sandbox -q "$qq_num"
+        
+        exit 0
+    else
+        echo "错误：找不到QQ($qq_num)的配置文件"
+        exit 1
+    fi
+}
+
+# 添加或更新QQ配置
+add_update_qq() {
+    local qq_num="$1"
+    local port="$2"
+    local config_file="${BASE_DIR}/qq_${qq_num}.json"
+    
+    echo '{"qq": "'$qq_num'", "port": '$port'}' > "$config_file"
+    echo "已将QQ号 $qq_num (端口: $port) 的配置写入到 $config_file"
+}
+
+# 获取已配置的QQ列表
+get_qq_list() {
+    find "$BASE_DIR" -name "qq_*.json" -exec basename {} \; | sed 's/qq_//g' | sed 's/\.json//g'
+}
+
+# 显示主菜单
+show_main_menu() {
+    local qq_list=$(get_qq_list)
+    local menu_items=()
+    
+    if [ -n "$qq_list" ]; then
+        echo "已配置的QQ账号:"
+        for qq in $qq_list; do
+            echo "$qq"
+            menu_items+=("$qq" "启动QQ $qq")
+        done
+    else
+        echo "未找到已配置的QQ账号"
+    fi
+    
+    exec 3>&1
+    selection=$(dialog --clear --backtitle "QQ多开启动器" \
+                      --title "主菜单" \
+                      --menu "请选择操作:" 15 60 8 \
+                      "新增账号" "添加新的QQ账号配置" \
+                      "修改配置" "修改现有QQ账号配置" \
+                      "启动账号" "启动已配置的QQ账号" \
+                      "退出" "退出程序" \
+                      2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    if [ $exit_status -eq 0 ]; then
+        case "$selection" in
+            "新增账号") show_add_qq_menu ;;
+            "修改配置") show_modify_qq_menu ;;
+            "启动账号") show_start_qq_menu ;;
+            "退出") echo "感谢使用QQ多开启动器，再见！"; exit 0 ;;
+        esac
+    else
+        echo "已取消操作，再见！"
+        exit 0
+    fi
+}
+
+# 显示添加QQ菜单
+show_add_qq_menu() {
+    exec 3>&1
+    values=$(dialog --ok-label "确定" \
+                   --backtitle "QQ多开启动器" \
+                   --title "添加新QQ账号" \
+                   --form "请输入QQ账号和端口信息:" \
+                   15 50 2 \
+                   "QQ账号:" 1 1 "" 1 10 30 0 \
+                   "端口:" 2 1 "2537" 2 10 30 0 \
+                   2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    if [ $exit_status -eq 0 ]; then
+        qq_num=$(echo "$values" | sed -n 1p)
+        port=$(echo "$values" | sed -n 2p)
+        
+        if [[ -z "$qq_num" ]]; then
+            echo "错误：QQ账号不能为空！"
+            show_main_menu
+            return
+        fi
+        
+        if [[ -z "$port" ]]; then
+            port=2537
+        fi
+        
+        add_update_qq "$qq_num" "$port"
+        
+        exec 3>&1
+        start_now=$(dialog --backtitle "QQ多开启动器" \
+                         --title "立即启动" \
+                         --yesno "是否立即启动QQ($qq_num)？" \
+                         7 50 \
+                         2>&1 1>&3)
+        start_status=$?
+        exec 3>&-
+        
+        clear
+        if [ $start_status -eq 0 ]; then
+            start_qq "$qq_num"
+        fi
+    else
+        echo "已取消添加操作"
+    fi
+    
+    show_main_menu
+}
+
+# 显示修改QQ配置菜单
+show_modify_qq_menu() {
+    local qq_list=$(get_qq_list)
+    
+    if [ -z "$qq_list" ]; then
+        dialog --backtitle "QQ多开启动器" \
+              --title "错误" \
+              --msgbox "没有找到已配置的QQ账号！" \
+              7 50
+        clear
+        show_main_menu
+        return
+    fi
+    
+    local menu_items=()
+    for qq in $qq_list; do
+        local config_file="${BASE_DIR}/qq_${qq}.json"
+        local port=$(jq -r '.port // 2537' "$config_file")
+        menu_items+=("$qq" "端口: $port")
+    done
+    
+    exec 3>&1
+    selected_qq=$(dialog --backtitle "QQ多开启动器" \
+                       --title "选择要修改的QQ账号" \
+                       --menu "请选择:" \
+                       15 50 8 \
+                       "${menu_items[@]}" \
+                       2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    if [ $exit_status -eq 0 ]; then
+        local config_file="${BASE_DIR}/qq_${selected_qq}.json"
+        local current_port=$(jq -r '.port // 2537' "$config_file")
+        
+        exec 3>&1
+        values=$(dialog --ok-label "确定" \
+                      --backtitle "QQ多开启动器" \
+                      --title "修改QQ配置" \
+                      --form "修改QQ($selected_qq)的配置:" \
+                      15 50 2 \
+                      "QQ账号:" 1 1 "$selected_qq" 1 10 30 0 \
+                      "端口:" 2 1 "$current_port" 2 10 30 0 \
+                      2>&1 1>&3)
+        modify_status=$?
+        exec 3>&-
+        
+        clear
+        if [ $modify_status -eq 0 ]; then
+            new_qq=$(echo "$values" | sed -n 1p)
+            new_port=$(echo "$values" | sed -n 2p)
+            
+            if [[ -z "$new_qq" ]]; then
+                echo "错误：QQ账号不能为空！"
+                show_main_menu
+                return
+            fi
+            
+            if [[ -z "$new_port" ]]; then
+                new_port=2537
+            fi
+            
+            if [[ "$selected_qq" != "$new_qq" ]]; then
+                rm -f "$config_file"
+            fi
+            
+            add_update_qq "$new_qq" "$new_port"
+            echo "QQ配置已更新！"
+        else
+            echo "已取消修改操作"
+        fi
+    else
+        echo "已取消选择操作"
+    fi
+    
+    show_main_menu
+}
+
+# 显示启动QQ菜单
+show_start_qq_menu() {
+    local qq_list=$(get_qq_list)
+    
+    if [ -z "$qq_list" ]; then
+        dialog --backtitle "QQ多开启动器" \
+              --title "错误" \
+              --msgbox "没有找到已配置的QQ账号！" \
+              7 50
+        clear
+        show_main_menu
+        return
+    fi
+    
+    local menu_items=()
+    for qq in $qq_list; do
+        menu_items+=("$qq" "启动QQ $qq")
+    done
+    
+    exec 3>&1
+    selected_qq=$(dialog --backtitle "QQ多开启动器" \
+                       --title "选择要启动的QQ账号" \
+                       --menu "请选择:" \
+                       15 50 8 \
+                       "${menu_items[@]}" \
+                       2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    if [ $exit_status -eq 0 ]; then
+        start_qq "$selected_qq"
+    else
+        echo "已取消启动操作"
+        show_main_menu
+    fi
+}
+
+# 主程序入口
+main() {
+    check_dependencies
+    
+    if [[ -n "$1" ]]; then
+        local qq_num="$1"
+        local port="${2:-2537}"
+        add_update_qq "$qq_num" "$port"
+        start_qq "$qq_num"
+    else
+        show_main_menu
+    fi
+}
+
+# 执行主程序
+main "$@"

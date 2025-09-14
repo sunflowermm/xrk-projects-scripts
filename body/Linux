@@ -1,0 +1,178 @@
+#!/bin/bash
+
+source /xrk/shell_modules/update.sh
+source /xrk/shell_modules/init.sh
+
+SCRIPT_NAME="xrkk"
+SCRIPT_VERSION="2.1-universal"
+
+# 检测系统类型
+detect_system() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+    else
+        echo "无法检测系统类型"
+        exit 1
+    fi
+}
+
+# 根据系统类型设置包管理器命令
+set_package_manager() {
+    case $OS in
+        "ubuntu"|"debian")
+            PKG_INSTALL="apt install -y"
+            PKG_REMOVE="apt remove -y"
+            PKG_UPDATE="apt update"
+            ;;
+        "arch")
+            PKG_INSTALL="pacman -S --noconfirm"
+            PKG_REMOVE="pacman -R --noconfirm"
+            PKG_UPDATE="pacman -Sy"
+            ;;
+        "centos")
+            PKG_INSTALL="yum install -y"
+            PKG_REMOVE="yum remove -y"
+            PKG_UPDATE="yum check-update"
+            ;;
+        *)
+            echo "不支持的系统类型: $OS"
+            exit 1
+            ;;
+    esac
+}
+
+# 显示帮助信息
+function show_help() {
+    echo "$SCRIPT_NAME $SCRIPT_VERSION - 通用版本"
+    echo "使用方法："
+    echo "  $SCRIPT_NAME i <软件包名>   下载并安装软件包"
+    echo "  $SCRIPT_NAME f <软件包名>   删除软件包"
+    echo "  $SCRIPT_NAME mk <文件夹名>  创建文件夹"
+    echo "  $SCRIPT_NAME s <签名链接>   填写sign链接到云崽配置文件"
+    echo "  $SCRIPT_NAME -h | --help    显示帮助信息"
+    echo "  $SCRIPT_NAME js             安装js插件相关操作"
+    echo "  $SCRIPT_NAME plugin         插件安装相关操作"
+    echo "  $SCRIPT_NAME other          脚本相关操作"
+    echo "  $SCRIPT_NAME dele           文字版文件管理相关操作"
+    echo "  $SCRIPT_NAME diadele        触屏版文件管理相关操作"
+    echo "  $SCRIPT_NAME up             更新云崽路径与变量"
+    echo "  $SCRIPT_NAME error          报错修复与处理"
+    echo "当前系统类型: $OS"
+}
+
+# 更新软件包索引
+function update_package_index() {
+    echo "正在更新软件包索引..."
+    $PKG_UPDATE
+}
+
+detect_system
+set_package_manager
+
+if [ $# -lt 1 ]; then
+    show_help
+    exit 1
+fi
+
+case "$1" in
+    i)
+        shift
+        if [ $# -lt 1 ]; then
+            echo "错误：请指定要安装的软件包名称"
+            exit 1
+        fi
+        update_package_index
+        echo "开始尝试下载并安装 $@"
+        $PKG_INSTALL "$@"
+        ;;
+    f)
+        shift
+        if [ $# -lt 1 ]; then
+            echo "错误：请指定要删除的软件包名称"
+            exit 1
+        fi
+        echo "正在尝试删除 $@"
+        $PKG_REMOVE "$@"
+        ;;
+    mk)
+        shift
+        if [ $# -lt 1 ]; then
+            echo "错误：请指定要创建的文件夹名称"
+            exit 1
+        fi
+        echo "正在创建 $@ 文件夹"
+        mkdir -p "$@"
+        ;;
+    s)
+        shift
+        if [ $# -lt 1 ]; then
+            echo "错误：请指定要填写的sign链接"
+            exit 1
+        fi
+        SIGN_LINK="$@"
+        if [ -n "$myz" ]; then
+            echo "正在将 sign_api_addr 设置为 $SIGN_LINK (Yunzai配置)"
+            sed -i "s|sign_api_addr:.*|sign_api_addr: $SIGN_LINK|" "$myz/config/config/bot.yaml"
+        fi
+        if [ -n "$xyz" ]; then
+            echo "正在将 sign_api_addr 设置为 $SIGN_LINK (Yunzai配置)"
+            sed -i "s|sign_api_addr:.*|sign_api_addr: $SIGN_LINK|" "$xyz/config/config/bot.yaml"
+        fi
+        if [ -n "$tyz" ]; then
+            echo "正在将 sign_api_addr 设置为 $SIGN_LINK (TRSS配置)"
+            sed -i "s|sign_api_addr:.*|  sign_api_addr: $SIGN_LINK|" "$tyz/config/ICQQ.yaml"
+        fi
+        ;;
+    -h|--help)
+        show_help
+        ;;
+    plugin)
+        shift
+        bash /xrk/body/menu/plug-in
+        ;;
+    twobot)
+        shift
+        bash /xrk/twobot
+        ;;
+    other)
+        shift
+        bash /xrk/advanced
+        ;;
+    js)
+        shift
+        bash /xrk/body/menu/js
+        ;;
+    dele)
+        shift
+        bash /xrk/body/menu/deletion
+        ;;
+    diadele)
+        shift
+        bash /xrk/body/menu/deletiondialog
+        ;;
+    up)
+        shift
+        check_changes
+        search_directories
+        ;;
+    error)
+        shift
+        bash /xrk/body/menu/errorbg
+
+        ;;
+    xrk)
+        shift
+        cd $yz
+        git clone --depth=1 https://gitcode.com/Xrkseek/xrk-plugin.git ./plugins/xrk-plugin/
+        pnpm i --prefix ./plugins/xrk-plugin
+        ;;
+    ncqq | nc)
+        shift
+        bash /xrk/Yunzai-install/NapCat.sh
+        ;;
+    *)
+        show_help
+        exit 1
+        ;;
+esac

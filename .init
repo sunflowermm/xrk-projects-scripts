@@ -1,0 +1,12 @@
+# 全局颜色变量
+source /xrk/shell_modules/color.sh
+# 全局云崽变量
+source /xrk/shell_modules/init.sh
+source /xrk/shell_modules/github.sh
+# 主逻辑
+check_changes
+search_directories
+source /xrk/.color
+if [ -d "$HOME/.tmux/plugins" ] && [ -z "$TMUX" ]; then
+    bash /xrk/body/tmux.sh
+fi

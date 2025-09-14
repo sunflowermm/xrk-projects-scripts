@@ -1,0 +1,611 @@
+#!/bin/bash
+
+# Lagrange ARM设备优化启动器 v4.0
+
+# 定义配置
+BASE_DIR="/xrk/body"
+LAGRANGE_DIR="/root/lagelan"
+LAGRANGE_EXEC="${LAGRANGE_DIR}/Lagrange.OneBot"
+VERSION_FILE="${LAGRANGE_DIR}/qq_build_version"
+AUTO_UPDATER_CONFIG="${LAGRANGE_DIR}/AutoUpdaterConfig.json"
+DEFAULT_BUILD="39038"
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# ARM设备内存优化设置
+setup_arm_environment() {
+    # 检测架构
+    ARCH=$(uname -m)
+    echo -e "${BLUE}检测到架构: ${ARCH}${NC}"
+    
+    # ARM设备专用环境变量
+    if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "armv"* ]]; then
+        echo -e "${YELLOW}应用ARM设备优化...${NC}"
+        
+        # 禁用诊断以减少内存使用
+        export COMPlus_EnableDiagnostics=0
+        
+        # 设置GC堆限制（根据可用内存动态调整）
+        AVAILABLE_MEM=$(free -m | awk 'NR==2{print $7}')
+        if [ "$AVAILABLE_MEM" -lt 512 ]; then
+            export DOTNET_GCHeapHardLimit=0x10000000  # 256MB
+            export COMPlus_GCHeapHardLimit=268435456
+        elif [ "$AVAILABLE_MEM" -lt 1024 ]; then
+            export DOTNET_GCHeapHardLimit=0x20000000  # 512MB
+            export COMPlus_GCHeapHardLimit=536870912
+        else
+            export DOTNET_GCHeapHardLimit=0x30000000  # 768MB
+            export COMPlus_GCHeapHardLimit=805306368
+        fi
+        
+        # 服务器GC模式（减少内存使用）
+        export DOTNET_gcServer=0
+        export COMPlus_gcServer=0
+        
+        # 减少线程池大小
+        export DOTNET_ThreadPool_MinThreads=2
+        export DOTNET_ThreadPool_MaxThreads=10
+        
+        # 禁用分层编译以减少内存
+        export DOTNET_TieredCompilation=0
+        export COMPlus_TieredCompilation=0
+        
+        # 设置JIT优化
+        export DOTNET_JitMinOpts=1
+        
+        echo -e "${GREEN}ARM优化已应用:${NC}"
+        echo "  - GC堆限制: $(($DOTNET_GCHeapHardLimit/1048576))MB"
+        echo "  - 可用内存: ${AVAILABLE_MEM}MB"
+    fi
+}
+
+# 检查并创建交换空间
+check_swap() {
+    SWAP_TOTAL=$(free -m | awk '/^Swap:/{print $2}')
+    if [ "$SWAP_TOTAL" -lt 512 ]; then
+        echo -e "${YELLOW}警告: 交换空间不足 (${SWAP_TOTAL}MB)${NC}"
+        echo "建议创建至少512MB的交换空间"
+    fi
+}
+
+# 清理内存
+clean_memory() {
+    echo -e "${BLUE}清理系统内存...${NC}"
+    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+    
+    # 显示内存状态
+    echo -e "${GREEN}内存状态:${NC}"
+    free -h
+}
+
+# 获取终端尺寸
+get_dialog_size() {
+    local term_height=$(tput lines 2>/dev/null || echo 24)
+    local term_width=$(tput cols 2>/dev/null || echo 80)
+    
+    [ $term_height -lt 20 ] && term_height=20
+    [ $term_width -lt 60 ] && term_width=60
+    
+    DIALOG_HEIGHT=$((term_height - 5))
+    DIALOG_WIDTH=$((term_width - 10))
+    
+    [ $DIALOG_HEIGHT -gt 25 ] && DIALOG_HEIGHT=25
+    [ $DIALOG_WIDTH -gt 80 ] && DIALOG_WIDTH=80
+    
+    MENU_HEIGHT=$((DIALOG_HEIGHT - 8))
+    [ $MENU_HEIGHT -lt 5 ] && MENU_HEIGHT=5
+    
+    FORM_HEIGHT=$((DIALOG_HEIGHT - 8))
+    [ $FORM_HEIGHT -lt 10 ] && FORM_HEIGHT=10
+}
+
+# 检查依赖
+check_dependencies() {
+    local missing_pkgs=""
+    
+    for pkg in jq dialog curl; do
+        if ! command -v $pkg &> /dev/null; then
+            missing_pkgs="$missing_pkgs $pkg"
+        fi
+    done
+    
+    if [ -n "$missing_pkgs" ]; then
+        echo -e "${RED}缺少必要的软件包:$missing_pkgs${NC}"
+        echo "安装命令："
+        echo "  apt-get install$missing_pkgs"
+        exit 1
+    fi
+    
+    if [ ! -f "$LAGRANGE_EXEC" ]; then
+        echo -e "${RED}错误：找不到 Lagrange.OneBot${NC}"
+        exit 1
+    fi
+}
+
+# 创建自动更新配置
+create_auto_updater_config() {
+    if [ ! -f "${AUTO_UPDATER_CONFIG}" ]; then
+        cat << EOF > "${AUTO_UPDATER_CONFIG}"
+{
+  "EnableAutoUpdate": true,
+  "CheckInterval": 360,
+  "ProxyUrl": "https://gh-proxy.com",
+  "LastUpdateTime": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+    fi
+}
+
+# 获取QQ构建版本
+get_qq_build_version() {
+    if [ -f "${VERSION_FILE}" ]; then
+        local version=$(cat "${VERSION_FILE}" 2>/dev/null | tr -d '[:space:]')
+        if [ -n "${version}" ] && [[ "${version}" =~ ^[0-9]+$ ]]; then
+            echo "${version}"
+        else
+            echo "${DEFAULT_BUILD}"
+        fi
+    else
+        echo "${DEFAULT_BUILD}"
+    fi
+}
+
+# 检查端口
+check_port_available() {
+    local port=$1
+    if command -v netstat &> /dev/null; then
+        netstat -tuln 2>/dev/null | grep -q ":${port} " && return 1
+    elif command -v ss &> /dev/null; then
+        ss -tuln 2>/dev/null | grep -q ":${port} " && return 1
+    fi
+    return 0
+}
+
+# 启动Lagrange (ARM优化版)
+start_lagrange() {
+    local qq_num="$1"
+    local config_file="${BASE_DIR}/qq_${qq_num}.json"
+    
+    if [[ ! -f "$config_file" ]]; then
+        echo -e "${RED}错误：找不到QQ($qq_num)的配置文件${NC}"
+        return 1
+    fi
+    
+    local port=$(jq -r '.port // 2573' "$config_file")
+    local ws_host=$(jq -r '.ws_host // "127.0.0.1"' "$config_file")
+    local access_token=$(jq -r '.access_token // ""' "$config_file")
+    
+    if ! check_port_available "$port"; then
+        echo -e "${YELLOW}警告：端口 ${port} 可能已被占用${NC}"
+        read -p "是否继续? (y/n): " -n 1 -r
+        echo
+        [[ ! $REPLY =~ ^[Yy]$ ]] && return 1
+    fi
+    
+    local qq_build=$(get_qq_build_version)
+    local sign_url="https://sign.lagrangecore.org/api/sign/${qq_build}"
+    
+    # 生成Lagrange配置
+    cat << EOF > "${LAGRANGE_DIR}/appsettings.json"
+{
+    "\$schema": "https://raw.githubusercontent.com/LagrangeDev/Lagrange.Core/master/Lagrange.OneBot/Resources/appsettings_schema.json",
+    "Logging": {
+        "LogLevel": {
+            "Default": "Information",
+            "Microsoft": "Warning",
+            "Microsoft.Hosting.Lifetime": "Information"
+        }
+    },
+    "SignServerUrl": "${sign_url}",
+    "SignProxyUrl": "",
+    "MusicSignServerUrl": "",
+    "Account": {
+        "Uin": ${qq_num},
+        "Password": "",
+        "Protocol": "Linux",
+        "AutoReconnect": true,
+        "GetOptimumServer": true
+    },
+    "Message": {
+        "IgnoreSelf": false,
+        "StringPost": false
+    },
+    "QrCode": {
+        "ConsoleCompatibilityMode": false
+    },
+    "Implementations": [
+        {
+            "Type": "ReverseWebSocket",
+            "Host": "${ws_host}",
+            "Port": ${port},
+            "Suffix": "/OneBotv11",
+            "ReconnectInterval": 5000,
+            "HeartBeatInterval": 5000,
+            "AccessToken": "${access_token}"
+        }
+    ]
+}
+EOF
+    
+    clear
+    
+    # ARM设备启动前准备
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${GREEN}      Lagrange ARM设备启动准备${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    
+    # 清理内存
+    clean_memory
+    
+    # 设置ARM环境
+    setup_arm_environment
+    
+    # 检查交换空间
+    check_swap
+    
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${GREEN}启动信息:${NC}"
+    echo -e "  QQ账号: ${qq_num}"
+    echo -e "  WebSocket: ws://${ws_host}:${port}/onebot/v11/ws"
+    echo -e "  签名服务: ${sign_url}"
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${YELLOW}提示: 按 Ctrl+C 停止运行${NC}"
+    echo ""
+    
+    # 启动Lagrange
+    cd "$LAGRANGE_DIR"
+    
+    # ARM设备使用限制资源启动
+    if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "armv"* ]]; then
+        # 使用nice降低优先级，减少资源竞争
+        nice -n 10 ./Lagrange.OneBot
+    else
+        ./Lagrange.OneBot
+    fi
+    
+    exit 0
+}
+
+# 添加或更新QQ配置
+add_update_qq() {
+    local qq_num="$1"
+    local port="${2:-2573}"
+    local ws_host="${3:-127.0.0.1}"
+    local access_token="${4:-}"
+    
+    local config_file="${BASE_DIR}/qq_${qq_num}.json"
+    
+    [ -f "$config_file" ] && cp "$config_file" "${config_file}.bak"
+    
+    cat << EOF > "$config_file"
+{
+    "qq": "${qq_num}",
+    "port": ${port},
+    "ws_host": "${ws_host}",
+    "access_token": "${access_token}",
+    "created": "$(date +%Y-%m-%d_%H:%M:%S)",
+    "updated": "$(date +%Y-%m-%d_%H:%M:%S)"
+}
+EOF
+    
+    echo -e "${GREEN}✓ 配置已保存${NC}"
+}
+
+# 获取QQ列表
+get_qq_list() {
+    find "$BASE_DIR" -name "qq_*.json" 2>/dev/null | \
+        sed 's/.*qq_//;s/\.json//' | sort -n
+}
+
+# 显示错误
+show_error_dialog() {
+    get_dialog_size
+    dialog --backtitle "Lagrange ARM启动器" \
+           --title "错误" \
+           --msgbox "$1" \
+           $((DIALOG_HEIGHT/2)) $((DIALOG_WIDTH*2/3))
+    clear
+}
+
+# 主菜单
+show_main_menu() {
+    get_dialog_size
+    local qq_list=$(get_qq_list)
+    local menu_items=()
+    
+    menu_items+=("新增账号" "添加新QQ账号")
+    
+    if [ -n "$qq_list" ]; then
+        menu_items+=("启动账号" "启动已配置账号")
+        menu_items+=("修改配置" "修改账号配置")
+        menu_items+=("删除账号" "删除账号配置")
+    fi
+    
+    menu_items+=("内存状态" "查看内存使用")
+    menu_items+=("退出" "退出程序")
+    
+    exec 3>&1
+    selection=$(dialog --clear \
+                      --backtitle "Lagrange ARM启动器 v4.0" \
+                      --title "主菜单" \
+                      --menu "请选择:" \
+                      $DIALOG_HEIGHT $DIALOG_WIDTH $MENU_HEIGHT \
+                      "${menu_items[@]}" \
+                      2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    [ $exit_status -ne 0 ] && exit 0
+    
+    case "$selection" in
+        "新增账号") show_add_qq_menu ;;
+        "启动账号") show_start_qq_menu ;;
+        "修改配置") show_modify_qq_menu ;;
+        "删除账号") show_delete_qq_menu ;;
+        "内存状态") show_memory_status ;;
+        "退出") exit 0 ;;
+    esac
+}
+
+# 显示内存状态
+show_memory_status() {
+    get_dialog_size
+    local mem_info=$(free -h)
+    dialog --backtitle "Lagrange ARM启动器" \
+           --title "内存状态" \
+           --msgbox "$mem_info" \
+           $DIALOG_HEIGHT $DIALOG_WIDTH
+    clear
+    show_main_menu
+}
+
+# 添加QQ
+show_add_qq_menu() {
+    get_dialog_size
+    
+    exec 3>&1
+    values=$(dialog --ok-label "确定" \
+                   --cancel-label "取消" \
+                   --backtitle "Lagrange ARM启动器" \
+                   --title "添加账号" \
+                   --form "配置信息:" \
+                   $FORM_HEIGHT $DIALOG_WIDTH 4 \
+                   "QQ账号:" 1 1 "" 1 15 30 0 \
+                   "端口:" 2 1 "2573" 2 15 30 0 \
+                   "WS地址:" 3 1 "127.0.0.1" 3 15 30 0 \
+                   "Token:" 4 1 "" 4 15 30 0 \
+                   2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    if [ $exit_status -eq 0 ]; then
+        qq_num=$(echo "$values" | sed -n 1p | tr -d ' ')
+        port=$(echo "$values" | sed -n 2p | tr -d ' ')
+        ws_host=$(echo "$values" | sed -n 3p | tr -d ' ')
+        access_token=$(echo "$values" | sed -n 4p)
+        
+        if [[ -z "$qq_num" ]] || [[ ! "$qq_num" =~ ^[0-9]+$ ]]; then
+            show_error_dialog "QQ账号必须是数字！"
+            show_add_qq_menu
+            return
+        fi
+        
+        [ -z "$port" ] && port=2573
+        [ -z "$ws_host" ] && ws_host="127.0.0.1"
+        
+        add_update_qq "$qq_num" "$port" "$ws_host" "$access_token"
+        
+        dialog --backtitle "Lagrange ARM启动器" \
+               --title "成功" \
+               --yesno "添加成功！是否立即启动？" \
+               $((DIALOG_HEIGHT/2)) $((DIALOG_WIDTH/2))
+        
+        [ $? -eq 0 ] && start_lagrange "$qq_num"
+        clear
+    fi
+    
+    show_main_menu
+}
+
+# 修改配置
+show_modify_qq_menu() {
+    get_dialog_size
+    local qq_list=$(get_qq_list)
+    
+    if [ -z "$qq_list" ]; then
+        show_error_dialog "没有已配置的账号！"
+        show_main_menu
+        return
+    fi
+    
+    local menu_items=()
+    for qq in $qq_list; do
+        local port=$(jq -r '.port // 2573' "${BASE_DIR}/qq_${qq}.json")
+        menu_items+=("$qq" "端口: $port")
+    done
+    
+    exec 3>&1
+    selected_qq=$(dialog --backtitle "Lagrange ARM启动器" \
+                        --title "选择账号" \
+                        --menu "选择要修改的账号:" \
+                        $DIALOG_HEIGHT $DIALOG_WIDTH $MENU_HEIGHT \
+                        "${menu_items[@]}" \
+                        2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    if [ $exit_status -eq 0 ]; then
+        local config_file="${BASE_DIR}/qq_${selected_qq}.json"
+        local current_port=$(jq -r '.port // 2573' "$config_file")
+        local current_host=$(jq -r '.ws_host // "127.0.0.1"' "$config_file")
+        local current_token=$(jq -r '.access_token // ""' "$config_file")
+        
+        exec 3>&1
+        values=$(dialog --ok-label "保存" \
+                       --cancel-label "取消" \
+                       --backtitle "Lagrange ARM启动器" \
+                       --title "修改配置" \
+                       --form "修改信息:" \
+                       $FORM_HEIGHT $DIALOG_WIDTH 3 \
+                       "端口:" 1 1 "$current_port" 1 15 30 0 \
+                       "WS地址:" 2 1 "$current_host" 2 15 30 0 \
+                       "Token:" 3 1 "$current_token" 3 15 30 0 \
+                       2>&1 1>&3)
+        modify_status=$?
+        exec 3>&-
+        
+        clear
+        if [ $modify_status -eq 0 ]; then
+            new_port=$(echo "$values" | sed -n 1p | tr -d ' ')
+            new_host=$(echo "$values" | sed -n 2p | tr -d ' ')
+            new_token=$(echo "$values" | sed -n 3p)
+            
+            add_update_qq "$selected_qq" "$new_port" "$new_host" "$new_token"
+            
+            dialog --backtitle "Lagrange ARM启动器" \
+                   --title "成功" \
+                   --msgbox "配置已更新！" \
+                   $((DIALOG_HEIGHT/2)) $((DIALOG_WIDTH/2))
+            clear
+        fi
+    fi
+    
+    show_main_menu
+}
+
+# 删除账号
+show_delete_qq_menu() {
+    get_dialog_size
+    local qq_list=$(get_qq_list)
+    
+    if [ -z "$qq_list" ]; then
+        show_error_dialog "没有已配置的账号！"
+        show_main_menu
+        return
+    fi
+    
+    local menu_items=()
+    for qq in $qq_list; do
+        menu_items+=("$qq" "删除此账号")
+    done
+    
+    exec 3>&1
+    selected_qq=$(dialog --backtitle "Lagrange ARM启动器" \
+                        --title "删除账号" \
+                        --menu "选择要删除的账号:" \
+                        $DIALOG_HEIGHT $DIALOG_WIDTH $MENU_HEIGHT \
+                        "${menu_items[@]}" \
+                        2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    if [ $exit_status -eq 0 ]; then
+        dialog --backtitle "Lagrange ARM启动器" \
+               --title "确认" \
+               --yesno "确定删除 QQ ${selected_qq}？" \
+               $((DIALOG_HEIGHT/2)) $((DIALOG_WIDTH/2))
+        
+        if [ $? -eq 0 ]; then
+            rm -f "${BASE_DIR}/qq_${selected_qq}.json"
+            dialog --backtitle "Lagrange ARM启动器" \
+                   --title "成功" \
+                   --msgbox "已删除！" \
+                   $((DIALOG_HEIGHT/2)) $((DIALOG_WIDTH/2))
+        fi
+        clear
+    fi
+    
+    show_main_menu
+}
+
+# 启动账号
+show_start_qq_menu() {
+    get_dialog_size
+    local qq_list=$(get_qq_list)
+    
+    if [ -z "$qq_list" ]; then
+        show_error_dialog "没有已配置的账号！"
+        show_main_menu
+        return
+    fi
+    
+    local menu_items=()
+    for qq in $qq_list; do
+        local port=$(jq -r '.port // 2573' "${BASE_DIR}/qq_${qq}.json")
+        local status="可用"
+        check_port_available "$port" || status="占用"
+        menu_items+=("$qq" "端口:$port [$status]")
+    done
+    
+    exec 3>&1
+    selected_qq=$(dialog --backtitle "Lagrange ARM启动器" \
+                        --title "启动账号" \
+                        --menu "选择要启动的账号:" \
+                        $DIALOG_HEIGHT $DIALOG_WIDTH $MENU_HEIGHT \
+                        "${menu_items[@]}" \
+                        2>&1 1>&3)
+    exit_status=$?
+    exec 3>&-
+    
+    clear
+    [ $exit_status -eq 0 ] && start_lagrange "$selected_qq"
+    show_main_menu
+}
+
+# 创建目录
+create_directories() {
+    [ ! -d "$BASE_DIR" ] && mkdir -p "$BASE_DIR"
+    [ ! -d "$LAGRANGE_DIR" ] && mkdir -p "$LAGRANGE_DIR"
+    create_auto_updater_config
+}
+
+# 主程序
+main() {
+    # 检测ARM架构
+    ARCH=$(uname -m)
+    
+    # 设置信号处理
+    trap 'clear; echo -e "${YELLOW}程序被中断${NC}"; exit 1' INT TERM
+    
+    # 检查依赖
+    check_dependencies
+    create_directories
+    
+    # 命令行模式
+    if [[ -n "$1" ]]; then
+        if [[ "$1" == "--help" ]]; then
+            echo "Lagrange ARM启动器 v4.0"
+            echo "用法: $0 [QQ号] [端口]"
+            exit 0
+        fi
+        
+        local qq_num="$1"
+        local port="${2:-2573}"
+        
+        if [[ ! "$qq_num" =~ ^[0-9]+$ ]]; then
+            echo -e "${RED}错误：QQ账号必须是数字${NC}"
+            exit 1
+        fi
+        
+        add_update_qq "$qq_num" "$port"
+        start_lagrange "$qq_num"
+    else
+        # 图形界面
+        echo -e "${GREEN}Lagrange ARM优化启动器 v4.0${NC}"
+        echo -e "${BLUE}架构: ${ARCH}${NC}"
+        sleep 1
+        show_main_menu
+    fi
+}
+
+# 执行
+main "$@"

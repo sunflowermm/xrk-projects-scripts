@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if ! command -v pnpm &>/dev/null; then
+    source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/github.sh")
+    install_pnpm() {
+        local architecture=$1
+        local version=$2
+
+        if [ "$architecture" = "x86_64" ]; then
+            pnpm="pnpm-linux-x64"
+            url="https://github.com/pnpm/pnpm/releases/download/$version/pnpm-linux-x64"
+        elif [ "$architecture" = "aarch64" ]; then
+            pnpm="pnpm-linux-arm64"
+            url="https://github.com/pnpm/pnpm/releases/download/$version/pnpm-linux-arm64"
+        else
+            echo "不支持的架构: $architecture"
+            exit 1
+        fi
+        getgh url || url="https://github.moeyy.xyz/$url"
+        echo -e "开始安装 pnpm..."
+        echo "下载地址: $url"
+        wget --tries=3 --timeout=30 -O "$pnpm" "$url"
+        if [ $? -ne 0 ]; then
+            echo "下载失败，请检查网络或下载链接。"
+            exit 1
+        fi
+        sudo mv "$HOME/$pnpm" /usr/local/bin/pnpm || { echo "权限不足，无法移动文件"; exit 1; }
+        sudo chmod 755 /usr/local/bin/pnpm
+        if pnpm -v &>/dev/null; then
+            echo "pnpm 安装成功！"
+        else
+            echo "pnpm 安装失败"
+        fi
+    }
+    cd "$HOME" || { echo "无法进入 HOME 目录"; exit 1; }
+    latest_version=v9.15.3
+    architecture=$(uname -m)
+    install_pnpm "$architecture" "$latest_version"
+fi

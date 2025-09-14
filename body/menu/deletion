@@ -1,0 +1,187 @@
+#!/bin/bash
+
+# 设置颜色变量
+red="\033[31m"
+green="\033[32m"
+yellow="\033[33m"
+
+function show_menu() {
+    local title=$1
+    local options=("${@:2}")
+    echo -e "${caidan3}按q键退出程序，按回车返回菜单${bg}"
+    echo -e "${caidan1}╭──────────────────────────╮${bg}"
+    for i in "${!options[@]}"; do
+        echo -e "${caidan2} $((i+1)). ${options[i]} ${bg}"
+    done
+    echo -e "${caidan1}╰──────────────────────────╯${bg}"
+    echo -e "${caidan3}请输入要管理的文件夹序号${bg}"
+}
+
+function clear_lines() {
+    local lines=$1
+    for ((i = 0; i < lines; i++)); do
+        printf "\e[1A\e[K"
+    done
+}
+
+# 删除文件/文件夹函数
+function delete_files() {
+    local want_path=$1
+    local files=("${@:2}")
+    local deleted=0
+    local failed=0
+    
+    echo -e "${yellow}将要删除以下文件/文件夹：${bg}"
+    for file in "${files[@]}"; do
+        local type_str=$([ -d "$want_path/$file" ] && echo "文件夹" || echo "文件")
+        echo "- $type_str: $file"
+    done
+    echo
+    read -p "确定要删除这些文件吗? (y/n): " confirm
+    case $confirm in
+        [Yy]*)
+            for file in "${files[@]}"; do
+                if rm -rf "$want_path/$file"; then
+                    ((deleted++))
+                else
+                    echo -e "${red}删除失败: $file${bg}"
+                    ((failed++))
+                fi
+            done
+            echo -e "${green}成功删除 $deleted 个文件/文件夹${bg}"
+            [ $failed -gt 0 ] && echo -e "${red}删除失败 $failed 个文件/文件夹${bg}"
+            ;;
+        *)
+            echo -e "${yellow}已取消删除操作${bg}"
+            ;;
+    esac
+    echo
+}
+
+# 文件管理函数
+function manage_files() {
+    local want_path=$1
+    local folder_name=$2
+    
+    while true; do
+        if [ ! -d "$want_path" ]; then
+            echo -e "${red}错误: 目录 $want_path 不存在${bg}"
+            return
+        fi
+        
+        IFS=$'\n'
+        file_list=($(find "$want_path" -mindepth 1 -maxdepth 1 2>/dev/null))
+        
+        # 检查目录是否为空
+        if [ ${#file_list[@]} -eq 0 ]; then
+            echo -e "${yellow}当前目录为空${bg}"
+            read -p "按回车键返回主菜单..." 
+            return
+        fi
+
+        # 转换为基本文件名
+        for i in "${!file_list[@]}"; do
+            file_list[$i]=$(basename "${file_list[$i]}")
+        done
+        
+        # 显示文件列表
+        echo -e "${caidan3}$folder_name：${bg}"
+        echo -e "${caidan1}╭──────────────────────────╮${bg}"
+        for i in "${!file_list[@]}"; do
+            if [ -d "$want_path/${file_list[i]}" ]; then
+                echo -e "${caidan2} $((i+1)). 📁 ${file_list[i]} ${bg}"
+            else
+                echo -e "${caidan2} $((i+1)). 📄 ${file_list[i]} ${bg}"
+            fi
+        done
+        echo -e "${caidan1}╰──────────────────────────╯${bg}"
+        
+        # 处理用户输入
+        echo -e "${caidan3}输入要删除的序号，多选用空格分隔${bg}"
+        read -p "(按回车返回主菜单，q退出程序): " input
+        
+        # 检查退出条件
+        [[ "$input" =~ [qQ] ]] && {
+            echo "程序已退出"
+            exit 0
+        }
+        [ -z "$input" ] && {
+            clear_lines $((${#file_list[@]} + 7))
+            return
+        }
+        
+        # 将输入分割成数组
+        IFS=' ' read -ra inputs <<< "$input"
+        
+        local files_to_delete=()
+        local invalid_input=false
+        
+        # 处理每个输入
+        for num in "${inputs[@]}"; do
+            if [[ "$num" =~ ^[0-9]+$ ]]; then
+                index=$((num - 1))
+                if [ "$index" -ge 0 ] && [ "$index" -lt ${#file_list[@]} ]; then
+                    files_to_delete+=("${file_list[index]}")
+                else
+                    echo -e "${red}错误: 序号 $num 超出范围${bg}"
+                    invalid_input=true
+                fi
+            else
+                echo -e "${red}错误: 无效的输入 '$num'${bg}"
+                invalid_input=true
+            fi
+        done
+        
+        if [ ${#files_to_delete[@]} -gt 0 ] && [ "$invalid_input" = false ]; then
+            delete_files "$want_path" "${files_to_delete[@]}"
+            read -p "按回车键继续..."
+            clear_lines $((${#file_list[@]} + 7))
+        fi
+    done
+}
+
+# 主程序
+function main() {
+    local options=("插件包目录" "js插件目录" "Bot目录" "自定义目录管理")
+    
+    # 主菜单循环
+    while true; do
+        show_menu "选择目录" "${options[@]}"
+        read -p "都这样了那还不会,那我懒得喷: " choice
+        
+        case $choice in
+            [qQ]) 
+                echo "程序已退出"
+                exit 0
+                ;;
+            1) 
+                want_path="$yz/plugins"
+                manage_files "$want_path" "${options[0]}"
+                ;;
+            2)
+                want_path="$yz/plugins/example"
+                manage_files "$want_path" "${options[1]}"
+                ;;
+            3)
+                want_path="$yz"
+                manage_files "$want_path" "${options[2]}"
+                ;;
+            4) 
+                read -p "输入你想要管理的文件目录: " want_path
+                if [ ! -d "$want_path" ]; then
+                    echo -e "${red}错误: 目录不存在${bg}"
+                    continue
+                fi
+                manage_files "$want_path" "自定义目录"
+                ;;
+            *)
+                echo -e "${red}请输入有效的选项${bg}"
+                ;;
+        esac
+        
+        # 清理屏幕
+        clear_lines 9
+    done
+}
+
+main

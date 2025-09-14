@@ -1,0 +1,30 @@
+#!/bin/bash
+source /xrk/shell_modules/init.sh
+
+# 显示帮助信息
+show_help() {
+  echo "用法: xyz-login [参数]"
+  echo "选项:"
+  echo "  无参数    - 正常重置葵崽账号"
+  echo "  数字参数  - 重置葵崽账号并传递该数字参数"
+  echo "  --h, -h   - 显示此帮助信息"
+  exit 0
+}
+
+# 处理帮助参数
+if [[ "$1" == "--h" || "$1" == "-h" ]]; then
+  show_help
+fi
+
+check_changes
+search_directories
+echo "正在重置葵崽账号"
+
+# 根据是否有参数决定执行方式
+if [ -z "$1" ]; then
+  # 无参数时，按原来方式执行
+  cd $xyz && node app login
+else
+  # 有参数时，将参数传递给node app login
+  cd $xyz && node app login "$1"
+fi

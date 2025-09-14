@@ -1,0 +1,3 @@
+export caidan1="\e[1;32m"
+export caidan2="\e[1;36m"
+export caidan3="\033[0;33m"

@@ -1,0 +1,3 @@
+export caidan1="\033[38;5;211m" # 淡粉色
+export caidan2="\033[38;5;147m" # 薰衣草
+export caidan3="\033[38;5;189m" # 浅紫色

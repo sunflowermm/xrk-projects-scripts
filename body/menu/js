@@ -1,0 +1,121 @@
+#!/bin/bash
+
+xrk=$HOME/xrk
+jh=$yz/plugins/example
+
+move_vocal(){
+    local woaini=$1
+    local wogeng=$2
+    sleep 1
+    if [ -d "$yz/resources/$woaini" ]; then
+        echo -e "${caidan1}已经安装过${woaini}了，正在跳过\e[0m"
+    else
+        mv -f $xrk/shell-js/$woaini $yz/resources/
+        echo -e "${caidan3}已安装 ${woaini}\e[0m"
+    fi
+    
+    sleep 1
+    if [ -d "$jh/$wogeng" ]; then
+        echo -e "${caidan2}已经安装过${wogeng}了，正在跳过\e[0m"
+    else
+        mv -f $xrk/shell-js/$wogeng $jh/
+        echo -e "${caidan3}已安装 ${wogeng}\e[0m"
+    fi
+}
+
+select_js_plugins() {
+    echo -e "${caidan3}获取 JS 插件列表...\e[0m"
+    local js_files=($(find $xrk/shell-js/ -maxdepth 1 -type f -name "*.js"))
+    
+    if [ ${#js_files[@]} -eq 0 ]; then
+        echo -e "${caidan1}未找到任何 JS 插件\e[0m"
+        return
+    fi
+    
+    echo -e "${caidan2}可用的 JS 插件:\e[0m"
+    for i in "${!js_files[@]}"; do
+        basename="${js_files[$i]##*/}"
+        echo -e "${caidan1}$i: $basename\e[0m"
+    done
+    
+    echo -e "${caidan2}输入你想要安装的插件编号(空格分隔，直接回车安装全部):\e[0m"
+    read -a selections
+    
+    if [ ${#selections[@]} -eq 0 ]; then
+        selections=($(seq 0 $((${#js_files[@]}-1))))
+    fi
+    
+    local selected_name_reply_js=false
+    
+    for i in "${selections[@]}"; do
+        if [[ $i =~ ^[0-9]+$ ]] && [ $i -ge 0 ] && [ $i -lt ${#js_files[@]} ]; then
+            selected_file=${js_files[$i]}
+            if [ "${selected_file##*/}" == "名称回复.js" ]; then
+                selected_name_reply_js=true
+            fi
+            mv -n "$selected_file" $jh/
+            echo -e "${caidan3}已安装 $(basename "$selected_file")\e[0m"
+        else
+            echo -e "${caidan1}无效的选择: $i\e[0m"
+        fi
+    done
+    
+    if [ "$selected_name_reply_js" = true ]; then
+        echo -e "${caidan3}检测到名称回复插件，请配置机器人名字\e[0m"
+        read -p "输入你想要的机器人名字: " add_text
+        sed -i "11 s/'[^']*'/'${add_text}'/" "$jh/名称回复.js"
+        echo -e "${caidan2}机器人名字已更新为: ${add_text}\e[0m"
+    fi
+}
+
+function clear_menu {
+    for ((i=0; i<forin; i++)); do
+        printf "\e[1A\e[K"
+    done
+}
+
+show_menu() {
+    echo -e "${caidan2} 输入q或0退出脚本 \e[0m"
+    echo -e "${caidan3} ┏━━━━━━━━━━━━━━━━━━━━━━━━┓ \e[0m"
+    echo -e "${caidan1}╭──────────────────────────╮\e[0m"
+    echo -e "${caidan2}        落魄插件列表        \e[0m"
+    echo -e "${caidan1}╰──────────────────────────╯\e[0m"
+    echo -e "${caidan2} 1. 安装李素裳所有的js插件  \e[0m"
+    echo -e "${caidan2} 2. 安装或更新向日葵插件    \e[0m"
+    echo -e "${caidan2} 3. 修改名称回复机器人名字  \e[0m"
+    echo -e "${caidan3} ┗━━━━━━━━━━━━━━━━━━━━━━━━┛ \e[0m"
+}
+
+while true; do
+    clear_menu
+    show_menu
+    read -p "请选择操作 [0-3]: " mainmenu
+    echo
+    
+    case $mainmenu in
+        1)
+            echo -e "${caidan3}正在克隆插件仓库...\e[0m"
+            git clone --depth=1 https://gitcode.com/Xrkseek/collection-of-jses.git $xrk
+            select_js_plugins
+            chmod 755 $xrk
+            rm -rf $xrk
+            echo -e "${caidan2}操作完成\e[0m"
+            ;;
+        2)
+            echo -e "${caidan2}去下载xrk-plugin吧，见鬼吧你，还在这安装\e[0m"
+            ;;
+        3)
+            read -p "输入你想要的机器人名字: " add_text
+            sed -i "11 s/'[^']*'/'${add_text}'/" "$jh/名称回复.js"
+            echo -e "${caidan2}机器人名字已更新为: ${add_text}\e[0m"
+            ;;
+        0 | q | Q)
+            echo -e "${caidan2}感谢使用！\e[0m"
+            exit 0
+            ;;
+        *)
+            echo -e "${caidan1}请输入有效的选项 [0-3]\e[0m"
+            ;;
+    esac
+    echo
+done

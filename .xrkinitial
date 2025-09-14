@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# 显示菜单的函数
+function show_premenu {
+    echo -e "\e[32m╭──────────────────────────────╮\e[0m"
+    echo -e "\e[33m ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ \e[0m"
+    echo -e "\e[38;5;94m      1.继续安装机器人安装\e[0m"
+    echo -e "\e[38;5;94m      2.退出\e[0m"
+    echo -e "\e[33m ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ \e[0m"
+    echo -e "\e[32m╰──────────────────────────────╯\e[0m"
+}
+
+# 菜单循环
+function menu_loop {
+    while true; do
+        echo -n "请从两个选项中选一个 (5秒后自动选择1): "
+        read -t 5 choice
+        if [ $? -eq 142 ]; then
+            choice=1
+            echo -e "\n自动选择选项 1"
+        fi
+        
+        case $choice in
+        1)
+            echo -e "\e[32m 开始安装云崽 \e[0m"
+            bash <(curl -sL "${url}")
+            if [ $? -ne 0 ]; then
+                echo -e "\e[31m 安装过程出现错误。 \e[0m"
+                exit 1
+            fi
+            exit 0
+            ;;
+        2)
+            echo -e "\e[32m 退出安装程序 \e[0m"
+            exit 0
+            ;;
+        *)
+            echo -e "\e[31m 输入无效，请重新选择 \e[0m"
+            ;;
+        esac
+    done
+}
+
+function common_setup {
+    install_package "wget" 
+    install_package "sudo"
+    show_premenu
+    menu_loop
+}
+
+function cotup {
+    apt update
+    apt install curl -y
+    bash <(curl -sSL https://linuxmirrors.cn/main.sh)
+    url="https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Yunzai-install/${ID}install.sh"
+    source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/install.sh")
+    确定系统安装器魔法
+}
+
+# 检测操作系统并执行相应的安装流程
+function detect_and_run {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [[ "$ID" == "ubuntu" ]]; then
+            echo "检测到的操作系统为 Ubuntu"
+            sed -i 's/ports.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list
+            cotup
+            common_setup
+        elif [[ "$ID" == "debian" ]]; then
+            echo "检测到的操作系统为 Debian"
+            sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+            cotup
+            common_setup
+        else
+            echo -e "\e[31m 未知系统，请在支持的系统上运行此脚本。 \e[0m"
+            exit 1
+        fi
+    else
+        echo -e "\e[31m 无法检测操作系统类型，请手动运行脚本。 \e[0m"
+        exit 1
+    fi
+}
+
+sleep 2
+
+detect_and_run
