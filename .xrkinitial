@@ -65,6 +65,19 @@ if ! command -v bash &>/dev/null; then
     fi
 fi
 
+# 1.6 让登录 shell 自动切到 bash（start 脚本当前以 /bin/sh -l 进入）
+if [ -d /root ]; then
+    profile_file="/root/.profile"
+    # 仅在未写入过时追加一段，避免重复
+    if ! grep -q "exec bash --login" "$profile_file" 2>/dev/null; then
+        {
+            echo 'if command -v bash >/dev/null 2>&1 && [ -z "$BASH_VERSION" ]; then'
+            echo '  exec bash --login'
+            echo 'fi'
+        } >> "$profile_file"
+    fi
+fi
+
 # 2. 统一 XRK_SOURCE 与 bootstrap 源（默认 3=Gitee）
 XRK_SOURCE="${XRK_SOURCE:-3}"
 if [ -f /xrk/shell_modules/bootstrap.sh ]; then
