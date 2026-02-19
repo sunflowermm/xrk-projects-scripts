@@ -3,7 +3,7 @@
 # 供 xm / install_xm / 主流程 / 容器 / 菜单脚本 等复用；Termux 换源见 Termux.sh 换源魔法 + repo.sh
 # 提供：detect_arch, detect_arch_raw, detect_platform, detect_os, install_pkg, ensure_cmd, change_source_linux*
 
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
 
 # 检测架构：x64|arm64|armv7l|ppc64le|s390x（Node/ffmpeg 等用）
 # 返回 uname -m 原始值供部分脚本使用，标准化名供下载 URL 用

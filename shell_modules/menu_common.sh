@@ -336,7 +336,7 @@ run_software() {
     local path="$1"
     shift
     local args=("$@")
-    local base="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+    local base="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
     local retry=0 max_retries=3
     
     # 优先本地执行

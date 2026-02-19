@@ -48,7 +48,7 @@ load_install_module() {
     [ -n "$base" ] && [ -f "${base}/$path" ] && { source "${base}/$path"; return 0; }
     
     # 最后远程加载（需要 SCRIPT_RAW_BASE）
-    local base_url="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+    local base_url="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
     if source <(curl -sL --connect-timeout 5 --max-time 30 "${base_url}/$path" 2>/dev/null); then
         return 0
     fi
@@ -64,7 +64,7 @@ init_install_env() {
     # 加载 bootstrap.sh（提供 get_base_from_arg、init_repo_source）
     load_install_module "shell_modules/bootstrap.sh" 2>/dev/null || {
         # 如果加载失败，直接设置默认值
-        SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+        SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
     }
     
     # 初始化仓库源（如果 bootstrap 加载成功）
@@ -74,7 +74,7 @@ init_install_env() {
         if type get_base_from_arg &>/dev/null; then
             SCRIPT_RAW_BASE="$(get_base_from_arg "$source_arg")"
         else
-            SCRIPT_RAW_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master"
+            SCRIPT_RAW_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master"
         fi
     fi
     export SCRIPT_RAW_BASE
@@ -107,6 +107,6 @@ run_install_script() {
     fi
     
     # 最后远程执行
-    local base_url="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+    local base_url="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
     bash <(curl -sL "${base_url}/$script_path") "${args[@]}"
 }

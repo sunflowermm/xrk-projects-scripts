@@ -2,7 +2,7 @@
 # 独立模块：安装 uv + Python（无 /xrk 依赖）
 
 UV_INSTALL_URL="https://astral.sh/uv/install.sh"
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
 [ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh" 2>/dev/null)
 PYTHON_VERSION="${UV_PYTHON_VERSION:-${PYTHON_LTS_VERSION:-3.12}}"
 export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:$PATH"

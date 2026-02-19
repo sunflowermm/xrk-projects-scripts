@@ -7,9 +7,15 @@ if [[ "$(pwd)" != *com.termux* ]]; then
 fi
 
 
-# 参数：$2 = 1 GitCode 2 GitHub 3 Gitee（默认 1），与 bootstrap 统一
-XRK_SOURCE="${2:-1}"
-source <(curl -sL "https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh")
+# 参数：$2 = 1 GitCode 2 GitHub 3 Gitee（默认 3），与 bootstrap 统一
+XRK_SOURCE="${2:-3}"
+# 首次引导：按 XRK_SOURCE 选择 bootstrap 所在源，默认 3=Gitee
+case "${XRK_SOURCE#-}" in
+    1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master" ;;
+    2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master" ;;
+    3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
+esac
+source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg "$XRK_SOURCE")}"
 export SCRIPT_RAW_BASE XRK_SOURCE
 

@@ -2,14 +2,15 @@
 # 统一引导：源推导、模块加载、日志（get_base_from_arg、get_clone_from_raw、init_repo_source、load_module、load_distro_deps、log_*）
 # 供 install.sh、install_xm、xm、Termux xrk.sh、distro_install_head 等复用
 
-# 从参数推导 SCRIPT_RAW_BASE（1=GitCode 2=GitHub 3=Gitee）
+# 从参数推导 SCRIPT_RAW_BASE（1=GitCode 2=GitHub 3=Gitee，默认 3=Gitee）
 get_base_from_arg() {
     local arg="${1:-$XRK_SOURCE}"
     case "${arg#-}" in
         1) echo "https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master" ;;
         2) echo "https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master" ;;
         3) echo "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
-        *) echo "https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master" ;;
+        # 默认走 Gitee
+        *) echo "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
     esac
 }
 

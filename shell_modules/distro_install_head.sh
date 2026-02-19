@@ -2,7 +2,7 @@
 # 各发行版安装脚本公共头部：加载依赖、日志、确定安装器
 # 用法：source 本文件后执行发行版特有逻辑
 
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
 if [ -f /xrk/shell_modules/bootstrap.sh ]; then
     source /xrk/shell_modules/bootstrap.sh
 else

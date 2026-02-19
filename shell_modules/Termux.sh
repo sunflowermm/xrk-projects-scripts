@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 # 脚本仓库源：由调用方 export SCRIPT_RAW_BASE，未设置则默认 GitCode
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
 if [[ "$SCRIPT_RAW_BASE" == *"raw.gitcode.com"* ]]; then
     FONT_URL="https://gitcode.com/Xrkseek/xrk-projects-scripts/releases/download/font"
 elif [[ "$SCRIPT_RAW_BASE" == *"raw.githubusercontent.com"* ]]; then

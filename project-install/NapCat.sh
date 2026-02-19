@@ -5,7 +5,7 @@
 
 # 统一初始化：加载 install_script_common.sh 并初始化环境
 # 支持远程执行：bash <(curl -sL https://raw.gitcode.com/.../NapCat.sh)
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
 if [ -f "/xrk/shell_modules/install_script_common.sh" ]; then
     source /xrk/shell_modules/install_script_common.sh
 elif [ -f "$(cd "$(dirname "$0")" && pwd)/../shell_modules/install_script_common.sh" ]; then
@@ -19,8 +19,8 @@ else
     }
 fi
 
-# 初始化安装环境（如果 install_script_common.sh 加载成功）
-type init_install_env &>/dev/null && init_install_env "${XRK_SOURCE:-1}" || true
+# 初始化安装环境（如果 install_script_common.sh 加载成功，默认 3=Gitee，与全局一致）
+type init_install_env &>/dev/null && init_install_env "${XRK_SOURCE:-3}" || true
 
 # 颜色（github.sh 已有 RED/GREEN/YELLOW/NC，此处补足）
 CYAN='\033[0;1;36;96m'

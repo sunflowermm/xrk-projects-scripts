@@ -1,13 +1,18 @@
 #!/bin/bash
 # 安装 xm 到 bin：换源、安装 Git、克隆脚本仓库、安装云崽 的统一入口
-# 参数：1=GitCode 2=GitHub 3=Gitee（默认 1）
+# 参数：1=GitCode 2=GitHub 3=Gitee（默认 3）
 
-XRK_SOURCE="${1:-1}"
-# 与 bootstrap 一致：用 get_base_from_arg / get_clone_from_raw 统一换源逻辑
+XRK_SOURCE="${1:-3}"
+# 与 bootstrap 一致：用 get_base_from_arg / get_clone_from_raw 统一换源逻辑（首跳按 XRK_SOURCE 选源）
 if [ -f /xrk/shell_modules/bootstrap.sh ]; then
     source /xrk/shell_modules/bootstrap.sh
 else
-    source <(curl -sL "https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh")
+    case "${XRK_SOURCE#-}" in
+        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master" ;;
+        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master" ;;
+        3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
+    esac
+    source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")
 fi
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg "$XRK_SOURCE")}"
 SCRIPT_CLONE_URL="${SCRIPT_CLONE_URL:-$(get_clone_from_raw "$SCRIPT_RAW_BASE")}"

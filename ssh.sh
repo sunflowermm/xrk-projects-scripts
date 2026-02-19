@@ -3,7 +3,7 @@
 # Licensed under MIT License
 
 TERMUX_DIR="$PREFIX"
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
 source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/Termux.sh")
 
 换源魔法

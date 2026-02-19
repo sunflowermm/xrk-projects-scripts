@@ -1,7 +1,7 @@
 #!/bin/bash
 # 主流程用：加载公共模块 + 确定系统类型，对外提供 install_package（统一走 common.sh install_pkg）
 
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
 
 # 加载公共模块（本地优先，否则远程）
 if [ -f /xrk/shell_modules/common.sh ]; then
