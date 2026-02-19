@@ -212,16 +212,17 @@ create_start_script() {
         alpine)  path_add="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" ;;
         *)       path_add="PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin" ;;
     esac
-    # Alpine 若无 bash 则用 sh
-    login_shell="/bin/bash --login"
-    [ ! -f "$INSTALL_DIR/bin/bash" ] && [ -f "$INSTALL_DIR/bin/sh" ] && login_shell="/bin/sh -l"
     cat > "$START_SCRIPT" <<- EOM
 #!/bin/bash
 echo "启动 $DISTRO ($RELEASE) ..."
 unset LD_PRELOAD
 cd \$(dirname \$0)
 command="proot --link2symlink -0 -r $INSTALL_DIR -b /dev -b /dev/null:/proc/sys/kernel/cap_last_cap -b /proc -b /data/data/com.termux/files/usr/tmp:/tmp -b $INSTALL_DIR/root:/dev/shm -w /root /usr/bin/env -i HOME=/root TERM=\$TERM LANG=zh_CN.UTF-8 $path_add"
-command+=" $login_shell"
+if [ -x "/bin/bash" ]; then
+    command+=" /bin/bash --login"
+else
+    command+=" /bin/sh -l"
+fi
 if [ -z "\$1" ];then
     exec \$command
 else
@@ -272,7 +273,9 @@ main() {
     echo -e "\033[1;35m欢迎使用 $DISTRO ($RELEASE) 安装脚本！\033[0m"
     sep
     if [ -d "$INSTALL_DIR/root" ] && [ -f "$START_SCRIPT" ]; then
-        info "检测到 $DISTRO 已安装，开始启动..."
+        info "检测到 $DISTRO 已安装，更新启动脚本并启动..."
+        # 确保使用最新的启动逻辑（例如 Alpine 无 bash 时自动回退到 sh）
+        create_start_script
         bash "$START_SCRIPT"
         exit 0
     fi
