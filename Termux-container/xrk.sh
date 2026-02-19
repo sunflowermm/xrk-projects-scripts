@@ -1,28 +1,29 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# 确保在Termux环境中运行
-if [[ "$(pwd)" != *com.termux* ]]; then
-    echo -e "\033[1;31m请在 Termux 原生环境下运行此脚本\033[0m"
-    exit 1
-fi
+# 确保在 Termux 环境运行（用 PREFIX 比 pwd 可靠）
+[ -n "${PREFIX:-}" ] || { echo -e "\033[1;31m请在 Termux 原生环境下运行此脚本\033[0m"; exit 1; }
 
-
-# 参数：$2 = 1 GitCode 2 GitHub 3 Gitee（默认 3），与 bootstrap 统一
+# 参数解析（--help 优先，避免无谓拉取 bootstrap）
 XRK_SOURCE="${2:-3}"
-# 首次引导：按 XRK_SOURCE 选择 bootstrap 所在源，默认 3=Gitee
-    case "${XRK_SOURCE#-}" in
-        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
-        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
-        3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
-    esac
+case "$1" in
+  --help|-h)
+    echo "用法: bash xrk.sh --<发行版> [源: 1=GitCode 2=GitHub 3=Gitee]"
+    echo "支持的发行版: --ubuntu --debian --alpine --arch --fedora --centos"
+    exit 0
+    ;;
+esac
+
+# 首次引导
+case "${XRK_SOURCE#-}" in
+    1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
+    2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
+    3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
+esac
 source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg "$XRK_SOURCE")}"
 export SCRIPT_RAW_BASE XRK_SOURCE
-
-# 引入外部函数（Termux 换源、字体键盘等）
 source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/Termux.sh")
 
-# 参数解析：支持多种发行版
 case "$1" in
   --ubuntu)
     DISTRO="ubuntu"
@@ -53,18 +54,6 @@ case "$1" in
     DISTRO="centos"
     RELEASE="9-Stream"
     SHORTCUT="s"
-    ;;
-  --help|-h)
-    echo "用法: bash xrk.sh --<发行版> [源: 1=GitCode 2=GitHub 3=Gitee]"
-    echo ""
-    echo "支持的发行版:"
-    echo "  --ubuntu    Ubuntu (noble)"
-    echo "  --debian    Debian (bookworm)"
-    echo "  --alpine    Alpine Linux (3.22)"
-    echo "  --arch      Arch Linux (current)"
-    echo "  --fedora    Fedora (43)"
-    echo "  --centos    CentOS Stream 9"
-    exit 0
     ;;
   *)
     echo -e "\033[1;31m请使用 --ubuntu / --debian / --alpine / --arch / --fedora / --centos 或 --help 查看帮助\033[0m"
@@ -176,13 +165,21 @@ install_system() {
     echo "127.0.0.1 localhost" > "$INSTALL_DIR/etc/hosts"
     echo -e "nameserver 223.5.5.5\nnameserver 223.6.6.6" > "$INSTALL_DIR/etc/resolv.conf"
     info "$DISTRO 系统安装完成"
-    # Alpine 默认无 bash，需先安装
-    if [ "$DISTRO" = "alpine" ]; then
-        info "Alpine 需安装 bash，正在执行..."
-        proot --link2symlink -0 -r "$INSTALL_DIR" -b /dev -b /proc -w /root \
-            /usr/bin/env -i HOME=/root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-            /bin/sh -c "apk add --no-cache bash" 2>/dev/null || warn "bash 安装失败，将使用 sh"
-    fi
+    # 确保 bash 存在（1.sh 需 bash 执行 .xrk，且支持上下键历史）
+    case "$DISTRO" in
+        alpine)
+            proot --link2symlink -0 -r "$INSTALL_DIR" -b /dev -b /proc -w /root \
+                /usr/bin/env -i HOME=/root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+                /bin/sh -c "apk add --no-cache bash" 2>/dev/null || warn "bash 安装失败"
+            ;;
+        ubuntu|debian)
+            _apt_sed=''
+            [ "$XRK_SOURCE" = "1" ] || [ "$XRK_SOURCE" = "3" ] && _apt_sed="sed -i 's/ports.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g; s/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g; s/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list 2>/dev/null; "
+            proot --link2symlink -0 -r "$INSTALL_DIR" -b /dev -b /proc -w /root \
+                /usr/bin/env -i HOME=/root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+                /bin/sh -c "${_apt_sed}apt-get update -qq && apt-get install -y bash" 2>/dev/null || warn "bash 安装失败"
+            ;;
+    esac
 }
 
 setup_locale() {
@@ -205,20 +202,16 @@ setup_locale() {
 create_start_script() {
     sep
     info "创建启动脚本 $START_SCRIPT"
-    # 通用 PATH，各发行版兼容
-    case "$DISTRO" in
-        ubuntu)  path_add="PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin" ;;
-        debian)  path_add="PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin:/usr/games:/usr/local/games" ;;
-        alpine)  path_add="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" ;;
-        *)       path_add="PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin" ;;
-    esac
+    path_add="PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin"
+    [ "$DISTRO" = "debian" ] && path_add="$path_add:/usr/games:/usr/local/games"
     cat > "$START_SCRIPT" <<- EOM
 #!/bin/bash
 echo "启动 $DISTRO ($RELEASE) ..."
 unset LD_PRELOAD
 cd \$(dirname \$0)
 command="proot --link2symlink -0 -r $INSTALL_DIR -b /dev -b /dev/null:/proc/sys/kernel/cap_last_cap -b /proc -b /data/data/com.termux/files/usr/tmp:/tmp -b $INSTALL_DIR/root:/dev/shm -w /root /usr/bin/env -i HOME=/root TERM=\$TERM LANG=zh_CN.UTF-8 $path_add"
-if [ -x "/bin/bash" ]; then
+# 在容器内检测 bash（支持上下键历史），否则回退 sh
+if proot --link2symlink -0 -r $INSTALL_DIR -b /dev -b /proc -w / /bin/sh -c '[ -x /bin/bash ]' 2>/dev/null; then
     command+=" /bin/bash --login"
 else
     command+=" /bin/sh -l"
@@ -236,22 +229,15 @@ EOM
     info "配置一次性启动脚本..."
     printf 'XRK_SOURCE="%s"\n' "$XRK_SOURCE" > "$INSTALL_DIR/root/.xrk_env"
     # 生成一次性 profile 脚本（使用 POSIX 兼容写法，避免 Alpine /bin/sh 报 bad substitution）
-    if [ "$DISTRO" = "alpine" ]; then
-        cat > "$INSTALL_DIR/etc/profile.d/1.sh" <<- 'EOM'
+    # 统一 1.sh（bash 已在 install_system 预装）
+    cat > "$INSTALL_DIR/etc/profile.d/1.sh" <<- 'EOM'
 rm -f /etc/profile.d/1.sh
 [ -f /root/.xrk_env ] && . /root/.xrk_env && rm -f /root/.xrk_env
 export LANG=zh_CN.UTF-8
-bash .xrk 2>/dev/null || sh .xrk
-EOM
-    else
-        cat > "$INSTALL_DIR/etc/profile.d/1.sh" <<- 'EOM'
-rm -f /etc/profile.d/1.sh
-[ -f /root/.xrk_env ] && . /root/.xrk_env && rm -f /root/.xrk_env
 locale-gen 2>/dev/null || true
 update-locale LANG=zh_CN.UTF-8 2>/dev/null || true
 bash .xrk
 EOM
-    fi
 
     cat > "$SHORTCUT_CMD" <<- EOM
 #!/bin/bash
@@ -275,7 +261,6 @@ main() {
     sep
     if [ -d "$INSTALL_DIR/root" ] && [ -f "$START_SCRIPT" ]; then
         info "检测到 $DISTRO 已安装，更新启动脚本并启动..."
-        # 确保使用最新的启动逻辑（例如 Alpine 无 bash 时自动回退到 sh）
         create_start_script
         bash "$START_SCRIPT"
         exit 0

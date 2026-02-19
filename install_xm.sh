@@ -33,7 +33,7 @@ if ! command -v curl &>/dev/null; then
     elif command -v yum &>/dev/null; then
         yum install -y curl
     elif command -v pacman &>/dev/null; then
-        pacman -Sy --noconfirm curl
+        pacman --disable-sandbox -Sy --noconfirm curl
     else
         echo "请先安装 curl"; exit 1
     fi
