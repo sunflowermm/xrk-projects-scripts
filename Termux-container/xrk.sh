@@ -210,11 +210,11 @@ echo "启动 $DISTRO ($RELEASE) ..."
 unset LD_PRELOAD
 cd \$(dirname \$0)
 command="proot --link2symlink -0 -r $INSTALL_DIR -b /dev -b /dev/null:/proc/sys/kernel/cap_last_cap -b /proc -b /data/data/com.termux/files/usr/tmp:/tmp -b $INSTALL_DIR/root:/dev/shm -w /root /usr/bin/env -i HOME=/root TERM=\$TERM LANG=zh_CN.UTF-8 $path_add"
-# 在容器内检测 bash（支持上下键历史），否则回退 sh
+# 在容器内检测 bash（启用交互模式，确保 readline/上下键历史生效），否则回退 sh
 if proot --link2symlink -0 -r $INSTALL_DIR -b /dev -b /proc -w / /bin/sh -c '[ -x /bin/bash ]' 2>/dev/null; then
-    command+=" /bin/bash --login"
+    command+=" /bin/bash --login -i"
 else
-    command+=" /bin/sh -l"
+    command+=" /bin/sh -l -i"
 fi
 if [ -z "\$1" ];then
     exec \$command
