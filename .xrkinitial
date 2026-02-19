@@ -67,9 +67,15 @@ if [ -d /etc/profile.d ]; then
 # XRK unified PS1
 if [ -n "$PS1" ]; then
   if [ -n "$BASH_VERSION" ]; then
+    # bash：使用标准转义序列，带颜色和当前路径
     PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
   else
-    PS1='\u@\h:\w\$ '
+    # 非 bash（dash、busybox sh 等）：不用 \u/\h/\w，避免显示乱码
+    _XRK_USER="$(id -un 2>/dev/null || printf 'root')"
+    _XRK_HOST="$(hostname 2>/dev/null || printf 'localhost')"
+    # 为了兼容性，这里用固定 ~，不依赖各 shell 的转义规则
+    PS1="${_XRK_USER}@${_XRK_HOST}:~\$ "
+    unset _XRK_USER _XRK_HOST
   fi
   export PS1
 fi
