@@ -61,21 +61,10 @@ change_source_linux_auto
 ensure_cmd git git
 
 # 2. 统一美化交互式 Shell 提示符（解决只显示一个 # 的问题）
-# 当前会话：如果是交互式终端，则直接设置一个带用户名/主机名/路径的彩色 PS1
-if [ -t 0 ] && [ -t 1 ]; then
-    if [ -n "$BASH_VERSION" ]; then
-        PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
-    else
-        PS1='\u@\h:\w\$ '
-    fi
-    export PS1
-fi
-
-# 后续新开的 bash 交互 Shell：向 root 的 bashrc 追加一次性 PS1 配置
-if [ -d /root ]; then
-    if ! grep -q "XRK custom PS1" /root/.bashrc 2>/dev/null; then
-        cat <<'EOF' >> /root/.bashrc
-# XRK custom PS1
+# 为所有发行版创建一个 profile.d 脚本，登录 Shell 自动生效
+if [ -d /etc/profile.d ]; then
+    cat <<'EOF' > /etc/profile.d/xrk-ps1.sh
+# XRK unified PS1
 if [ -n "$PS1" ]; then
   if [ -n "$BASH_VERSION" ]; then
     PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
@@ -85,7 +74,6 @@ if [ -n "$PS1" ]; then
   export PS1
 fi
 EOF
-    fi
 fi
 
 # 下载并运行 install_xm，然后启动 xm
