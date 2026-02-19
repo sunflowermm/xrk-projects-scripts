@@ -1,0 +1,145 @@
+#!/bin/bash
+# xm：脚本仓库统一入口（换源 / 安装仓库 / 主流程 / 主菜单 / 环境安装）
+
+cd "$HOME" || exit
+
+# 加载源配置与公共模块（bootstrap 提供 init_repo_source、load_module）
+if [ -f /xrk/shell_modules/bootstrap.sh ]; then
+    source /xrk/shell_modules/bootstrap.sh
+else
+    source <(curl -sL "https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh")
+fi
+init_repo_source
+load_module "shell_modules/common.sh"
+# 有 /xrk 时加载菜单公共（终端列宽、居中），保证中文与框线对齐
+if [ -d /xrk ] && [ -f /xrk/shell_modules/menu_common.sh ]; then
+    [ -f /xrk/.init ] && source /xrk/.init
+    source /xrk/shell_modules/menu_common.sh
+fi
+
+require_xrk() {
+    [ -d /xrk ] || { echo "请先执行 3 安装脚本仓库"; return 1; }
+}
+
+# 优先本地，否则远程拉取（不依赖 /xrk）
+run_software() {
+    local path="$1"
+    if [ -d /xrk ] && [ -f "/xrk/$path" ]; then
+        bash "/xrk/$path"
+    else
+        ensure_cmd curl curl
+        bash <(curl -sL "$SCRIPT_RAW_BASE/$path")
+    fi
+}
+
+env_install_menu() {
+    local c
+    while true; do
+        if type menu_show &>/dev/null; then
+            # 使用统一菜单显示函数（带前缀"  "）
+            echo ""
+            menu_show "环境安装(yq/chromium等)" "  " "yq" "Chromium" "Node.js" "pnpm" "ffmpeg" "Python + uv" "返回"
+        else
+            echo ""
+            echo "  ╭────────────────────────────╮"
+            echo "  │   环境安装(yq/chromium等)  │"
+            echo "  ├────────────────────────────┤"
+            echo "  │  1  yq                     │"
+            echo "  │  2  Chromium              │"
+            echo "  │  3  Node.js               │"
+            echo "  │  4  pnpm                  │"
+            echo "  │  5  ffmpeg                │"
+            echo "  │  6  Python + uv           │"
+            echo "  │  0  返回                  │"
+            echo "  ╰────────────────────────────╯"
+        fi
+        echo ""
+        read -rp "请选择 [0-6]: " c
+        c=$(echo "$c" | tr -d '[:space:]')
+        case "$c" in
+            1) run_software "Yunzai-install/software/yq" ;;
+            2) run_software "Yunzai-install/software/chromium" ;;
+            3) run_software "Yunzai-install/software/node" ;;
+            4) run_software "Yunzai-install/software/pnpm" ;;
+            5) run_software "Yunzai-install/software/ffmpeg" ;;
+            6) run_software "body/modules/python_uv" ;;
+            0) return 0 ;;
+            *) echo "无效选择" ;;
+        esac
+    done
+}
+
+show_menu() {
+    if type menu_show &>/dev/null; then
+        # 使用统一菜单显示函数（带前缀"  "）
+        local opts=("换源(apt 镜像)" "安装 Git" "安装脚本仓库" "安装主流程(机器人等)" "环境安装(yq/chromium)")
+        [ -d /xrk ] && opts+=("进入主菜单(xrk)" "环境与模块(tmux等)")
+        opts+=("退出")
+        echo ""
+        menu_show "xm 主菜单" "  " "${opts[@]}"
+    else
+        echo ""
+        echo "  ╭────────────────────────────╮"
+        echo "  │          xm 主菜单          │"
+        echo "  ├────────────────────────────┤"
+        echo "  │  1  换源（apt 镜像）       │"
+        echo "  │  2  安装 Git               │"
+        echo "  │  3  安装脚本仓库           │"
+        echo "  │  4  安装主流程(机器人等)   │"
+        echo "  │  5  环境安装(yq/chromium)  │"
+        [ -d /xrk ] && echo "  │  6  进入主菜单(xrk)       │"
+        [ -d /xrk ] && echo "  │  7  环境与模块(tmux等)   │"
+        echo "  │  0  退出                   │"
+        echo "  ╰────────────────────────────╯"
+    fi
+    echo ""
+}
+
+while true; do
+    show_menu
+    read -rp "请选择: " raw_choice
+    choice=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    case "$choice" in
+        1)
+            change_source_linux
+            ;;
+        2)
+            install_pkg git && echo "Git 安装完成"
+            ;;
+        3)
+            if [ -d /xrk ]; then
+                read -rp "/xrk 已存在，是否删除并重新克隆? (y/N): " confirm
+                [[ "$confirm" =~ ^[yY]$ ]] || { echo "已取消"; continue; }
+                rm -rf /xrk
+            fi
+            if git clone --depth=1 "$SCRIPT_CLONE_URL" /xrk; then
+                printf 'SCRIPT_RAW_BASE="%s"\nSCRIPT_CLONE_URL="%s"\n' "$SCRIPT_RAW_BASE" "$SCRIPT_CLONE_URL" > /xrk/.repo_source
+                echo "脚本仓库已安装到 /xrk"
+            else
+                echo "克隆失败，请检查网络或 Git"
+            fi
+            ;;
+        4)
+            require_xrk || continue
+            echo "[xm] 开始安装主流程（脚本与机器人）..."
+            exec bash /xrk/body/xrkwrite.sh
+            ;;
+        5)
+            env_install_menu
+            ;;
+        6)
+            require_xrk || continue
+            exec bash /xrk/body/xrk
+            ;;
+        7)
+            require_xrk || continue
+            bash /xrk/body/modules/env
+            ;;
+        0|q)
+            echo "再见"; exit 0
+            ;;
+        *)
+            echo "无效选择"
+            ;;
+    esac
+done

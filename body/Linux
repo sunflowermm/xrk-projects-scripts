@@ -1,44 +1,40 @@
 #!/bin/bash
-
+# xrkk：软件包安装/删除、云崽路径与 sign、菜单入口（统一走 common + install）
 source /xrk/shell_modules/update.sh
 source /xrk/shell_modules/init.sh
+[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh
+[ -f /xrk/shell_modules/install.sh ] && source /xrk/shell_modules/install.sh
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 1 1  # 初始化：需要common（detect_os），需要check_changes（检测路径）
 
 SCRIPT_NAME="xrkk"
 SCRIPT_VERSION="2.1-universal"
 
-# 检测系统类型
-detect_system() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        OS=$ID
-    else
-        echo "无法检测系统类型"
-        exit 1
+# 包管理：有 install.sh 时用 install_package，否则用 common 的 detect_os 按系统执行
+_do_install() {
+    if type install_package &>/dev/null; then
+        确定系统安装器魔法 2>/dev/null || true
+        install_package "$@"
+        return
     fi
+    type detect_os &>/dev/null || { echo "请先安装脚本仓库到 /xrk 或手动安装: $*"; return 1; }
+    local os; os=$(detect_os)
+    case "$os" in
+        debian|ubuntu) apt update -qq; apt install -y "$@" ;;
+        arch) pacman -Sy --noconfirm "$@" ;;
+        centos) command -v dnf &>/dev/null && dnf install -y "$@" || yum install -y "$@" ;;
+        *) echo "请手动安装: $*"; return 1 ;;
+    esac
 }
 
-# 根据系统类型设置包管理器命令
-set_package_manager() {
-    case $OS in
-        "ubuntu"|"debian")
-            PKG_INSTALL="apt install -y"
-            PKG_REMOVE="apt remove -y"
-            PKG_UPDATE="apt update"
-            ;;
-        "arch")
-            PKG_INSTALL="pacman -S --noconfirm"
-            PKG_REMOVE="pacman -R --noconfirm"
-            PKG_UPDATE="pacman -Sy"
-            ;;
-        "centos")
-            PKG_INSTALL="yum install -y"
-            PKG_REMOVE="yum remove -y"
-            PKG_UPDATE="yum check-update"
-            ;;
-        *)
-            echo "不支持的系统类型: $OS"
-            exit 1
-            ;;
+_do_remove() {
+    type detect_os &>/dev/null || { echo "请先安装脚本仓库到 /xrk 或手动卸载: $*"; return 1; }
+    local os; os=$(detect_os)
+    case "$os" in
+        debian|ubuntu) apt remove -y "$@" ;;
+        arch) pacman -R --noconfirm "$@" ;;
+        centos) command -v dnf &>/dev/null && dnf remove -y "$@" || yum remove -y "$@" ;;
+        *) echo "请手动卸载: $*"; return 1 ;;
     esac
 }
 
@@ -58,17 +54,8 @@ function show_help() {
     echo "  $SCRIPT_NAME diadele        触屏版文件管理相关操作"
     echo "  $SCRIPT_NAME up             更新云崽路径与变量"
     echo "  $SCRIPT_NAME error          报错修复与处理"
-    echo "当前系统类型: $OS"
+    echo "当前系统: $(detect_os 2>/dev/null || echo '未知')"
 }
-
-# 更新软件包索引
-function update_package_index() {
-    echo "正在更新软件包索引..."
-    $PKG_UPDATE
-}
-
-detect_system
-set_package_manager
 
 if [ $# -lt 1 ]; then
     show_help
@@ -82,9 +69,8 @@ case "$1" in
             echo "错误：请指定要安装的软件包名称"
             exit 1
         fi
-        update_package_index
-        echo "开始尝试下载并安装 $@"
-        $PKG_INSTALL "$@"
+        echo "开始尝试下载并安装 $*"
+        _do_install "$@"
         ;;
     f)
         shift
@@ -92,8 +78,8 @@ case "$1" in
             echo "错误：请指定要删除的软件包名称"
             exit 1
         fi
-        echo "正在尝试删除 $@"
-        $PKG_REMOVE "$@"
+        echo "正在尝试删除 $*"
+        _do_remove "$@"
         ;;
     mk)
         shift
@@ -137,7 +123,7 @@ case "$1" in
         ;;
     other)
         shift
-        bash /xrk/advanced
+        bash /xrk/body/menu/advanced
         ;;
     js)
         shift
@@ -169,7 +155,7 @@ case "$1" in
         ;;
     ncqq | nc)
         shift
-        bash /xrk/Yunzai-install/NapCat.sh
+        run_software "Yunzai-install/NapCat.sh"
         ;;
     *)
         show_help

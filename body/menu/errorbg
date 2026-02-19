@@ -1,214 +1,83 @@
 #!/bin/bash
+# 报错修复：浏览器/Node/pnpm/yq/ffmpeg 重装
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 1 0  # 初始化：需要common（install_pkg），不需要check_changes
 
-function clear_menu {
-    for ((i=0; i<forin; i++)); do
-        printf "\e[1A\e[K"
-    done
-}
-
-# 检测系统类型
-get_os_type() {
-    if [ -f /etc/debian_version ]; then
-        if grep -qi "ubuntu" /etc/os-release; then
-            echo "ubuntu"
-        else
-            echo "debian"
-        fi
-    elif [ -f /etc/redhat-release ]; then
-        echo "centos"
-    elif [ -f /etc/arch-release ]; then
-        echo "arch"
-    else
-        echo "unknown"
-    fi
-}
-
-function check_dependencies() {
-    local deps=("curl" "wget" "git")
-    local os_type=$(get_os_type)
-    
-    for dep in "${deps[@]}"; do
-        if ! command -v "$dep" &>/dev/null; then
-            echo "正在安装必要依赖: $dep"
-            case $os_type in
-                ubuntu|debian)
-                    apt-get update && apt-get install -y "$dep"
-                    ;;
-                centos)
-                    yum -y install "$dep"
-                    ;;
-                arch)
-                    pacman -Sy --noconfirm "$dep"
-                    ;;
-            esac
-        fi
-    done
-}
-
-# 清理现有安装
-function clean_existing() {
+# 清理现有安装（按系统）
+clean_existing() {
     local package=$1
-    local os_type=$(get_os_type)
-    
+    local os
+    os=$(detect_os)
     echo "清理现有 $package 安装..."
-    case $os_type in
-        ubuntu|debian)
-            apt-get remove --purge -y "$package"* 2>/dev/null
-            apt-get autoremove -y 2>/dev/null
-            ;;
-        centos)
-            yum remove -y "$package"* 2>/dev/null
-            ;;
-        arch)
-            pacman -Rns --noconfirm "$package" 2>/dev/null
-            ;;
+    case "$os" in
+        debian|ubuntu) apt-get remove --purge -y "${package}"* 2>/dev/null; apt-get autoremove -y 2>/dev/null ;;
+        centos)        command -v dnf &>/dev/null && dnf remove -y "${package}"* 2>/dev/null || yum remove -y "${package}"* 2>/dev/null ;;
+        arch)          pacman -Rns --noconfirm "$package" 2>/dev/null ;;
+        *)             ;;
     esac
 }
 
-function install_chromium() {
-    local os_type=$(get_os_type)
-    
-    # 清理现有安装
+install_chromium() {
     clean_existing "chromium"
-    
-    if [ "$os_type" = "ubuntu" ]; then
-        bash <(curl -sL https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Yunzai-install/software/chromium)
+    os=$(detect_os)
+    if [ "$os" = "ubuntu" ]; then
+        run_software "Yunzai-install/software/chromium"
     else
-        # 其他系统使用包管理器安装
-        case $os_type in
-            debian)
-                apt-get update && apt-get install -y chromium
-                ;;
-            centos)
-                yum install -y chromium
-                ;;
-            arch)
-                pacman -Sy --noconfirm chromium
-                ;;
-        esac
+        install_pkg chromium 2>/dev/null || run_software "Yunzai-install/software/chromium"
     fi
 }
 
-function clean_and_install_node() {
+clean_and_install_node() {
     clean_existing "nodejs"
     clean_existing "npm"
-    rm -rf /usr/local/bin/npm /usr/local/lib/node_modules
-    rm -rf /opt/node
-    find / -name npm -exec rm -r {} + 2>/dev/null
-    bash <(curl -sL https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Yunzai-install/software/node)
+    rm -rf /usr/local/bin/npm /usr/local/lib/node_modules /opt/node 2>/dev/null
+    find / -name npm -type f 2>/dev/null | head -5 | xargs -r rm -f 2>/dev/null
+    run_software "Yunzai-install/software/node"
 }
 
-function clean_and_install_pnpm() {
+clean_and_install_pnpm() {
     npm uninstall -g pnpm 2>/dev/null
     rm -rf ~/.pnpm-store 2>/dev/null
-    bash <(curl -sL https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Yunzai-install/software/pnpm)
+    run_software "Yunzai-install/software/pnpm"
 }
 
-function clean_and_install_yq() {
-    # 清理现有yq
-    local os_type=$(get_os_type)
-    case $os_type in
-        ubuntu|debian)
-            apt-get remove --purge -y yq
-            ;;
-        centos)
-            yum remove -y yq
-            ;;
-        arch)
-            pacman -Rns --noconfirm yq
-            ;;
-    esac
-    bash <(curl -sL https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Yunzai-install/software/yq)
+clean_and_install_yq() {
+    clean_existing "yq"
+    run_software "Yunzai-install/software/yq"
 }
 
-function fix_puppeteer() {
+fix_puppeteer() {
     export PUPPETEER_SKIP_DOWNLOAD='true'
-    pnpm config set node_sqlite3_binary_host_mirror https://npmmirror.com/mirrors/sqlite3
+    pnpm config set node_sqlite3_binary_host_mirror https://npmmirror.com/mirrors/sqlite3 2>/dev/null
     if [ -d "$yz" ]; then
-        cd "$yz" || exit
-        pnpm update puppeteer@19.8.3 -w
-        pnpm i
+        (cd "$yz" && pnpm update puppeteer@19.8.3 -w && pnpm i)
     else
-        echo "未找到云崽目录"
-        return 1
+        echo "未找到云崽目录"; return 1
     fi
 }
 
 show_menu() {
-    echo -e "${caidan3}╭───────────────────────────╮${bg}"
-    echo -e "${caidan1}╭───────────────────────────╮${bg}"
-    echo -e "${caidan2} 1 浏览器修复[多系统支持]      ${bg}"
-    echo -e "${caidan2} 2 修复依赖项1[智能诊断修复]   ${bg}"
-    echo -e "${caidan2} 3 修复依赖项2[深度清理重装]   ${bg}"
-    echo -e "${caidan2} 4 Node.js 完整重装(含环境清理)${bg}"
-    echo -e "${caidan2} 5 PNPM    完整重装           ${bg}"
-    echo -e "${caidan2} 6 YQ      完整重装           ${bg}"
-    echo -e "${caidan2} 7 FFMPEG                   ${bg}"
-    echo -e "${caidan1}╰───────────────────────────╯${bg}"
-    echo -e "${caidan3}╰───────────────────────────╯${bg}"
-    echo -e "${caidan1}输入q退出脚本${bg}"
-    echo
+    # 使用双色边框菜单显示函数（自动宽度、自动对齐）
+    menu_show_double "报错修复菜单" "浏览器修复 [多系统支持]" "修复依赖项1 [智能诊断]" "修复依赖项2 [深度重装]" "Node.js 完整重装" "PNPM 完整重装" "YQ 完整重装" "FFMPEG"
 }
 
-# 主程序
-check_dependencies
+# 确保基础依赖（使用统一函数）
+menu_check_deps curl wget git
 
 while true; do
     show_menu
-    read -p "请选择要执行的操作 [1-6/q]: " CHOICE
+    read -p "请选择要执行的操作 [1-7/q]: " CHOICE
     forin=13 clear_menu
-    
     case "$CHOICE" in
-        1)
-            echo "智能浏览器修复开始，5秒后执行..."
-            sleep 5
-            read -p "确认删除并重装浏览器？[y/N]: " confirm
-            if [[ $confirm =~ ^[Yy]$ ]]; then
-                install_chromium
-                fix_puppeteer
-                echo "浏览器修复完成"
-            fi
-            ;;
-        2)
-            echo "开始智能诊断修复..."
-            fix_puppeteer
-            echo "基础依赖修复完成"
-            ;;
-        3)
-            echo "开始深度清理并重装..."
-            if [ -d "$yz" ]; then
-                echo "正在进行深度依赖修复..."
-                rm -rf "$HOME/.pm2" "$yz/node_modules"
-                clean_and_install_node
-                clean_and_install_pnpm
-                fix_puppeteer
-                echo "修复完成，请使用 yz 命令启动云崽"
-            else
-                echo "未检测到云崽安装"
-            fi
-            ;;
-        4)
-            echo "开始Node.js完整重装..."
-            clean_and_install_node
-            ;;
-        5)
-            echo "开始PNPM完整重装..."
-            clean_and_install_pnpm
-            ;;
-        6)
-            echo "开始YQ完整重装..."
-            clean_and_install_yq
-            ;;
-        7)
-            echo "开始安装FFMPEG..."
-            bash <(curl -sL https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Yunzai-install/software/ffmpeg)
-            ;;
-        q|Q)
-            echo "退出脚本"
-            exit 0
-            ;;
-        *)
-            echo "无效选择，请重新输入"
-            ;;
+        1) read -p "确认删除并重装浏览器？[y/N]: " confirm
+           [[ "$confirm" =~ ^[Yy]$ ]] && install_chromium && fix_puppeteer && echo "浏览器修复完成" ;;
+        2) fix_puppeteer; echo "基础依赖修复完成" ;;
+        3) [ -d "$yz" ] && { rm -rf "$HOME/.pm2" "$yz/node_modules"; clean_and_install_node; clean_and_install_pnpm; fix_puppeteer; echo "修复完成，请使用 yz 启动云崽"; } || echo "未检测到云崽安装" ;;
+        4) clean_and_install_node ;;
+        5) clean_and_install_pnpm ;;
+        6) clean_and_install_yq ;;
+        7) run_software "Yunzai-install/software/ffmpeg" ;;
+        q|Q) echo "退出脚本"; exit 0 ;;
+        *) echo "无效选择，请重新输入" ;;
     esac
 done

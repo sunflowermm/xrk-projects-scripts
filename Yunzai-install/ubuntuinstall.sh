@@ -1,20 +1,19 @@
 #!/bin/bash
-# 导入函数与变量
-source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/color.sh")
-source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/Yunzai_pieces.sh")
-source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/install.sh")
-确定系统安装器魔法
+# Ubuntu 主流程安装
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+[ -f /xrk/shell_modules/distro_install_head.sh ] && source /xrk/shell_modules/distro_install_head.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/distro_install_head.sh")
 
+log_success "Ubuntu 主流程"
 # 更新系统
-echo -e "${color_light_blue}正在更新系统软件包...${reset_color}"
+log_info "正在更新系统软件包..."
 if apt update && apt upgrade -y; then
-    echo -e "${color_light_green}系统更新完成${reset_color}"
+    log_success "系统更新完成"
 else
-    echo -e "${color_red}系统更新失败，请重新运行脚本${reset_color}"
+    log_error "系统更新失败，请重新运行脚本"
     exit 1
 fi
 
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Yunzai-install/software/yq)
+[ -f /xrk/Yunzai-install/software/yq ] && bash /xrk/Yunzai-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/yq")
 # 安装基本工具
 for package in git wget tar dialog xz-utils jq redis sudo tmux fonts-wqy*; do
     install_package "$package"
@@ -30,8 +29,8 @@ done
 检测npm-node-pnpm安装
 
 # 检查浏览器
-echo -e "${color_light_blue}开始检查 Chromium ${reset_color}"
-bash <(curl https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Yunzai-install/software/chromium)
+log_info "开始检查 Chromium ..."
+[ -f /xrk/Yunzai-install/software/chromium ] && bash /xrk/Yunzai-install/software/chromium || bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/chromium")
 
 # 启动 Redis
 检测redis安装

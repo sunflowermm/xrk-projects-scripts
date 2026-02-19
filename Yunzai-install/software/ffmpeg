@@ -1,8 +1,12 @@
 #!/bin/bash
+# FFmpeg 完整版安装：BtbN 构建，支持 Linux(x64/arm64) / macOS(x64/arm64)
 
 set -e
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
+[ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh")
+[ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/github.sh")
 
-# 颜色定义
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[0;33m'
@@ -10,254 +14,97 @@ RED='\033[0;31m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-LATEST_VERSION="latest"
 BUILD_TYPE="gpl"
-source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/github.sh")
+# BtbN 架构：64(x86_64) | arm64
+arch=$(detect_arch)
+case "$arch" in
+    x64) ffmpeg_arch="64" ;;
+    arm64) ffmpeg_arch="arm64" ;;
+    *) echo -e "${RED}不支持的架构: $(uname -m)（BtbN 仅支持 x64/arm64）${NC}"; exit 1 ;;
+esac
+os=$(detect_platform)
+case "$os" in
+    linux|macos) ;;
+    *) echo -e "${RED}不支持的系统: $(uname -s)${NC}"; exit 1 ;;
+esac
+
 show_progress() {
     local text="$1"
     echo -ne "${BLUE}$text...${NC}"
-    while kill -0 $! 2>/dev/null; do
-        echo -ne "."
-        sleep 0.5
-    done
+    while kill -0 $! 2>/dev/null; do echo -n "."; sleep 0.5; done
     echo -e " ${GREEN}✓${NC}"
-}
-
-detect_arch() {
-    case "$(uname -m)" in
-        x86_64) echo "64" ;;
-        aarch64|arm64) echo "arm64" ;;
-        *) echo -e "${RED}错误: 不支持的架构 $(uname -m)${NC}"; exit 1 ;;
-    esac
-}
-
-detect_os() {
-    case "$(uname -s)" in
-        Linux) echo "linux" ;;
-        Darwin) echo "macos" ;;
-        *) echo -e "${RED}错误: 不支持的操作系统 $(uname -s)${NC}"; exit 1 ;;
-    esac
 }
 
 check_permission() {
     if [ ! -w "/usr/local/bin" ] && [ "$EUID" -ne 0 ]; then
-        echo -e "${YELLOW}当前用户无权限写入 /usr/local/bin，自动安装到用户目录${NC}"
+        echo -e "${YELLOW}无权限写 /usr/local/bin，安装到 ~/.local/bin${NC}"
         INSTALL_DIR="$HOME/.local/bin"
         mkdir -p "$INSTALL_DIR"
-        
-        # 检查 PATH 中是否已包含用户目录
-        if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
-            echo -e "${YELLOW}配置环境变量到 ~/.bashrc${NC}"
-            
-            # 检查 .bashrc 是否存在该配置
-            local bashrc="$HOME/.bashrc"
-            local path_export="export PATH=\"\$HOME/.local/bin:\$PATH\""
-            
-            if [ ! -f "$bashrc" ] || ! grep -q "HOME/.local/bin" "$bashrc"; then
-                echo "$path_export" >> "$bashrc"
-                echo -e "${GREEN}已添加 PATH 配置到 ~/.bashrc${NC}"
-                echo -e "${CYAN}注意: 请重新登录或执行 'source ~/.bashrc' 使环境变量生效${NC}"
-            else
-                echo -e "${BLUE}PATH 配置已存在于 ~/.bashrc 中${NC}"
-            fi
-        fi
+        echo "$PATH" | grep -q "$INSTALL_DIR" || { echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$HOME/.bashrc"; }
     else
         INSTALL_DIR="/usr/local/bin"
     fi
-    echo -e "${BLUE}安装目录: $INSTALL_DIR${NC}"
 }
 
 check_ffmpeg_version() {
-    if command -v ffmpeg >/dev/null 2>&1; then
-        local current_version=$(ffmpeg -version 2>/dev/null | head -n1)
-        echo -e "${BLUE}检测到已安装FFmpeg:${NC}"
-        echo -e "${YELLOW}$current_version${NC}"
-        read -p "是否重新安装? [y/N]: " -r
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo -e "${GREEN}安装已取消${NC}"
-            return 1
-        fi
+    if command -v ffmpeg &>/dev/null; then
+        echo -e "${BLUE}已安装: $(ffmpeg -version 2>/dev/null | head -1)${NC}"
+        read -rp "是否重新安装? [y/N]: " -r
+        [[ "$REPLY" =~ ^[yY]$ ]] || return 1
     fi
     return 0
 }
 
 get_download_url() {
-    local os="$1"
-    local arch="$2"
-    local version="$3"
-    local build_type="$4"
-    
-    local base_url="https://github.com/BtbN/FFmpeg-Builds/releases/download"
-    
-    case "$os" in
-        linux)
-            if [ "$arch" = "64" ]; then
-                echo "${base_url}/${version}/ffmpeg-master-${version}-linux64-${build_type}.tar.xz"
-            else
-                echo "${base_url}/${version}/ffmpeg-master-${version}-linuxarm64-${build_type}.tar.xz"
-            fi
-            ;;
-        macos)
-            if [ "$arch" = "64" ]; then
-                echo "${base_url}/${version}/ffmpeg-master-${version}-macos64-${build_type}.tar.xz"
-            else
-                echo "${base_url}/${version}/ffmpeg-master-${version}-macosarm64-${build_type}.tar.xz"
-            fi
-            ;;
-    esac
+    local base="https://github.com/BtbN/FFmpeg-Builds/releases/download"
+    if [ "$os" = "linux" ]; then
+        [ "$ffmpeg_arch" = "64" ] && echo "$base/$FFMPEG_VERSION/ffmpeg-master-$FFMPEG_VERSION-linux64-$BUILD_TYPE.tar.xz" || echo "$base/$FFMPEG_VERSION/ffmpeg-master-$FFMPEG_VERSION-linuxarm64-$BUILD_TYPE.tar.xz"
+    else
+        [ "$ffmpeg_arch" = "64" ] && echo "$base/$FFMPEG_VERSION/ffmpeg-master-$FFMPEG_VERSION-macos64-$BUILD_TYPE.tar.xz" || echo "$base/$FFMPEG_VERSION/ffmpeg-master-$FFMPEG_VERSION-macosarm64-$BUILD_TYPE.tar.xz"
+    fi
 }
 
 install_ffmpeg() {
-    local arch=$(detect_arch)
-    local os=$(detect_os)
-    local url=$(get_download_url "$os" "$arch" "$LATEST_VERSION" "$BUILD_TYPE")
-    local temp_dir=$(mktemp -d)
-    local archive_name="ffmpeg.tar.xz"
-    
-    echo -e "${BLUE}开始安装FFmpeg完整版 ($os-$arch)${NC}"
-    echo -e "${CYAN}下载地址: $url${NC}"
-    
-    (
-        cd "$temp_dir"
-        getgh url || url="https://github.moeyy.xyz/$url"
-        
-        wget --tries=3 --timeout=60 -O "$archive_name" "$url" || {
-            echo "代理下载失败，尝试直连..."
-            url=$(get_download_url "$os" "$arch" "$LATEST_VERSION" "$BUILD_TYPE")
-            wget --tries=3 --timeout=60 -O "$archive_name" "$url"
-        }
-    ) &
-    show_progress "下载FFmpeg"
-    
-    if [ ! -s "$temp_dir/$archive_name" ]; then
-        echo -e "${RED}下载失败或文件为空${NC}"
-        rm -rf "$temp_dir"
-        exit 1
-    fi
-    
-    (
-        cd "$temp_dir"
-        tar -Jxf "$archive_name"
-        
-        local ffmpeg_dir=$(find . -maxdepth 1 -type d -name "ffmpeg-*" | head -n1)
-        if [ -z "$ffmpeg_dir" ] || [ ! -d "$ffmpeg_dir/bin" ]; then
-            echo -e "${RED}解压失败或找不到FFmpeg目录${NC}"
-            exit 1
-        fi
-        
-        # 备份现有文件
-        for tool in ffmpeg ffprobe ffplay; do
-            if [ -f "$INSTALL_DIR/$tool" ]; then
-                if [ "$INSTALL_DIR" = "/usr/local/bin" ] && [ "$EUID" -ne 0 ]; then
-                    sudo mv "$INSTALL_DIR/$tool" "$INSTALL_DIR/$tool.bak" 2>/dev/null
-                else
-                    mv "$INSTALL_DIR/$tool" "$INSTALL_DIR/$tool.bak" 2>/dev/null
-                fi
-            fi
-        done
-        
-        # 安装文件
-        chmod +x "$ffmpeg_dir"/bin/*
-        for tool in ffmpeg ffprobe ffplay; do
-            if [ -f "$ffmpeg_dir/bin/$tool" ]; then
-                if [ "$INSTALL_DIR" = "/usr/local/bin" ] && [ "$EUID" -ne 0 ]; then
-                    sudo cp "$ffmpeg_dir/bin/$tool" "$INSTALL_DIR/"
-                else
-                    cp "$ffmpeg_dir/bin/$tool" "$INSTALL_DIR/"
-                fi
-            fi
-        done
-        
-        # 清理备份文件
-        rm -f "$INSTALL_DIR"/*.bak 2>/dev/null || true
-    ) &
-    show_progress "安装FFmpeg"
-    
+    local url
+    url=$(get_download_url)
+    getgh "url" 2>/dev/null || true
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    echo -e "${BLUE}安装 FFmpeg ($os-$ffmpeg_arch)${NC}"
+    (cd "$temp_dir" && wget --tries=3 --timeout=60 -O ffmpeg.tar.xz "$url" || wget --tries=3 --timeout=60 -O ffmpeg.tar.xz "$(get_download_url)") &
+    show_progress "下载 FFmpeg"
+    [ ! -s "$temp_dir/ffmpeg.tar.xz" ] && { echo -e "${RED}下载失败${NC}"; rm -rf "$temp_dir"; exit 1; }
+    (cd "$temp_dir" && tar -Jxf ffmpeg.tar.xz && \
+        ffmpeg_dir=$(find . -maxdepth 1 -type d -name "ffmpeg-*" | head -1) && \
+        [ -n "$ffmpeg_dir" ] && [ -d "$ffmpeg_dir/bin" ] && \
+        chmod +x "$ffmpeg_dir"/bin/* && \
+        for t in ffmpeg ffprobe ffplay; do
+            [ -f "$ffmpeg_dir/bin/$t" ] && { [ "$INSTALL_DIR" = "/usr/local/bin" ] && [ "$EUID" -ne 0 ] && sudo cp "$ffmpeg_dir/bin/$t" "$INSTALL_DIR/" || cp "$ffmpeg_dir/bin/$t" "$INSTALL_DIR/"; }
+        done) &
+    show_progress "安装 FFmpeg"
     rm -rf "$temp_dir"
 }
 
-setup_and_verify() {
-    if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
-        export PATH="$INSTALL_DIR:$PATH"
-    fi
-    
-    if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
-        local ffmpeg_ver=$(ffmpeg -version 2>/dev/null | head -n1 | awk '{print $3}')
-        echo -e "${GREEN}✅ 安装成功!${NC}"
-        echo -e "${GREEN}   FFmpeg: $ffmpeg_ver${NC}"
-        echo -e "${GREEN}   安装路径: $INSTALL_DIR${NC}"
-        echo -e "${GREEN}   构建类型: $BUILD_TYPE (完整功能)${NC}"
-        
-        if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
-            echo -e "${CYAN}   注意: 如需在新终端中使用，请重新登录或执行 'source ~/.bashrc'${NC}"
-        fi
-    else
-        echo -e "${RED}❌ 安装失败${NC}"
-        exit 1
-    fi
-}
+case "${1:-}" in
+    -h|--help)
+        echo "用法: $0 [选项]"
+        echo "  -u  卸载"
+        echo "支持: Linux/macOS, x64/arm64"
+        exit 0
+        ;;
+    -u|--uninstall)
+        for d in /usr/local/bin "$HOME/.local/bin"; do
+            [ -f "$d/ffmpeg" ] && { [ "$d" = "/usr/local/bin" ] && [ "$EUID" -ne 0 ] && sudo rm -f "$d"/ffmpeg "$d"/ffprobe "$d"/ffplay || rm -f "$d"/ffmpeg "$d"/ffprobe "$d"/ffplay; echo "已卸载"; }
+        done
+        exit 0
+        ;;
+esac
 
-uninstall_ffmpeg() {
-    local dirs=("/usr/local/bin" "$HOME/.local/bin")
-    echo -e "${YELLOW}开始卸载FFmpeg...${NC}"
-    
-    for dir in "${dirs[@]}"; do
-        if [ -f "$dir/ffmpeg" ]; then
-            echo -e "${BLUE}从 $dir 卸载FFmpeg${NC}"
-            if [ "$dir" = "/usr/local/bin" ] && [ "$EUID" -ne 0 ]; then
-                sudo rm -f "$dir"/ffmpeg "$dir"/ffprobe "$dir"/ffplay
-            else
-                rm -f "$dir"/ffmpeg "$dir"/ffprobe "$dir"/ffplay
-            fi
-            echo -e "${GREEN}✅ 卸载完成${NC}"
-        fi
-    done
-}
-
-show_help() {
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}         FFmpeg 完整版安装脚本${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo "用法: $0 [选项]"
-    echo ""
-    echo "选项:"
-    echo "  -h, --help        显示帮助信息"
-    echo "  -u, --uninstall   卸载FFmpeg"
-    echo ""
-    echo "示例:"
-    echo "  $0                # 安装FFmpeg完整版"
-    echo "  $0 -u             # 卸载FFmpeg"
-    echo ""
-    echo "支持系统: Linux (x86_64, aarch64), macOS (x86_64, arm64)"
-    echo "默认安装GPL版本，提供完整的编解码功能"
-    echo "自动选择安装目录并配置环境变量"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-}
-
-main() {
-    case "${1:-}" in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -u|--uninstall)
-            uninstall_ffmpeg
-            exit 0
-            ;;
-        *)
-            check_permission
-            
-            if check_ffmpeg_version; then
-                install_ffmpeg
-                setup_and_verify
-                echo -e "${GREEN}🎉 FFmpeg完整版安装完成! 可以开始使用了${NC}"
-                echo -e "${BLUE}验证命令: ffmpeg -version${NC}"
-            else
-                echo -e "${GREEN}🎉 FFmpeg环境已就绪!${NC}"
-            fi
-            ;;
-    esac
-}
-
-main "$@"
+check_permission
+if check_ffmpeg_version; then
+    install_ffmpeg
+    [ "$INSTALL_DIR" = "$HOME/.local/bin" ] && export PATH="$INSTALL_DIR:$PATH"
+    command -v ffmpeg &>/dev/null && echo -e "${GREEN}✅ FFmpeg $(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}') 安装成功${NC}" || { echo -e "${RED}安装失败${NC}"; exit 1; }
+else
+    echo -e "${GREEN}FFmpeg 环境已就绪${NC}"
+fi

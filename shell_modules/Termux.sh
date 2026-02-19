@@ -1,91 +1,84 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-FONT_URL="https://gitcode.com/Xrkseek/sunflower-yunzai-scripts/releases/download/font"
-Termux_URL="https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Termux-container"
+# 脚本仓库源：由调用方 export SCRIPT_RAW_BASE，未设置则默认 GitCode
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+if [[ "$SCRIPT_RAW_BASE" == *"raw.gitcode.com"* ]]; then
+    FONT_URL="https://gitcode.com/Xrkseek/xrk-projects-scripts/releases/download/font"
+elif [[ "$SCRIPT_RAW_BASE" == *"raw.githubusercontent.com"* ]]; then
+    FONT_URL="https://github.com/sunflowermm/xrk-projects-scripts/releases/download/font"
+else
+    FONT_URL="https://gitee.com/xrkseek/xrk-projects-scripts/releases/download/font"
+fi
+Termux_URL="$SCRIPT_RAW_BASE/Termux-container"
 
-#修改键盘和字体布局
+# 修改键盘和字体布局
 function 字体键盘魔法() {
     local font_dir="$HOME/.termux"
     local font_file="$font_dir/font.ttf"
     local prop_file="$font_dir/termux.properties"
-    local font_url="${FONT_URL}/font.ttf"
-    local prop_url="${Termux_URL}/termux.properties"
+    # 使用 Termux 的临时目录而不是 /tmp
+    local temp_dir="$HOME/.cache"
+    local temp_font="$temp_dir/font.ttf.tmp"
+    local temp_prop="$temp_dir/termux.properties.tmp"
     local need_reload=false
 
+    # 创建必要的目录
     mkdir -p "$font_dir"
+    mkdir -p "$temp_dir"
 
-    # 获取远程文件大小
-    local remote_font_size=$(curl -sI "$font_url" | grep -i "content-length" | awk '{print $2}' | tr -d '\r')
-    local remote_prop_size=$(curl -sI "$prop_url" | grep -i "content-length" | awk '{print $2}' | tr -d '\r')
-    
-    # 获取本地文件大小
-    local local_font_size=0
-    local local_prop_size=0
-    if [ -f "$font_file" ]; then
-        local_font_size=$(stat -c%s "$font_file" 2>/dev/null || stat -f%z "$font_file" 2>/dev/null || echo "0")
-    fi
-    if [ -f "$prop_file" ]; then
-        local_prop_size=$(stat -c%s "$prop_file" 2>/dev/null || stat -f%z "$prop_file" 2>/dev/null || echo "0")
-    fi
-
-    # 检查字体文件
-    if [ ! -f "$font_file" ] || [ "$local_font_size" != "$remote_font_size" ]; then
-        echo "下载字体文件..."
-        curl -L -o "$font_file" "$font_url"
-        if [ $? -eq 0 ]; then
-            echo "字体文件下载成功"
-            need_reload=true
+    # 处理字体文件
+    echo "检查字体文件..."
+    if curl -L -o "$temp_font" "${FONT_URL}/font.ttf"; then
+        if [ -f "$font_file" ] && cmp -s "$temp_font" "$font_file"; then
+            echo "字体文件无需更新"
+            rm -f "$temp_font"
         else
-            echo "字体文件下载失败"
-            return 1
+            mv "$temp_font" "$font_file"
+            echo "字体文件已更新"
+            need_reload=true
         fi
     else
-        echo "字体文件已是最新版本"
+        echo "字体下载失败"
+        rm -f "$temp_font"
     fi
 
-    # 检查键盘布局文件
-    if [ ! -f "$prop_file" ] || [ "$local_prop_size" != "$remote_prop_size" ]; then
-        echo "下载键盘布局..."
-        curl -L -o "$prop_file" "$prop_url"
-        if [ $? -eq 0 ]; then
-            echo "键盘布局下载成功"
-            need_reload=true
+    # 处理键盘布局文件
+    echo "检查键盘布局..."
+    if curl -L -o "$temp_prop" "${Termux_URL}/termux.properties"; then
+        if [ -f "$prop_file" ] && cmp -s "$temp_prop" "$prop_file"; then
+            echo "键盘布局无需更新"
+            rm -f "$temp_prop"
         else
-            echo "键盘布局下载失败"
-            return 1
+            mv "$temp_prop" "$prop_file"
+            chmod 644 "$prop_file"
+            echo "键盘布局已更新"
+            need_reload=true
         fi
     else
-        echo "键盘布局已是最新版本"
+        echo "键盘布局下载失败"
+        rm -f "$temp_prop"
     fi
 
     # 只在有更新时才reload
     if [ "$need_reload" = true ]; then
         termux-reload-settings
-        echo "字体和键盘布局设置已更新并重载。"
+        echo "设置已更新并重载"
     else
-        echo "字体和键盘布局无需更新。"
+        echo "无需重载"
     fi
 }
 
-#换源与安装必备软件包
+# 换源与安装必备软件包
 function 换源魔法() {
-    bash <(curl -sL https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/Termux-container/repo.sh)
-    yes | apt update -y || { echo "更新失败，请检查网络连接"; exit 1; }
+    bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/repo.sh")
+    yes | apt update -y || { echo "更新失败"; return 1; }
     
-    # 检查并安装必备软件包
     local packages=("tar" "proot" "wget" "git")
     local need_install=()
     
     for pkg in "${packages[@]}"; do
-        if ! command -v "$pkg" &>/dev/null; then
-            need_install+=("$pkg")
-        fi
+        command -v "$pkg" &>/dev/null || need_install+=("$pkg")
     done
     
-    if [ ${#need_install[@]} -gt 0 ]; then
-        echo "需要安装的软件包: ${need_install[*]}"
-        pkg install -y "${need_install[@]}"
-    else
-        echo "所有必备软件包已安装"
-    fi
+    [ ${#need_install[@]} -gt 0 ] && pkg install -y "${need_install[@]}" || echo "必备软件包已安装"
 }

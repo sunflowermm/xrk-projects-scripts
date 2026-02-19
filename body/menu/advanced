@@ -1,102 +1,46 @@
 #!/bin/bash
+# 高级：切换主题、重装脚本
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 0 1  # 初始化：不需要common，需要check_changes（检测xyz/tyz/myz）
 
-function clear_menu
-{
-for ((i=0;i<forin;i++));do
-    printf "\e[1A\e[K"
-done
-}
+# 主题键与显示名一一对应
+THEMES=(".theme" ".theme2" ".theme3" ".theme4" ".theme5" ".theme6" ".theme7" ".theme8" ".theme9" ".theme10" ".theme11" ".theme12" ".theme13")
+THEME_NAMES=("向日葵原版主题" "暗夜锋芒" "甜心微爱" "极光幻境" "霓虹都市" "薄暮流云" "科技未来" "沙漠晨曦" "深海之谜" "森林密语" "莓果甜心" "星空梦境" "金属光泽")
 
 while true; do
-    echo -e "${caidan3}╭──────────────────╮${bg}"
-    echo -e "${caidan1}╭──────────────────╮${bg}"
-    echo -e "${caidan2} 1. 切换脚本主题 ${bg}"
-    echo -e "${caidan2} 2. 重装脚本 ${bg}"
-    echo -e "${caidan1}╰──────────────────╯${bg}"
-    echo -e "${caidan3}╰──────────────────╯${bg}"
+    # 使用统一菜单显示函数
+    menu_show "脚本高级菜单" "切换脚本主题" "重装脚本"
     echo
-    read -p "输入要管理的文件夹序号：" patch
+    read -p "输入要管理的序号 [1-2]，q 退出: " patch
     forin=8 clear_menu
     case $patch in
-        1 )
-        echo -e "${caidan3}╭──────────────────╮${bg}"
-        echo -e "${caidan1}╭──────────────────╮${bg}"
-        echo -e "${caidan2} 1. 向日葵原版主题 ${bg}"
-        echo -e "${caidan2} 2. 暗夜锋芒 ${bg}"
-        echo -e "${caidan2} 3. 甜心微爱 ${bg}"
-        echo -e "${caidan2} 4. 极光幻境 ${bg}"
-        echo -e "${caidan2} 5. 霓虹都市 ${bg}"
-        echo -e "${caidan2} 6. 薄暮流云 ${bg}"
-        echo -e "${caidan2} 7. 科技未来 ${bg}"
-        echo -e "${caidan2} 8. 沙漠晨曦 ${bg}"
-        echo -e "${caidan2} 9. 深海之谜 ${bg}"
-        echo -e "${caidan2} 10. 森林密语 ${bg}"
-        echo -e "${caidan2} 11. 莓果甜心 ${bg}"
-        echo -e "${caidan2} 12. 星空梦境 ${bg}"
-        echo -e "${caidan2} 13. 金属光泽 ${bg}"
-        echo -e "${caidan1}╰──────────────────╯${bg}"
-        echo -e "${caidan3}╰──────────────────╯${bg}"
-        echo
-        read -p "选择想要选择的主题：" color
-        forin=19 clear_menu
-        case $color in
-            1)
-                yq -i '.color = ".theme"' /xrk/system.yaml
-            ;;
-            2)
-                yq -i '.color = ".theme2"' /xrk/system.yaml
-            ;;
-            3)
-                yq -i '.color = ".theme3"' /xrk/system.yaml
-            ;;
-            4)
-                yq -i '.color = ".theme4"' /xrk/system.yaml
-            ;;
-            5)
-                yq -i '.color = ".theme5"' /xrk/system.yaml
-            ;;
-            6)
-                yq -i '.color = ".theme6"' /xrk/system.yaml
-            ;;
-            7)
-                yq -i '.color = ".theme7"' /xrk/system.yaml
-            ;;
-            8)
-                yq -i '.color = ".theme8"' /xrk/system.yaml
-            ;;
-            9)
-                yq -i '.color = ".theme9"' /xrk/system.yaml
-            ;;
-            10)
-                yq -i '.color = ".theme10"' /xrk/system.yaml
-            ;;
-            11)
-                yq -i '.color = ".theme11"' /xrk/system.yaml
-            ;;
-            12)
-                yq -i '.color = ".theme12"' /xrk/system.yaml
-            ;;
-            13)
-                yq -i '.color = ".theme13"' /xrk/system.yaml
-            ;;
-            esac 
-         chmod 755 /xrk/.init
-         . /xrk/.init
-         echo -e "${caidan1}更改${bg}${caidan2}完成${bg}"
-         exit 0
-         ;;
-        2 )
-            if [ -n "$myz" ]; then
-              bash /xrk/body/miaowrite.sh
+        1)
+            # 主题子菜单（使用统一函数）
+            menu_show "切换脚本主题" "${THEME_NAMES[@]}"
+            echo
+            read -p "选择主题 [1-13]，q 返回: " color
+            forin=19 clear_menu
+            if [[ "$color" =~ ^[0-9]+$ ]] && [ "$color" -ge 1 ] && [ "$color" -le 13 ]; then
+                yq -i '.color = "'"${THEMES[$((color-1))]}"'"' /xrk/system.yaml
+                chmod 755 /xrk/.init
+                . /xrk/.init
+                echo -e "${caidan1}更改${bg}${caidan2}完成${bg}"
+                exit 0
             fi
-            if [ -n "$tyz" ]; then
-              bash /xrk/body/trsswrite.sh
-            fi
+            ;;
+        2)
             if [ -n "$xyz" ]; then
-              bash /xrk/body/xrkwrite.sh
+                bash /xrk/body/xrkwrite.sh
+            elif [ -n "$tyz" ]; then
+                bash /xrk/body/trsswrite.sh
+            elif [ -n "$myz" ]; then
+                bash /xrk/body/miaowrite.sh
+            else
+                echo -e "${red}未检测到云崽/时雨/喵崽路径，请先安装主流程${bg}"
+                read -p "按回车返回..." _
             fi
             ;;
-        * )
+        *)
             echo -e "${red}退出咯${bg}"
             exit 1
             ;;

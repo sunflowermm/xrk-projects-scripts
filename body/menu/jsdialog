@@ -1,13 +1,13 @@
 #!/bin/bash
+# 李素裳 JS 插件（dialog 触屏版）
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 1 0  # 初始化：需要common（install_pkg），不需要check_changes
 
 xrk=$HOME/xrk
-jh=$yz/plugins/example
+jh="$yz/plugins/example"
 
-# 检查 dialog 是否安装
-if ! command -v dialog &> /dev/null; then
-    echo "请先安装 dialog 包"
-    exit 1
-fi
+# 检查 dialog 是否安装（使用统一函数）
+menu_check_deps dialog 1  # exit_on_fail=1
 
 # 初始化 dialog 设置
 DIALOG_BACKTITLE="插件安装助手"

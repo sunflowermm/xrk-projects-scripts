@@ -1,5 +1,6 @@
 #!/bin/bash
-
+# tmux 窗格：显示葵崽/时雨/向日葵命令（需 .init 提供 caidan/bg）
+[ -f /xrk/.init ] && source /xrk/.init
 source /xrk/shell_modules/init.sh
 source /xrk/shell_modules/github.sh
 check_changes

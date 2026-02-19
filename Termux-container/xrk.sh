@@ -7,10 +7,16 @@ if [[ "$(pwd)" != *com.termux* ]]; then
 fi
 
 
-# 引入外部函数
-source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/Termux.sh")
+# 参数：$2 = 1 GitCode 2 GitHub 3 Gitee（默认 1），与 bootstrap 统一
+XRK_SOURCE="${2:-1}"
+source <(curl -sL "https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh")
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg "$XRK_SOURCE")}"
+export SCRIPT_RAW_BASE XRK_SOURCE
 
-# 参数解析
+# 引入外部函数（Termux 换源、字体键盘等）
+source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/Termux.sh")
+
+# 参数解析：支持多种发行版
 case "$1" in
   --ubuntu)
     DISTRO="ubuntu"
@@ -22,8 +28,40 @@ case "$1" in
     RELEASE="bookworm"
     SHORTCUT="d"
     ;;
+  --alpine)
+    DISTRO="alpine"
+    RELEASE="3.22"
+    SHORTCUT="a"
+    ;;
+  --arch)
+    DISTRO="archlinux"
+    RELEASE="current"
+    SHORTCUT="c"
+    ;;
+  --fedora)
+    DISTRO="fedora"
+    RELEASE="43"
+    SHORTCUT="f"
+    ;;
+  --centos)
+    DISTRO="centos"
+    RELEASE="9-Stream"
+    SHORTCUT="s"
+    ;;
+  --help|-h)
+    echo "用法: bash xrk.sh --<发行版> [源: 1=GitCode 2=GitHub 3=Gitee]"
+    echo ""
+    echo "支持的发行版:"
+    echo "  --ubuntu    Ubuntu (noble)"
+    echo "  --debian    Debian (bookworm)"
+    echo "  --alpine    Alpine Linux (3.22)"
+    echo "  --arch      Arch Linux (current)"
+    echo "  --fedora    Fedora (43)"
+    echo "  --centos    CentOS Stream 9"
+    exit 0
+    ;;
   *)
-    echo -e "\033[1;31m老弟会不会用啊\033[0m"
+    echo -e "\033[1;31m请使用 --ubuntu / --debian / --alpine / --arch / --fedora / --centos 或 --help 查看帮助\033[0m"
     exit 1
     ;;
 esac
@@ -32,17 +70,20 @@ esac
 INSTALL_DIR="$HOME/${DISTRO^}"
 START_SCRIPT="$HOME/${DISTRO}_start"
 SHORTCUT_CMD="$PREFIX/bin/$SHORTCUT"
-INITIAL_SCRIPT_URL="https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/.xrkinitial"
-ARCH="arm64"
+INITIAL_SCRIPT_URL="$SCRIPT_RAW_BASE/.xrkinitial"
+# LXC 镜像架构：arm64(aarch64) | amd64(x86_64)
+case "$(uname -m)" in
+    aarch64|arm64) ARCH="arm64" ;;
+    x86_64|amd64)  ARCH="amd64" ;;
+    *)             ARCH="arm64" ;;  # 默认 arm64（常见手机）
+esac
 
-# 镜像列表
-# 镜像与中文名对应关系 (使用关联数组)
+# 镜像列表（USTC 无 LXC 镜像已移除，详见 MIRROR_CHECK.md）
 declare -A MIRRORS
 MIRRORS=(
-    ["https://mirrors.bfsu.edu.cn/lxc-images/images"]="北京外国语大学镜像站"
-    ["https://mirror.nju.edu.cn/lxc-images/images"]="南京大学镜像站"
     ["https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images"]="清华大学TUNA镜像站"
-    ["https://mirrors.ustc.edu.cn/lxc-images/images"]="中国科学技术大学镜像站"
+    ["https://mirror.nju.edu.cn/lxc-images/images"]="南京大学镜像站"
+    ["https://mirrors.bfsu.edu.cn/lxc-images/images"]="北京外国语大学镜像站"
     ["https://images.linuxcontainers.org/images"]="官方Linux Containers镜像源"
 )
 
@@ -129,6 +170,13 @@ install_system() {
     echo "127.0.0.1 localhost" > "$INSTALL_DIR/etc/hosts"
     echo -e "nameserver 223.5.5.5\nnameserver 223.6.6.6" > "$INSTALL_DIR/etc/resolv.conf"
     info "$DISTRO 系统安装完成"
+    # Alpine 默认无 bash，需先安装
+    if [ "$DISTRO" = "alpine" ]; then
+        info "Alpine 需安装 bash，正在执行..."
+        proot --link2symlink -0 -r "$INSTALL_DIR" -b /dev -b /proc -w /root \
+            /usr/bin/env -i HOME=/root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            /bin/sh -c "apk add --no-cache bash" 2>/dev/null || warn "bash 安装失败，将使用 sh"
+    fi
 }
 
 setup_locale() {
@@ -137,27 +185,37 @@ setup_locale() {
     locale_file="$INSTALL_DIR/etc/locale.conf"
     locale_gen="$INSTALL_DIR/etc/locale.gen"
     groups_ud="$INSTALL_DIR/root/.hushlogin"
-    [ -f "$locale_gen" ] && sed -i '/zh_CN.UTF-8 UTF-8/s/^#//' "$locale_gen"
-    [ -f "$locale_gen" ] && sed -i '/en_US.UTF-8 UTF-8/s/^#//' "$locale_gen"
-    echo 'LANG=zh_CN.UTF-8' > "$locale_file"
     touch "$groups_ud"
+    if [ "$DISTRO" = "alpine" ]; then
+        echo 'LANG=zh_CN.UTF-8' > "$locale_file"
+        [ -f "$INSTALL_DIR/etc/profile.d/locale.sh" ] || echo 'export LANG=zh_CN.UTF-8' > "$INSTALL_DIR/etc/profile.d/locale.sh"
+    else
+        [ -f "$locale_gen" ] && sed -i '/zh_CN.UTF-8 UTF-8/s/^#//' "$locale_gen"
+        [ -f "$locale_gen" ] && sed -i '/en_US.UTF-8 UTF-8/s/^#//' "$locale_gen"
+        echo 'LANG=zh_CN.UTF-8' > "$locale_file"
+    fi
 }
 
 create_start_script() {
     sep
     info "创建启动脚本 $START_SCRIPT"
+    # 通用 PATH，各发行版兼容
+    case "$DISTRO" in
+        ubuntu)  path_add="PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin" ;;
+        debian)  path_add="PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin:/usr/games:/usr/local/games" ;;
+        alpine)  path_add="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" ;;
+        *)       path_add="PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin" ;;
+    esac
+    # Alpine 若无 bash 则用 sh
+    login_shell="/bin/bash --login"
+    [ ! -f "$INSTALL_DIR/bin/bash" ] && [ -f "$INSTALL_DIR/bin/sh" ] && login_shell="/bin/sh -l"
     cat > "$START_SCRIPT" <<- EOM
 #!/bin/bash
 echo "启动 $DISTRO ($RELEASE) ..."
 unset LD_PRELOAD
 cd \$(dirname \$0)
-command="proot --link2symlink -0 -r $INSTALL_DIR -b /dev -b /dev/null:/proc/sys/kernel/cap_last_cap -b /proc -b /data/data/com.termux/files/usr/tmp:/tmp -b $INSTALL_DIR/root:/dev/shm -w /root /usr/bin/env -i HOME=/root TERM=\$TERM LANG=zh_CN.UTF-8"
-if [ "$DISTRO" = "ubuntu" ]; then
-    command+=" PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin"
-elif [ "$DISTRO" = "debian" ]; then
-    command+=" PATH=/usr/local/sbin:/usr/local/bin:/bin:/usr/bin:/sbin:/usr/sbin:/usr/games:/usr/local/games"
-fi
-command+=" /bin/bash --login"
+command="proot --link2symlink -0 -r $INSTALL_DIR -b /dev -b /dev/null:/proc/sys/kernel/cap_last_cap -b /proc -b /data/data/com.termux/files/usr/tmp:/tmp -b $INSTALL_DIR/root:/dev/shm -w /root /usr/bin/env -i HOME=/root TERM=\$TERM LANG=zh_CN.UTF-8 $path_add"
+command+=" $login_shell"
 if [ -z "\$1" ];then
     exec \$command
 else
@@ -169,12 +227,23 @@ EOM
     chmod +x "$START_SCRIPT"
     curl -o "$INSTALL_DIR/root/.xrk" "$INITIAL_SCRIPT_URL"
     info "配置一次性启动脚本..."
-    cat >> "$INSTALL_DIR/etc/profile.d/1.sh" <<- EOM
+    printf 'XRK_SOURCE="%s"\n' "$XRK_SOURCE" > "$INSTALL_DIR/root/.xrk_env"
+    if [ "$DISTRO" = "alpine" ]; then
+        cat >> "$INSTALL_DIR/etc/profile.d/1.sh" <<- EOM
 rm -f \${BASH_SOURCE[0]}
-locale-gen || true
-update-locale LANG=zh_CN.UTF-8
+[ -f /root/.xrk_env ] && source /root/.xrk_env && rm -f /root/.xrk_env
+export LANG=zh_CN.UTF-8
+bash .xrk 2>/dev/null || sh .xrk
+EOM
+    else
+        cat >> "$INSTALL_DIR/etc/profile.d/1.sh" <<- EOM
+rm -f \${BASH_SOURCE[0]}
+[ -f /root/.xrk_env ] && source /root/.xrk_env && rm -f /root/.xrk_env
+locale-gen 2>/dev/null || true
+update-locale LANG=zh_CN.UTF-8 2>/dev/null || true
 bash .xrk
 EOM
+    fi
 
     cat > "$SHORTCUT_CMD" <<- EOM
 #!/bin/bash

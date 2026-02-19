@@ -1,16 +1,24 @@
 #!/bin/bash
-#拆那人活着好累啊，还是中文好
+# 主流程用：加载公共模块 + 确定系统类型，对外提供 install_package（统一走 common.sh install_pkg）
+
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+
+# 加载公共模块（本地优先，否则远程）
+if [ -f /xrk/shell_modules/common.sh ]; then
+    # shellcheck source=/dev/null
+    source /xrk/shell_modules/common.sh
+else
+    # shellcheck source=/dev/null
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
+fi
+
+# 确定系统安装器：仅设置 OS_TYPE，实际安装统一用 install_pkg
 function 确定系统安装器魔法() {
-    if grep -Eqi "Ubuntu" /etc/issue && grep -Eq "Ubuntu" /etc/*-release; then
-        source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/Linux/debian-and-ubuntu_install.sh")
-    elif grep -Eqi "Debian" /etc/issue && grep -Eq "Debian" /etc/*-release; then
-        source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/Linux/debian-and-ubuntu_install.sh")
-    elif [ -f /etc/arch-release ]; then
-        source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/Linux/arch_install.sh")
-    elif grep -Eqi "CentOS|Red Hat" /etc/issue && grep -Eq "CentOS|Red Hat" /etc/*-release; then
-        source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/Linux/centos_install.sh")
-    else
-        echo "无法识别的系统类型，脚本退出。"
-        exit 1
-    fi
+    export OS_TYPE
+    OS_TYPE=$(detect_os)
+}
+
+# 对外接口：与原有 install_package 一致，内部走 common 的 install_pkg
+function install_package() {
+    install_pkg "$1"
 }

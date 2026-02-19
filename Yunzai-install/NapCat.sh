@@ -1,130 +1,101 @@
 #!/bin/bash
+# NapCat 安装脚本（支持远程/本地执行，复用底层 github.sh 代理、common.sh 架构/包管理）
 
-CYAN='\033[0;1;36;96m'    # 青色用于普通信息
-GREEN='\033[0;1;32;92m'   # 绿色用于成功信息
-YELLOW='\033[0;1;33;93m'  # 黄色用于警告信息
-RED='\033[0;1;31;91m'     # 红色用于错误信息
-BLUE='\033[0;1;34;94m'    # 蓝色用于其他信息
-NC='\033[0m'              # 重置颜色
+# 统一初始化：加载 install_script_common.sh 并初始化环境
+# 支持远程执行：bash <(curl -sL https://raw.gitcode.com/.../NapCat.sh)
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+if [ -f "/xrk/shell_modules/install_script_common.sh" ]; then
+    source /xrk/shell_modules/install_script_common.sh
+elif [ -f "$(cd "$(dirname "$0")" && pwd)/../shell_modules/install_script_common.sh" ]; then
+    source "$(cd "$(dirname "$0")" && pwd)/../shell_modules/install_script_common.sh"
+else
+    source <(curl -sL "${SCRIPT_RAW_BASE}/shell_modules/install_script_common.sh" 2>/dev/null) || {
+        # 如果 install_script_common.sh 不存在，使用简化加载逻辑
+        SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd 2>/dev/null || echo ".")"
+        [ -f "/xrk/shell_modules/github.sh" ] && source /xrk/shell_modules/github.sh || [ -f "${SCRIPT_DIR}/../shell_modules/github.sh" ] && source "${SCRIPT_DIR}/../shell_modules/github.sh" 2>/dev/null || true
+        [ -f "/xrk/shell_modules/common.sh" ] && source /xrk/shell_modules/common.sh || [ -f "${SCRIPT_DIR}/../shell_modules/common.sh" ] && source "${SCRIPT_DIR}/../shell_modules/common.sh" 2>/dev/null || true
+    }
+fi
+
+# 初始化安装环境（如果 install_script_common.sh 加载成功）
+type init_install_env &>/dev/null && init_install_env "${XRK_SOURCE:-1}" || true
+
+# 颜色（github.sh 已有 RED/GREEN/YELLOW/NC，此处补足）
+CYAN='\033[0;1;36;96m'
+BLUE='\033[0;1;34;94m'
+NC="${NC:-\033[0m}"
 
 TARGET_FOLDER="/opt/QQ/resources/app/app_launcher"
 
 function log() {
+    local time msg
     time=$(date +"%Y-%m-%d %H:%M:%S")
-    message="[${time}]: $1 "
+    msg="[${time}]: $1"
     case "$1" in
-        *"失败"*|*"错误"*|*"sudo不存在"*|*"当前用户不是root用户"*|*"无法连接"*)
-            echo -e "${RED}${message}${NC}"
-            ;;
-        *"成功"*)
-            echo -e "${GREEN}${message}${NC}"
-            ;;
-        *"忽略"*|*"跳过"*)
-            echo -e "${YELLOW}${message}${NC}"
-            ;;
-        *)
-            echo -e "${CYAN}${message}${NC}"
-            ;;
+        *"失败"*|*"错误"*|*"无法连接"*|*"不存在"*) echo -e "${RED}${msg}${NC}" ;;
+        *"成功"*) echo -e "${GREEN}${msg}${NC}" ;;
+        *"忽略"*|*"跳过"*) echo -e "${YELLOW}${msg}${NC}" ;;
+        *) echo -e "${CYAN}${msg}${NC}" ;;
     esac
 }
 
-function execute_command() {
-    log "${2}中..."
-    ${1}
-    if [ $? -eq 0 ]; then
-        log "${2} (${1})成功"
-    else
-        log "${2} (${1})失败"
-        exit 1
-    fi
-}
+# 执行命令并统一报错（合并原 run_cmd 逻辑）
+run_cmd() { log "$2中..."; if ! eval "$1"; then log "$2失败"; exit 1; fi; log "$2成功"; }
 
+# 架构检测：优先用 common.detect_arch，否则 fallback
 function get_system_arch() {
-    system_arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
-    if [ "${system_arch}" = "none" ]; then
-        log "无法识别的系统架构, 请检查错误。"
-        exit 1
+    if type detect_arch &>/dev/null; then
+        case "$(detect_arch)" in
+            x64)   system_arch="amd64" ;;
+            arm64) system_arch="arm64" ;;
+            armv7l) system_arch="armhf" ;;
+            *) log "无法识别的系统架构"; exit 1 ;;
+        esac
+    else
+        system_arch=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')
+        [ -z "$system_arch" ] || [ "$system_arch" = "none" ] && { log "无法识别的系统架构"; exit 1; }
     fi
     log "当前系统架构: ${system_arch}"
 }
 
-function detect_package_manager() {
-    if command -v apt-get &> /dev/null; then
-        package_manager="apt-get"
-    elif command -v dnf &> /dev/null; then
-        package_manager="dnf"
+# 包管理器检测：优先用 common.detect_os，否则按命令存在判断
+function set_package_tool() {
+    if type detect_os &>/dev/null; then
+        case "$(detect_os)" in
+            debian|ubuntu) package_manager="apt-get"; package_installer="dpkg" ;;
+            centos|rhel|fedora|rocky|almalinux) package_manager="dnf"; package_installer="rpm" ;;
+            *) log "目前仅支持 apt-get/dnf"; exit 1 ;;
+        esac
     else
-        log "高级包管理器检查失败, 目前仅支持apt-get/dnf。"
-        exit 1
+        command -v apt-get &>/dev/null && { package_manager="apt-get"; package_installer="dpkg"; return; }
+        command -v dnf &>/dev/null && { package_manager="dnf"; package_installer="rpm"; return; }
+        log "未找到 apt-get/dnf"; exit 1
     fi
-    log "当前高级包管理器: ${package_manager}"
-}
-
-function detect_package_installer() {
-    if command -v dpkg &> /dev/null; then
-        package_installer="dpkg"
-    elif command -v rpm &> /dev/null; then
-        package_installer="rpm"
-    else
-        log "基础包管理器检查失败, 目前仅支持dpkg/rpm。"
-        exit 1
-    fi
-    log "当前基础包管理器: ${package_installer}"
-}
-
-function network_test() {
-    local parm1=${1}
-    local found=0
-    target_proxy=""
-    
-    # 如果没有设置proxy_num，默认为9（自动选择）
-    if [ -z "${proxy_num}" ]; then
-        proxy_num=9
-    fi
-
-    if [ "${parm1}" == "Github" ]; then
-        proxy_arr=("https://ghp.ci" "https://github.moeyy.xyz" "https://mirror.ghproxy.com" "https://gh-proxy.com" "https://x.haod.me")
-        check_url="https://raw.githubusercontent.com/NapNeko/NapCatQQ/main/package.json"
-    fi
-
-    if [ ! -z "${proxy_num}" ] && [ "${proxy_num}" -ge 1 ] && [ "${proxy_num}" -le ${#proxy_arr[@]} ]; then
-        log "手动指定代理: ${proxy_arr[$proxy_num-1]}"
-        target_proxy="${proxy_arr[$proxy_num-1]}"
-    else
-        if [ "${proxy_num}" -ne 0 ]; then
-            log "proxy 未指定或超出范围, 正在检查${parm1}代理可用性..."
-            for proxy in "${proxy_arr[@]}"; do
-                status=$(curl -o /dev/null -s -w "%{http_code}" "${proxy}/${check_url}")
-                if [ "${parm1}" == "Github" ] && [ ${status} -eq 200 ]; then
-                    found=1
-                    target_proxy="${proxy}"
-                    log "将使用${parm1}代理: ${proxy}"
-                    break
-                fi
-            done
-
-            if [ ${found} -eq 0 ]; then
-                log "无法连接到${parm1}, 请检查网络。"
-                exit 1
-            fi
-        else
-            log "代理已关闭, 将直接连接${parm1}..."
-        fi
-    fi
+    log "当前包管理器: ${package_manager}"
 }
 
 function install_dependency() {
     log "开始更新依赖..."
-    detect_package_manager
+    set_package_tool
 
-    if [ "${package_manager}" = "apt-get" ]; then
-        execute_command "apt-get update -y -qq" "更新软件包列表"
-        execute_command "apt-get install -y -qq zip unzip jq curl xvfb screen xauth procps" "安装zip unzip jq curl xvfb screen xauth procps"
-    elif [ "${package_manager}" = "dnf" ]; then
-        execute_command "dnf install -y epel-release" "安装epel"
-        execute_command "dnf install --allowerasing -y zip unzip jq curl xorg-x11-server-Xvfb screen procps-ng" "安装zip unzip jq curl xorg-x11-server-Xvfb screen procps-ng"
+    if type install_pkg &>/dev/null; then
+        if [ "${package_manager}" = "apt-get" ]; then
+            apt-get update -y -qq 2>/dev/null || true
+            for p in zip unzip jq curl xvfb screen xauth procps; do install_pkg "$p" 2>/dev/null || true; done
+        elif [ "${package_manager}" = "dnf" ]; then
+            dnf install -y epel-release 2>/dev/null || true
+            for p in zip unzip jq curl xorg-x11-server-Xvfb screen procps-ng; do install_pkg "$p" 2>/dev/null || true; done
+        fi
+    else
+        if [ "${package_manager}" = "apt-get" ]; then
+            run_cmd "apt-get update -y -qq" "更新软件包列表"
+            run_cmd "apt-get install -y -qq zip unzip jq curl xvfb screen xauth procps" "安装依赖"
+        elif [ "${package_manager}" = "dnf" ]; then
+            run_cmd "dnf install -y epel-release" "安装 epel"
+            run_cmd "dnf install --allowerasing -y zip unzip jq curl xorg-x11-server-Xvfb screen procps-ng" "安装依赖"
+        fi
     fi
-    log "更新依赖成功..."
+    log "更新依赖成功"
 }
 
 function create_tmp_folder() {
@@ -136,20 +107,9 @@ function create_tmp_folder() {
 }
 
 function clean() {
-    rm -rf ./NapCat
-    if [ $? -ne 0 ]; then
-        log "临时目录删除失败, 请手动删除 ./NapCat。"
-    fi
-    rm -rf ./NapCat.Shell.zip
-    if [ $? -ne 0 ]; then
-        log "NapCatQQ压缩包删除失败, 请手动删除 NapCat.Shell.zip。"
-    fi
-    if [ -f "/etc/init.d/napcat" ]; then
-        rm -f /etc/init.d/napcat
-    fi
-    if [ -d "${TARGET_FOLDER}/napcat.packet" ]; then
-        rm -rf  "${TARGET_FOLDER}/napcat.packet"
-    fi
+    rm -rf ./NapCat ./NapCat.Shell.zip
+    [ -f "/etc/init.d/napcat" ] && rm -f /etc/init.d/napcat
+    [ -d "${TARGET_FOLDER}/napcat.packet" ] && rm -rf "${TARGET_FOLDER}/napcat.packet"
 }
 
 function download_napcat() {
@@ -159,8 +119,12 @@ function download_napcat() {
         log "检测到已下载NapCat安装包,跳过下载..."
     else
         log "开始下载NapCat安装包,请稍等..."
-        network_test "Github"
-        napcat_download_url="${target_proxy:+${target_proxy}/}https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCat.Shell.zip"
+        # 默认使用原始 GitHub 地址，并尽量通过 github.sh 自动加代理
+        napcat_download_url="https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCat.Shell.zip"
+        # proxy_num=0 时关闭代理，其余情况交给 getgh 自动选择可用代理
+        if [ "${proxy_num}" != "0" ] && command -v getgh >/dev/null 2>&1; then
+            getgh napcat_download_url
+        fi
 
         curl -L -# "${napcat_download_url}" -o "${default_file}"
         if [ $? -ne 0 ]; then
@@ -253,7 +217,6 @@ function check_linuxqq(){
     fi
 
     linuxqq_target_build=${linuxqq_target_version##*-}
-    detect_package_installer
 
     log "最低linuxQQ版本: ${linuxqq_target_version}, 构建: ${linuxqq_target_build}"
     
@@ -353,7 +316,7 @@ function install_linuxqq() {
             log "检测到当前目录下存在QQ安装包, 将使用本地安装包进行安装。"
         fi
 
-        execute_command "dnf localinstall -y ./QQ.rpm" "安装QQ"
+        run_cmd "dnf localinstall -y ./QQ.rpm" "安装QQ"
         rm -f QQ.rpm
     elif [ "${package_manager}" = "apt-get" ]; then
         if ! [ -f "QQ.deb" ]; then
@@ -368,9 +331,9 @@ function install_linuxqq() {
             log "检测到当前目录下存在QQ安装包, 将使用本地安装包进行安装。"
         fi
 
-        execute_command "apt-get install -f -y -qq ./QQ.deb" "安装QQ"
-        execute_command "apt-get install -y -qq libnss3" "安装libnss3"
-        execute_command "apt-get install -y -qq libgbm1" "安装libgbm1"
+        run_cmd "apt-get install -f -y -qq ./QQ.deb" "安装QQ"
+        run_cmd "apt-get install -y -qq libnss3" "安装libnss3"
+        run_cmd "apt-get install -y -qq libgbm1" "安装libgbm1"
         log "安装libasound2中..."
         apt-get install -y -qq libasound2
         if [ $? -eq 0 ]; then
@@ -538,8 +501,11 @@ function check_napcat_cli() {
 
 function install_napcat_cli() {
     log "安装NapCatQQ CLI..."   
-    network_test "Github"
-    napcat_cli_download_url="${target_proxy:+${target_proxy}/}https://raw.githubusercontent.com/NapNeko/NapCat-Installer/refs/heads/main/script/napcat"
+    # 默认使用原始 GitHub 地址，并尽量通过 github.sh 自动加代理
+    napcat_cli_download_url="https://raw.githubusercontent.com/NapNeko/NapCat-Installer/refs/heads/main/script/napcat"
+    if [ "${proxy_num}" != "0" ] && command -v getgh >/dev/null 2>&1; then
+        getgh napcat_cli_download_url
+    fi
     default_file="napcatcli"
     log "NapCatQQ CLI 下载链接: ${napcat_cli_download_url}"
     curl -L -# "${napcat_cli_download_url}" -o "./${default_file}"

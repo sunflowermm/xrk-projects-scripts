@@ -1,6 +1,9 @@
 #!/bin/bash
+# 文件/目录删除（dialog 触屏版），依赖 yz
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 0 0  # 初始化：不需要common，不需要check_changes
 
-# 设置dialog颜色
+# 设置 dialog 颜色
 export DIALOGRC="/dev/null"
 export DIALOG_OK=0
 export DIALOG_CANCEL=1

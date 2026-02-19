@@ -1,33 +1,32 @@
 #!/bin/bash
+# Node.js 安装：使用最新 LTS，支持 x64/arm64/armv7l/ppc64le/s390x
 
 set -e
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
+[ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh")
 
-# 颜色定义
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-LATEST_VERSION="v23.5.0"
-MIN_MAJOR_VERSION=23
+# Node 官方支持：x64 arm64 armv7l ppc64le s390x
+arch=$(detect_arch)
+case "$arch" in
+    x64|arm64|armv7l|ppc64le|s390x) ;;
+    *) echo -e "${RED}不支持的架构: $(uname -m)${NC}"; exit 1 ;;
+esac
+
+LATEST_VERSION="$NODE_LTS_VERSION"
+MIN_MAJOR_VERSION=$(echo "$LATEST_VERSION" | sed 's/^v//' | cut -d'.' -f1)
 
 show_progress() {
     local text="$1"
     echo -ne "${BLUE}$text...${NC}"
-    while kill -0 $! 2>/dev/null; do
-        echo -ne "."
-        sleep 0.5
-    done
+    while kill -0 $! 2>/dev/null; do echo -n "."; sleep 0.5; done
     echo -e " ${GREEN}✓${NC}"
-}
-
-detect_arch() {
-    case "$(uname -m)" in
-        x86_64) echo "x64" ;;
-        aarch64|arm64) echo "arm64" ;;
-        *) echo -e "${RED}错误: 不支持的架构 $(uname -m)${NC}"; exit 1 ;;
-    esac
 }
 
 check_permission() {
@@ -37,101 +36,52 @@ check_permission() {
     fi
 }
 
-get_major_version() {
-    local version="$1"
-    echo "$version" | sed 's/^v//' | cut -d'.' -f1
-}
-
 check_nodejs_version() {
     if command -v node &>/dev/null; then
-        local current_version=$(node -v)
-        local current_major=$(get_major_version "$current_version")
-        
-        echo -e "${BLUE}检测到已安装Node.js $current_version${NC}"
-        
+        local current_major=$(node -v | sed 's/^v//' | cut -d'.' -f1)
+        echo -e "${BLUE}检测到已安装 Node.js $(node -v)${NC}"
         if [ "$current_major" -ge "$MIN_MAJOR_VERSION" ]; then
-            echo -e "${GREEN}✅ 当前版本已满足要求 (>= v$MIN_MAJOR_VERSION)，跳过安装${NC}"
-            return 1  # 不需要安装
-        else
-            echo -e "${YELLOW}⚠️  当前版本过低 (< v$MIN_MAJOR_VERSION)，开始自动升级...${NC}"
-            return 0  # 需要安装
+            echo -e "${GREEN}✅ 当前版本已满足 LTS 要求，跳过安装${NC}"
+            return 1
         fi
+        echo -e "${YELLOW}⚠️ 当前版本过低，开始升级到 LTS...${NC}"
     else
-        echo -e "${BLUE}未检测到Node.js，开始全新安装...${NC}"
-        return 0  # 需要安装
+        echo -e "${BLUE}未检测到 Node.js，开始全新安装...${NC}"
     fi
+    return 0
 }
 
 install_nodejs() {
-    local arch=$(detect_arch)
     local url="https://nodejs.org/dist/$LATEST_VERSION/node-$LATEST_VERSION-linux-$arch.tar.xz"
-    local temp_dir=$(mktemp -d)
-    
-    echo -e "${BLUE}开始安装Node.js $LATEST_VERSION ($arch)${NC}"
-    
-    (
-        cd "$temp_dir"
-        if command -v wget &>/dev/null; then
-            wget -q --show-progress "$url"
-        else
-            curl -L -# "$url" -o "node-$LATEST_VERSION-linux-$arch.tar.xz"
-        fi
-    ) &
-    show_progress "下载Node.js $LATEST_VERSION"
-    
-    (
-        cd "$temp_dir"
-        tar -xf "node-$LATEST_VERSION-linux-$arch.tar.xz"
-        
-        sudo mkdir -p /opt/node
-        sudo rm -rf /opt/node/*
-        sudo mv "node-$LATEST_VERSION-linux-$arch"/* /opt/node/
-        
-        sudo ln -sf /opt/node/bin/node /usr/local/bin/node
-        sudo ln -sf /opt/node/bin/npm /usr/local/bin/npm
-        sudo ln -sf /opt/node/bin/npx /usr/local/bin/npx
-    ) &
-    show_progress "安装Node.js"
-    
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    echo -e "${BLUE}开始安装 Node.js $LATEST_VERSION (LTS) [$arch]${NC}"
+    (cd "$temp_dir" && { command -v wget &>/dev/null && wget -q --show-progress "$url" || curl -L -# "$url" -o "node-$LATEST_VERSION-linux-$arch.tar.xz"; }) &
+    show_progress "下载 Node.js $LATEST_VERSION"
+    (cd "$temp_dir" && tar -xf "node-$LATEST_VERSION-linux-$arch.tar.xz" && \
+        sudo mkdir -p /opt/node && sudo rm -rf /opt/node/* && \
+        sudo mv "node-$LATEST_VERSION-linux-$arch"/* /opt/node/ && \
+        sudo ln -sf /opt/node/bin/node /usr/local/bin/node && \
+        sudo ln -sf /opt/node/bin/npm /usr/local/bin/npm && \
+        sudo ln -sf /opt/node/bin/npx /usr/local/bin/npx) &
+    show_progress "安装 Node.js"
     rm -rf "$temp_dir"
-    
-    if ! echo "$PATH" | grep -q "/opt/node/bin"; then
-        echo 'export PATH=$PATH:/opt/node/bin' >> "$HOME/.bashrc"
-        export PATH=$PATH:/opt/node/bin
-    fi
+    echo "$PATH" | grep -q "/opt/node/bin" || { echo 'export PATH=$PATH:/opt/node/bin' >> "$HOME/.bashrc"; export PATH=$PATH:/opt/node/bin; }
 }
 
-# 配置npm和验证安装
 setup_and_verify() {
-    npm config set registry https://registry.npmmirror.com &
-    show_progress "配置npm镜像"
-    
-    if command -v node &>/dev/null && command -v npm &>/dev/null; then
-        local node_ver=$(node -v)
-        local npm_ver=$(npm -v)
-        echo -e "${GREEN}✅ 安装成功!${NC}"
-        echo -e "${GREEN}   Node.js: $node_ver${NC}"
-        echo -e "${GREEN}   npm: $npm_ver${NC}"
-    else
-        echo -e "${RED}❌ 安装失败${NC}"
-        exit 1
-    fi
+    npm config set registry https://registry.npmmirror.com 2>/dev/null &
+    show_progress "配置 npm 镜像"
+    command -v node &>/dev/null && command -v npm &>/dev/null && \
+        echo -e "${GREEN}✅ Node.js: $(node -v)  npm: $(npm -v)${NC}" || { echo -e "${RED}❌ 安装失败${NC}"; exit 1; }
 }
 
-# 主函数
-main() {
-    check_permission
-    
-    if check_nodejs_version; then
-        install_nodejs
-        setup_and_verify
-        echo -e "${GREEN}🎉 安装完成! 可以开始使用 Node.js 23 了${NC}"
-    else
-        if command -v npm &>/dev/null; then
-            npm config set registry https://registry.npmmirror.com &
-        fi
-        echo -e "${GREEN}🎉 Node.js 环境已就绪!${NC}"
-    fi
-}
-
-main "$@"
+check_permission
+if check_nodejs_version; then
+    install_nodejs
+    setup_and_verify
+    echo -e "${GREEN}🎉 Node.js LTS 安装完成${NC}"
+else
+    command -v npm &>/dev/null && npm config set registry https://registry.npmmirror.com 2>/dev/null
+    echo -e "${GREEN}🎉 Node.js 环境已就绪${NC}"
+fi

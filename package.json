@@ -1,11 +1,11 @@
 {
-  "name": "sunflower-yunzai-scripts",
+  "name": "xrk-projects-scripts",
   "version": "1.3.5",
   "description": "向日葵葵脚本",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://gitcode.com/Xrkseek/sunflower-yunzai-scripts"
+    "url": "https://gitcode.com/Xrkseek/xrk-projects-scripts"
   },
   "author": "xrk114514",
   "license": "ISC",

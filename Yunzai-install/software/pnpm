@@ -1,39 +1,25 @@
 #!/bin/bash
+# pnpm 安装：使用 versions.sh 版本，支持 x64/arm64
 
-if ! command -v pnpm &>/dev/null; then
-    source <(curl -sL "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/shell_modules/github.sh")
-    install_pnpm() {
-        local architecture=$1
-        local version=$2
+command -v pnpm &>/dev/null && { echo -e "\033[0;32mpnpm 已安装: $(pnpm -v)\033[0m"; exit 0; }
 
-        if [ "$architecture" = "x86_64" ]; then
-            pnpm="pnpm-linux-x64"
-            url="https://github.com/pnpm/pnpm/releases/download/$version/pnpm-linux-x64"
-        elif [ "$architecture" = "aarch64" ]; then
-            pnpm="pnpm-linux-arm64"
-            url="https://github.com/pnpm/pnpm/releases/download/$version/pnpm-linux-arm64"
-        else
-            echo "不支持的架构: $architecture"
-            exit 1
-        fi
-        getgh url || url="https://github.moeyy.xyz/$url"
-        echo -e "开始安装 pnpm..."
-        echo "下载地址: $url"
-        wget --tries=3 --timeout=30 -O "$pnpm" "$url"
-        if [ $? -ne 0 ]; then
-            echo "下载失败，请检查网络或下载链接。"
-            exit 1
-        fi
-        sudo mv "$HOME/$pnpm" /usr/local/bin/pnpm || { echo "权限不足，无法移动文件"; exit 1; }
-        sudo chmod 755 /usr/local/bin/pnpm
-        if pnpm -v &>/dev/null; then
-            echo "pnpm 安装成功！"
-        else
-            echo "pnpm 安装失败"
-        fi
-    }
-    cd "$HOME" || { echo "无法进入 HOME 目录"; exit 1; }
-    latest_version=v9.15.3
-    architecture=$(uname -m)
-    install_pnpm "$architecture" "$latest_version"
-fi
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
+[ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh")
+[ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/github.sh")
+
+arch=$(detect_arch_raw)
+case "$arch" in
+    x86_64|amd64) pnpm_bin="pnpm-linux-x64" ;;
+    aarch64|arm64) pnpm_bin="pnpm-linux-arm64" ;;
+    *) echo -e "\033[0;31m不支持的架构: $arch（pnpm 仅支持 x64/arm64）\033[0m"; exit 1 ;;
+esac
+
+url="https://github.com/pnpm/pnpm/releases/download/$PNPM_VERSION/$pnpm_bin"
+getgh "url" 2>/dev/null || url="https://github.moeyy.xyz/$url"
+cd "$HOME" || exit 1
+echo "开始安装 pnpm $PNPM_VERSION..."
+wget --tries=3 --timeout=30 -O "$pnpm_bin" "$url" || { echo "下载失败"; exit 1; }
+sudo mv "$pnpm_bin" /usr/local/bin/pnpm && sudo chmod 755 /usr/local/bin/pnpm
+rm -f "$pnpm_bin" 2>/dev/null
+pnpm -v &>/dev/null && echo -e "\033[0;32mpnpm $(pnpm -v) 安装成功\033[0m" || { echo -e "\033[0;31mpnpm 安装失败\033[0m"; exit 1; }

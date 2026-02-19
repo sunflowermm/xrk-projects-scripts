@@ -81,12 +81,6 @@ PROXIES=(
     ""
 )
 
-# 打乱代理列表（仅在脚本初始化时执行一次）
-shuffled_proxies=($(printf "%s\n" "${PROXIES[@]}" | shuf))
-
-# 缓存快速代理
-fast_proxy=""
-
 function getgh() {
     local var_name="$1"
     local original_url="${!var_name}"
@@ -94,16 +88,31 @@ function getgh() {
     local speed_threshold=2
     local curl_timeout=3
 
-    # 如果已经有快速代理，直接使用缓存
-    if [ -n "$fast_proxy" ]; then
-        local proxied_url="${fast_proxy}/${original_url}"
-        eval "$var_name=\"$proxied_url\""
-        echo -e "${GREEN}✅ 使用缓存的快速代理: ${proxied_url}${NC}"
-        return 0
+    # 手动代理选择：proxy_num 全局变量
+    # 0 = 不使用代理；1-N = 使用对应序号的内置代理
+    if [ -n "${proxy_num}" ]; then
+        if [ "${proxy_num}" = "0" ]; then
+            # 强制直连
+            echo -e "${YELLOW}已关闭代理，直接使用原始地址: ${original_url}${NC}"
+            return 0
+        fi
+        if [[ "${proxy_num}" =~ ^[0-9]+$ ]] && [ "${proxy_num}" -ge 1 ] && [ "${proxy_num}" -le ${#PROXIES[@]} ]; then
+            local manual_proxy="${PROXIES[$((proxy_num-1))]}"
+            if [ -n "${manual_proxy}" ]; then
+                local proxied_url="${manual_proxy}/${original_url}"
+                eval "$var_name=\"$proxied_url\""
+                echo -e "${GREEN}使用手动指定的代理: ${manual_proxy}${NC}"
+                return 0
+            fi
+        fi
     fi
 
+    # 打乱代理列表（每次调用时随机顺序）
+    local shuffled_proxies=($(printf "%s\n" "${PROXIES[@]}" | shuf))
+    local temp_file
+    temp_file=$(mktemp)
+
     # 并行测试代理
-    local temp_file=$(mktemp)
     for proxy in "${shuffled_proxies[@]}"; do
         if [ -z "$proxy" ]; then
             continue
@@ -114,22 +123,34 @@ function getgh() {
     wait
 
     # 读取测试结果并选择最优代理
+    local best_proxy=""
+    local best_time=""
+
     while read -r line; do
         local http_code=$(echo "$line" | awk '{print $1}')
         local time_total=$(echo "$line" | awk '{print $2}')
         local proxy=$(echo "$line" | awk '{print $3}')
-        if [ "$http_code" = "200" ] && awk "BEGIN{exit($time_total<$speed_threshold?0:1)}"; then
-            fast_proxy="$proxy"
-            local proxied_url="${fast_proxy}/${original_url}"
-            eval "$var_name=\"$proxied_url\""
-            echo -e "${GREEN}✅ 使用代理: ${proxied_url}, 响应时间: ${time_total}s${NC}"
-            rm "$temp_file"
-            return 0
+        if [ "$http_code" = "200" ]; then
+            # 只接受在阈值内的结果
+            if awk "BEGIN{exit($time_total<$speed_threshold?0:1)}"; then
+                if [ -z "$best_time" ] || awk "BEGIN{exit($time_total<$best_time?0:1)}"; then
+                    best_time="$time_total"
+                    best_proxy="$proxy"
+                fi
+            fi
         fi
     done < "$temp_file"
 
     rm "$temp_file"
-    echo -e "${RED}❌ 没有找到满意的代理，使用原始 URL: ${original_url}${NC}"
+
+    if [ -n "$best_proxy" ]; then
+        local proxied_url="${best_proxy}/${original_url}"
+        eval "$var_name=\"$proxied_url\""
+        echo -e "${GREEN}已选择代理: ${best_proxy}，响应时间约 ${best_time}s${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}未找到合适的代理，继续使用原始地址: ${original_url}${NC}"
 }
 
 function git() {

@@ -1,11 +1,29 @@
 #!/bin/bash
+# Lagrange.Core 安装脚本（支持远程/本地执行，复用底层 github.sh 代理、common.sh 架构/包管理）
 
-# Lagrange.Core 安装脚本
+# 统一初始化：加载 install_script_common.sh 并初始化环境
+# 支持远程执行：bash <(curl -sL https://raw.gitcode.com/.../Lagrange.sh)
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
+if [ -f "/xrk/shell_modules/install_script_common.sh" ]; then
+    source /xrk/shell_modules/install_script_common.sh
+elif [ -f "$(cd "$(dirname "$0")" && pwd)/../shell_modules/install_script_common.sh" ]; then
+    source "$(cd "$(dirname "$0")" && pwd)/../shell_modules/install_script_common.sh"
+else
+    source <(curl -sL "${SCRIPT_RAW_BASE}/shell_modules/install_script_common.sh" 2>/dev/null) || {
+        # 如果 install_script_common.sh 不存在，使用简化加载逻辑
+        SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd 2>/dev/null || echo ".")"
+        [ -f "/xrk/shell_modules/github.sh" ] && source /xrk/shell_modules/github.sh || [ -f "${SCRIPT_DIR}/../shell_modules/github.sh" ] && source "${SCRIPT_DIR}/../shell_modules/github.sh" 2>/dev/null || true
+        [ -f "/xrk/shell_modules/common.sh" ] && source /xrk/shell_modules/common.sh || [ -f "${SCRIPT_DIR}/../shell_modules/common.sh" ] && source "${SCRIPT_DIR}/../shell_modules/common.sh" 2>/dev/null || true
+    }
+fi
+
+# 初始化安装环境（如果 install_script_common.sh 加载成功）
+type init_install_env &>/dev/null && init_install_env "${XRK_SOURCE:-1}" || true
 
 CYAN='\033[0;1;36;96m'
 GREEN='\033[0;1;32;92m'
 RED='\033[0;1;31;91m'
-NC='\033[0m'
+NC="${NC:-\033[0m}"
 
 REPO="LagrangeDev/Lagrange.Core"
 API_URL="https://api.github.com/repos/${REPO}/releases"
@@ -13,41 +31,34 @@ INSTALL_DIR="/root/lagelan"
 TARGET_EXECUTABLE="Lagrange.OneBot"
 
 function log() {
+    local time msg
     time=$(date +"%Y-%m-%d %H:%M:%S")
-    message="[${time}]: $1"
+    msg="[${time}]: $1"
     case "$1" in
-        *"失败"*|*"错误"*|*"无法连接"*)
-            echo -e "${RED}${message}${NC}"
-            ;;
-        *"成功"*)
-            echo -e "${GREEN}${message}${NC}"
-            ;;
-        *)
-            echo -e "${CYAN}${message}${NC}"
-            ;;
+        *"失败"*|*"错误"*|*"无法连接"*) echo -e "${RED}${msg}${NC}" ;;
+        *"成功"*) echo -e "${GREEN}${msg}${NC}" ;;
+        *) echo -e "${CYAN}${msg}${NC}" ;;
     esac
 }
 
+# 架构检测：优先用 common.detect_arch
 function get_system_info() {
-    arch_raw=$(uname -m)
-    case "${arch_raw}" in
-        x86_64|amd64)
-            system_arch="x64"
-            ;;
-        aarch64|arm64)
-            system_arch="arm64"
-            ;;
-        armv7l|armhf)
-            system_arch="arm"
-            ;;
-        *)
-            log "不支持的系统架构: ${arch_raw}"
-            exit 1
-            ;;
-    esac
-    
+    if type detect_arch &>/dev/null; then
+        case "$(detect_arch)" in
+            x64)   system_arch="x64" ;;
+            arm64) system_arch="arm64" ;;
+            armv7l) system_arch="arm" ;;
+            *) log "不支持的系统架构"; exit 1 ;;
+        esac
+    else
+        case "$(uname -m)" in
+            x86_64|amd64) system_arch="x64" ;;
+            aarch64|arm64) system_arch="arm64" ;;
+            armv7l|armhf) system_arch="arm" ;;
+            *) log "不支持的系统架构: $(uname -m)"; exit 1 ;;
+        esac
+    fi
     log "检测到系统架构: ${system_arch}"
-    
     if [ "${system_arch}" = "arm" ]; then
         download_filename="Lagrange.OneBot_linux-arm_net9.0_SelfContained.tar.gz"
     else
@@ -55,38 +66,12 @@ function get_system_info() {
     fi
 }
 
-function network_test() {
-    target_proxy=""
-    proxy_num=${proxy_num:-9}
-    
-    proxy_arr=("https://ghp.ci" "https://github.moeyy.xyz" "https://mirror.ghproxy.com" "https://gh-proxy.com" "https://x.haod.me")
-    check_url="https://api.github.com/repos/${REPO}/releases/latest"
-    
-    if [ "${proxy_num}" -ge 1 ] && [ "${proxy_num}" -le ${#proxy_arr[@]} ]; then
-        target_proxy="${proxy_arr[$proxy_num-1]}"
-        log "使用代理: ${target_proxy}"
-    elif [ "${proxy_num}" -eq 0 ]; then
-        log "直连GitHub..."
-    else
-        log "检查GitHub代理可用性..."
-        for proxy in "${proxy_arr[@]}"; do
-            if curl -s --connect-timeout 5 "${proxy}/${check_url}" >/dev/null 2>&1; then
-                target_proxy="${proxy}"
-                log "使用代理: ${proxy}"
-                break
-            fi
-        done
-        
-        if [ -z "${target_proxy}" ]; then
-            log "无法连接GitHub，请检查网络"
-            exit 1
-        fi
-    fi
-}
-
 function install_dependency() {
     log "安装依赖包..."
-    
+    if type install_pkg &>/dev/null; then
+        for p in curl jq tar file; do install_pkg "$p" 2>/dev/null || true; done
+        return 0
+    fi
     if command -v apt-get &>/dev/null; then
         apt-get update -qq && apt-get install -y -qq curl jq tar file
     elif command -v dnf &>/dev/null; then
@@ -97,21 +82,16 @@ function install_dependency() {
         log "未找到支持的包管理器"
         exit 1
     fi
-    
-    if [ $? -ne 0 ]; then
-        log "依赖包安装失败"
-        exit 1
-    fi
+    [ $? -ne 0 ] && { log "依赖包安装失败"; exit 1; }
 }
 
 function get_download_url() {
     log "获取最新版本..."
     
-    # 修复URL构造问题
-    if [ -n "${target_proxy}" ]; then
-        api_url="${target_proxy}/${API_URL}"
-    else
-        api_url="${API_URL}"
+    # 默认使用 GitHub 原始 API 地址，代理交给 github.sh 统一处理
+    api_url="${API_URL}"
+    if [ "${proxy_num}" != "0" ] && command -v getgh >/dev/null 2>&1; then
+        getgh api_url
     fi
     
     # 获取原始下载URL
@@ -121,14 +101,10 @@ function get_download_url() {
         log "未找到安装包: ${download_filename}"
         exit 1
     fi
-    
-    # 修复重复代理前缀问题
-    if [ -n "${target_proxy}" ]; then
-        # 确保原始URL不包含代理前缀
-        clean_url=$(echo "${original_download_url}" | sed "s|${target_proxy}/||g")
-        download_url="${target_proxy}/${clean_url}"
-    else
-        download_url="${original_download_url}"
+    # 下载地址同样通过 github.sh 进行代理处理
+    download_url="${original_download_url}"
+    if [ "${proxy_num}" != "0" ] && command -v getgh >/dev/null 2>&1; then
+        getgh download_url
     fi
     
     log "下载地址: ${download_url}"
@@ -159,9 +135,7 @@ function verify_file() {
     # 验证是否为gzip格式
     if ! file "${file_path}" | grep -q "gzip compressed"; then
         log "文件不是有效的gzip格式"
-        # 显示文件内容的前几行来帮助诊断
-        log "文件内容预览:"
-        head -3 "${file_path}" | log
+        log "文件内容预览: $(head -3 "${file_path}" 2>/dev/null | tr '\n' ' ')"
         return 1
     fi
     
@@ -298,7 +272,6 @@ function main() {
     
     get_system_info
     install_dependency
-    network_test
     get_download_url
     download_and_extract
     install_lagrange

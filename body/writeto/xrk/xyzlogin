@@ -1,5 +1,6 @@
 #!/bin/bash
-source /xrk/shell_modules/init.sh
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 0 1  # 初始化：不需要common，需要check_changes（检测xyz路径，.init会加载init.sh）
 
 # 显示帮助信息
 show_help() {
@@ -15,9 +16,6 @@ show_help() {
 if [[ "$1" == "--h" || "$1" == "-h" ]]; then
   show_help
 fi
-
-check_changes
-search_directories
 echo "正在重置葵崽账号"
 
 # 根据是否有参数决定执行方式

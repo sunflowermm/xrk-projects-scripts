@@ -1,8 +1,7 @@
 #!/bin/bash
+# Lagrange ARM 设备优化启动器 v4.0（可复制到 /usr/local/bin/lg）
+[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh
 
-# Lagrange ARM设备优化启动器 v4.0
-
-# 定义配置
 BASE_DIR="/xrk/body"
 LAGRANGE_DIR="/root/lagelan"
 LAGRANGE_EXEC="${LAGRANGE_DIR}/Lagrange.OneBot"
@@ -104,23 +103,18 @@ get_dialog_size() {
     [ $FORM_HEIGHT -lt 10 ] && FORM_HEIGHT=10
 }
 
-# 检查依赖
+# 检查依赖（有 common 时自动 install_pkg）
 check_dependencies() {
-    local missing_pkgs=""
-    
     for pkg in jq dialog curl; do
-        if ! command -v $pkg &> /dev/null; then
-            missing_pkgs="$missing_pkgs $pkg"
+        if ! command -v $pkg &>/dev/null; then
+            if type install_pkg &>/dev/null; then
+                install_pkg "$pkg" || { echo -e "${RED}安装 $pkg 失败${NC}"; exit 1; }
+            else
+                echo -e "${RED}缺少 $pkg，请安装: apt-get install $pkg${NC}"; exit 1
+            fi
         fi
     done
-    
-    if [ -n "$missing_pkgs" ]; then
-        echo -e "${RED}缺少必要的软件包:$missing_pkgs${NC}"
-        echo "安装命令："
-        echo "  apt-get install$missing_pkgs"
-        exit 1
-    fi
-    
+
     if [ ! -f "$LAGRANGE_EXEC" ]; then
         echo -e "${RED}错误：找不到 Lagrange.OneBot${NC}"
         exit 1

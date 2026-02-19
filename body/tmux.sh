@@ -23,9 +23,18 @@ handle_error() {
     exit 1
 }
 
-# 检查依赖
+# 检查依赖（有 common 时自动安装 tmux）
 check_dependencies() {
-    command -v tmux >/dev/null 2>&1 || handle_error "未安装 tmux"
+    if ! command -v tmux &>/dev/null; then
+        if [ -f /xrk/shell_modules/common.sh ]; then
+            source /xrk/shell_modules/common.sh
+            [ -f /xrk/shell_modules/install.sh ] && source /xrk/shell_modules/install.sh
+            确定系统安装器魔法 2>/dev/null || true
+            install_package tmux 2>/dev/null || ensure_cmd tmux tmux || handle_error "未安装 tmux"
+        else
+            handle_error "未安装 tmux"
+        fi
+    fi
     [ -f "$TMUX_CONF" ] || handle_error "配置文件不存在: $TMUX_CONF"
     [ -f "/xrk/body/window_a.sh" ] || handle_error "window_a.sh 不存在"
     [ -f "/xrk/body/window_b.sh" ] || handle_error "window_b.sh 不存在"

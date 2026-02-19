@@ -1,13 +1,16 @@
 #!/bin/bash
+# GitHub 代理切换（whiptail 触屏版），共用 github.sh 的 PROXIES
+[ -f /xrk/.init ] && source /xrk/.init  # 先加载.init（提供颜色）
+[ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 0 0  # 初始化：不需要common，不需要check_changes（但保留颜色变量）
 
-# 设置颜色变量 - 使用柔和的色调
-RED='\033[38;2;255;85;85m'      # 柔和的红色
-GREEN='\033[38;2;80;200;120m'   # 柔和的绿色
-YELLOW='\033[38;2;241;196;15m'  # 柔和的黄色
-BLUE='\033[38;2;30;144;255m'    # 柔和的蓝色
-NC='\033[0m'                    # 重置颜色
+RED="$RED"
+GREEN="$GREEN"
+YELLOW="$YELLOW"
+BLUE='\033[38;2;30;144;255m'
+NC="$NC"
 
-# whiptail界面颜色设置 - 使用更现代的深蓝主题
 export NEWT_COLORS='
 root=,black
 window=white,black
@@ -18,20 +21,6 @@ actbutton=white,red
 title=blue,black
 '
 
-# 代理列表
-PROXIES=(
-    "http://124.156.150.245:10086"
-    "http://140.83.60.48:8081"
-    "https://gh-proxy.com"
-    "https://ghproxy.114514616.xyz"
-    "https://mirror.ghproxy.com"
-    "https://gh.api.99988866.xyz"
-    "https://gh.h233.eu.org"
-    "https://gh.tryxd.cn"
-    ""
-)
-
-# 要过滤的目录
 FILTER_DIRS=('example' 'other' 'system' 'adapter')
 
 # 显示加载动画
@@ -85,10 +74,7 @@ get_proxy() {
     echo -e "${BLUE}🔍 正在检测原始URL: ${clean_url}${NC}"
 
     for proxy in "${shuffled_proxies[@]}"; do
-        if [ -z "$proxy" ]; then
-            echo -e "${RED}❌ 没有找到可用的快速代理，将使用原始URL: ${clean_url}${NC}"
-            return 1
-        fi
+        [ -z "$proxy" ] && continue
 
         local proxied_check_url="${proxy}/https://raw.githubusercontent.com/${check_path}"
         local result

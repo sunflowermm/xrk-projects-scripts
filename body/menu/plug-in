@@ -1,13 +1,8 @@
 #!/bin/bash
+# 插件菜单：安装/管理插件、Python 环境、代理
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 1 0  # 初始化：需要common（install_pkg），不需要check_changes
 
-# 颜色定义
-red='\033[0;31m'
-green='\033[0;32m'
-yellow='\033[0;33m'
-blue='\033[0;34m'
-plain='\033[0m'
-
-# 基础配置
 MENU_DIR="$yz/plugins/XRK/resources/plugins"
 CATEGORIES=(
     "推荐插件:recommended_plugins.json"
@@ -18,221 +13,46 @@ CATEGORIES=(
 )
 YZ_DIR="$yz"
 
-source /xrk/shell_modules/github.sh
-
-# 清屏函数
-clear_lines() {
-    local lines=$1
-    for ((i = 0; i < lines; i++)); do
-        printf "\e[1A\e[K"
-    done
-}
-
-# 检查依赖
+# 检查依赖（使用统一函数）
 check_dependencies() {
     clear
-    local deps=("jq" "dialog" "git" "pnpm" "curl")
-    local missing_deps=()
-
-    for dep in "${deps[@]}"; do
-        if ! command -v "$dep" &>/dev/null; then
-            missing_deps+=("$dep")
-        fi
-    done
-
-    if [ ${#missing_deps[@]} -ne 0 ]; then
-        echo -e "${caidan2}正在安装缺失的依赖: ${missing_deps[*]}${bg}"
-        if grep -Eqi "Ubuntu" /etc/issue && grep -Eq "Ubuntu" /etc/*-release; then
-            apt update && apt install -y "${missing_deps[@]}"
-        elif [ -f /etc/arch-release ]; then
-            pacman -Sy --noconfirm "${missing_deps[@]}"
-        elif [ -f /etc/redhat-release ]; then
-            yum install -y "${missing_deps[@]}"
-        else
-            echo -e "${red}无法确定包管理器，请手动安装: ${missing_deps[*]}${bg}"
-            return 1
-        fi
-    fi
+    menu_check_deps jq dialog git pnpm curl
 }
 
-# 安装Python环境
+# 统一执行 pnpm 安装（合并重复逻辑）
+run_pnpm_install() {
+    [ -d "$YZ_DIR" ] && (cd "$YZ_DIR" && pnpm i) || echo -e "${red}云崽目录不存在${bg}"
+}
+
+# 配置 Python 环境：统一走 uv 模块
 install_python_env() {
-    echo -e "${caidan2}正在检查 Python 环境...${bg}"
-    
-    # 检测系统架构
-    local arch=$(uname -m)
-    echo -e "${caidan2}检测到系统架构: $arch${bg}"
-    
-    local PYTHON_CMD=""
-    if command -v python3 &>/dev/null; then
-        PYTHON_CMD="python3"
-    elif command -v python &>/dev/null; then
-        PYTHON_CMD="python"
+    if [ -f /xrk/body/modules/python_uv ]; then
+        bash /xrk/body/modules/python_uv
+    else
+        echo -e "${red}未找到 python_uv 模块${bg}"
     fi
-
-    if [ -z "$PYTHON_CMD" ]; then
-        echo -e "${caidan2}未检测到 Python，开始安装...${bg}"
-        
-        # Debian/Ubuntu系
-        if command -v apt &>/dev/null; then
-            echo -e "${caidan2}检测到Debian/Ubuntu系统${bg}"
-            apt update
-            # 使用--no-install-recommends减少安装不必要的依赖
-            apt install -y --no-install-recommends python3 python3-pip python3-venv python3-dev
-            
-            # ARM架构可能需要额外的依赖
-            if [[ "$arch" == "arm"* || "$arch" == "aarch64" ]]; then
-                echo -e "${caidan2}ARM架构，安装额外依赖...${bg}"
-                apt install -y --no-install-recommends build-essential libffi-dev
-            fi
-            
-            PYTHON_CMD="python3"
-            
-        # Arch系
-        elif command -v pacman &>/dev/null; then
-            echo -e "${caidan2}检测到Arch系统${bg}"
-            pacman -Sy --needed --noconfirm python python-pip
-            
-            if [[ "$arch" == "arm"* || "$arch" == "aarch64" ]]; then
-                pacman -Sy --needed --noconfirm base-devel
-            fi
-            
-            PYTHON_CMD="python"
-            
-        # Red Hat/CentOS系
-        elif command -v yum &>/dev/null; then
-            echo -e "${caidan2}检测到Red Hat/CentOS系统${bg}"
-            yum install -y python3 python3-pip python3-devel
-            
-            if [[ "$arch" == "arm"* || "$arch" == "aarch64" ]]; then
-                yum install -y gcc libffi-devel
-            fi
-            
-            PYTHON_CMD="python3"
-            
-        # macOS
-        elif command -v brew &>/dev/null; then
-            echo -e "${caidan2}检测到macOS系统${bg}"
-            brew install python
-            PYTHON_CMD="python3"
-            
-        else
-            echo -e "${red}无法确定包管理器，请手动安装 Python${bg}"
-            return 1
-        fi
-    fi
-    
-    # 确保pip已安装并可用
-    echo -e "${caidan2}检查pip是否可用...${bg}"
-    local PIP_CMD=""
-    
-    if command -v pip3 &>/dev/null; then
-        PIP_CMD="pip3"
-    elif command -v pip &>/dev/null; then
-        PIP_CMD="pip"
-    elif [ -n "$PYTHON_CMD" ]; then
-        echo -e "${caidan2}尝试通过ensurepip安装pip...${bg}"
-        $PYTHON_CMD -m ensurepip --upgrade --default-pip || {
-            echo -e "${caidan2}尝试通过get-pip.py安装pip...${bg}"
-            curl -s https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-            $PYTHON_CMD get-pip.py --force-reinstall
-            rm -f get-pip.py
-        }
-        
-        # 再次检查pip是否可用
-        if command -v pip3 &>/dev/null; then
-            PIP_CMD="pip3"
-        elif command -v pip &>/dev/null; then
-            PIP_CMD="pip"
-        else
-            echo -e "${red}pip安装失败，请手动安装${bg}"
-            return 1
-        fi
-    fi
-    
-    # 配置pip镜像源
-    if [ ! -f ~/.pip/pip.conf ]; then
-        echo -e "${caidan2}配置 pip 镜像源...${bg}"
-        mkdir -p ~/.pip
-        cat > ~/.pip/pip.conf << EOF
-[global]
-index-url = https://mirrors.aliyun.com/pypi/simple/
-trusted-host = mirrors.aliyun.com
-EOF
-    fi
-
-    # 安装Poetry
-    if ! command -v poetry &>/dev/null; then
-        echo -e "${caidan2}正在安装 Poetry...${bg}"
-        
-        # 使用curl方式安装Poetry
-        curl -sSL https://install.python-poetry.org | $PYTHON_CMD -
-        
-        # 配置环境变量
-        if ! grep -q "POETRY_HOME" ~/.profile; then
-            echo -e "${caidan2}配置 Poetry 环境变量...${bg}"
-            cat >> ~/.profile << EOF
-# Python Poetry 环境变量
-export PATH="\$HOME/.local/bin:\$PATH"
-export POETRY_HOME="\$HOME/.poetry"
-EOF
-        fi
-
-        # 立即应用环境变量
-        export PATH="$HOME/.local/bin:$PATH"
-        export POETRY_HOME="$HOME/.poetry"
-        # 如果~/.profile文件不存在，创建一个
-        if [[ ":$PATH:" != *":$HOME/.poetry/bin:"* ]]; then
-            export PATH="$HOME/.poetry/bin:$PATH"
-        fi
-        
-        # 配置Poetry
-        echo -e "${caidan2}配置 Poetry...${bg}"
-        if command -v poetry &>/dev/null; then
-            poetry config repositories.aliyun https://mirrors.aliyun.com/pypi/simple/
-            poetry config virtualenvs.in-project true
-        else
-            echo -e "${yellow}警告: Poetry安装后可能需要重启终端才能生效${bg}"
-        fi
-    fi
-
-    # 显示版本信息
-    echo -e "${caidan2}Python环境配置完成！${bg}"
-    echo -e "${caidan2}Python版本: $($PYTHON_CMD --version)${bg}"
-    echo -e "${caidan2}Pip版本: $($PIP_CMD --version)${bg}"
-    
-    if command -v poetry &>/dev/null; then
-        echo -e "${caidan2}Poetry版本: $(poetry --version)${bg}"
-    fi
-
     read -p "按Enter继续..."
 }
 
-# 加载插件数据
+# 加载插件数据（使用统一文件检查）
 load_plugins() {
     local category_file="$1"
     local json_file="$MENU_DIR/$category_file"
     
-    if [ ! -f "$json_file" ]; then
-        echo -e "${red}错误: 找不到配置文件 $json_file${bg}"
-        return 1
-    fi
+    menu_check_file "$json_file" "找不到配置文件 $json_file" || return 1
     
     jq -r '.[] | "\(.cn_name)|\(.name)|\(.description)|\(.git)"' "$json_file"
 }
 
-# 显示插件选择界面
+# 显示插件选择界面（使用统一函数）
 show_plugin_selection() {
-    echo -e "${caidan3}┏━━━━━━━━━━ 插件类别 ━━━━━━━━━━┓${bg}"
-    echo -e "${caidan1}╭──────────────────────────────╮${bg}"
-    local index=1
+    # 收集所有类别名称
+    local category_names=()
     for category in "${CATEGORIES[@]}"; do
         IFS=":" read -r name _ <<< "$category"
-        echo -e "${caidan2}  $index. $name${bg}"
-        ((index++))
+        category_names+=("$name")
     done
-    echo -e "${caidan1}╰──────────────────────────────╯${bg}"
-    echo -e "${caidan3}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${bg}"
+    menu_show "插件类别选择" "${category_names[@]}"
 }
 
 # 安装普通插件
@@ -242,25 +62,21 @@ install_normal_plugin() {
     local cn_name="$3"
     local target_dir="$YZ_DIR/plugins/$name"
     
-    # 检查是否为GitHub链接并使用代理
-    if [[ "$git_url" == *"github.com"* ]]; then
-        local git_url_var="git_url"
-        getgh "git_url_var"
-        git_url="$git_url_var"
-    fi
-    
-    if [ ! -d "$target_dir" ]; then
-        echo -e "${caidan2}正在安装 $cn_name...${bg}"
-        if git clone --depth=1 "$git_url" "$target_dir"; then
-            echo -e "${green}✓ $cn_name 安装成功!${bg}"
-            return 0
-        else
-            echo -e "${red}✗ $cn_name 安装失败${bg}"
-            return 1
-        fi
-    else
+    # GitHub 链接走代理（getgh 会改写同名变量）
+    [[ "$git_url" == *"github.com"* ]] && getgh "git_url"
+
+    if [ -d "$target_dir" ]; then
         echo -e "${yellow}! $cn_name 已安装${bg}"
         return 0
+    fi
+    
+    echo -e "${caidan2}正在安装 $cn_name...${bg}"
+    if git clone --depth=1 "$git_url" "$target_dir"; then
+        echo -e "${green}✓ $cn_name 安装成功!${bg}"
+        return 0
+    else
+        echo -e "${red}✗ $cn_name 安装失败${bg}"
+        return 1
     fi
 }
 
@@ -271,27 +87,22 @@ install_js_plugin() {
     local target_dir="$YZ_DIR/plugins/example"
     local target_file="$target_dir/${cn_name}.js"
 
-    # 检查是否为GitHub链接并使用代理
-    if [[ "$git_url" == *"github.com"* ]]; then
-        local git_url_var="git_url"
-        getgh "git_url_var"
-        git_url="$git_url_var"
-    fi
-    
+    [[ "$git_url" == *"github.com"* ]] && getgh "git_url"
+
     mkdir -p "$target_dir"
     
-    if [ ! -f "$target_file" ]; then
-        echo -e "${caidan2}正在安装 $cn_name...${bg}"
-        if curl -s "$git_url" -o "$target_file"; then
-            echo -e "${green}✓ $cn_name 安装成功!${bg}"
-            return 0
-        else
-            echo -e "${red}✗ $cn_name 安装失败${bg}"
-            return 1
-        fi
-    else
+    if [ -f "$target_file" ]; then
         echo -e "${yellow}! $cn_name 已安装${bg}"
         return 0
+    fi
+    
+    echo -e "${caidan2}正在安装 $cn_name...${bg}"
+    if curl -s "$git_url" -o "$target_file"; then
+        echo -e "${green}✓ $cn_name 安装成功!${bg}"
+        return 0
+    else
+        echo -e "${red}✗ $cn_name 安装失败${bg}"
+        return 1
     fi
 }
 
@@ -342,23 +153,17 @@ show_text_plugins() {
     
     while true; do
         clear
-        echo -e "${caidan3}┏━━━━━━━━━━ $category_name ━━━━━━━━━━┓${bg}"
-        echo -e "${caidan1}╭──────────────────────────────╮${bg}"
-        
-        local index=1
-        local plugins_data=()
+        # 先读取所有插件名称
+        local plugins_data=() plugin_names=()
         while IFS="|" read -r cn_name name description git; do
             if [ -n "$cn_name" ]; then
                 plugins_data+=("$cn_name|$name|$description|$git")
-                echo -e "${caidan2}  $index. $cn_name${bg}"
-                ((index++))
+                plugin_names+=("$cn_name")
             fi
         done < <(load_plugins "$category_file")
-        
-        echo -e "${caidan1}╰──────────────────────────────╯${bg}"
-        echo -e "${caidan3}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${bg}"
-        
-        echo -e "${caidan2}输入插件编号安装 (多个用空格分隔)，输入 0 返回${bg}"
+        # 使用统一菜单显示函数
+        menu_show "${category_name} 插件" "${plugin_names[@]}"
+        echo -e "${caidan3}输入插件编号安装 (多选用空格)，0 返回${bg}"
         read -p "请选择: " selections
         
         if [ "$selections" = "0" ]; then
@@ -385,24 +190,9 @@ show_text_plugins() {
     done
 }
 
-# 显示主菜单
+# 显示主菜单（使用统一函数，自动宽度、自动对齐）
 show_main_menu() {
-    echo -e "${caidan2}输入0或者q退出插件安装脚本${bg}"
-    echo -e "${caidan3}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${bg}"
-    echo -e "${caidan1}╭──────────────────────────────╮${bg}"
-    echo -e "${caidan2}         向日葵插件菜单         ${bg}"
-    echo -e "${caidan1}───────────────────────────────${bg}"
-    echo -e "${caidan2}  1. 安装插件(触屏版)          ${bg}"
-    echo -e "${caidan2}  2. 安装插件(文字版)          ${bg}"
-    echo -e "${caidan2}  3. 安装李诗雅 js 插件(触屏版) ${bg}"
-    echo -e "${caidan2}  4. 安装李诗雅 js 插件(文字版) ${bg}"
-    echo -e "${caidan2}  5. 插件文件管理(触屏版)        ${bg}"
-    echo -e "${caidan2}  6. 插件文件管理(文字版)        ${bg}"
-    echo -e "${caidan2}  7. 配置Python环境            ${bg}"
-    echo -e "${caidan2}  8. 切换插件代理(触屏版)        ${bg}"
-    echo -e "${caidan2}  9. 切换插件代理(文字版)        ${bg}"
-    echo -e "${caidan1}╰──────────────────────────────╯${bg}"
-    echo -e "${caidan3}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${bg}"
+    menu_show "向日葵插件菜单" "安装插件(触屏版)" "安装插件(文字版)" "李诗雅 js(触屏版)" "李诗雅 js(文字版)" "插件文件管理(触屏)" "插件文件管理(文字)" "配置 Python 环境" "切换插件代理(触屏)" "切换插件代理(文字)"
 }
 
 # 主程序
@@ -430,7 +220,7 @@ main() {
                     show_text_plugins "$category_name" "$category_file"
                   fi
                     clear
-                    cd "$YZ_DIR" && pnpm i
+                    run_pnpm_install
                   else
                   echo -e "${red}无效的选择${bg}"
                   sleep 2
@@ -440,25 +230,25 @@ main() {
                 clear
                 bash /xrk/body/menu/jsdialog
                 clear
-                cd "$YZ_DIR" && pnpm i
+                run_pnpm_install
                 ;;
             4)
                 clear
                 bash /xrk/body/menu/js
                 clear
-                cd "$YZ_DIR" && pnpm add axios -w && pnpm i
+                [ -d "$YZ_DIR" ] && (cd "$YZ_DIR" && pnpm add axios -w && pnpm i) || echo -e "${red}云崽目录不存在${bg}"
                 ;;
             5)
                 clear
                 bash /xrk/body/menu/deletiondialog
                 clear
-                cd "$YZ_DIR" && pnpm i
+                run_pnpm_install
                 ;;
             6)
                 clear
                 bash /xrk/body/menu/deletion
                 clear
-                cd "$YZ_DIR" && pnpm i
+                run_pnpm_install
                 ;;
 
             7)
@@ -478,7 +268,7 @@ main() {
             q|0)
                 clear
                 echo -e "${caidan2}感谢使用，再见！${bg}"
-                cd "$YZ_DIR" && pnpm i
+                run_pnpm_install
                 exit 0
                 ;;
             *)

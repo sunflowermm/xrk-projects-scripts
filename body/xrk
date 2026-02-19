@@ -1,17 +1,25 @@
 #!/bin/bash
-cd $HOME
-#检查权限
+# 主菜单：云崽安装、插件、报错修复、换签、脚本、NapCat、拉格朗日、环境
+cd "$HOME" || true
+source /xrk/shell_modules/repo_source.sh
 source /xrk/shell_modules/update.sh
 source /xrk/.init
+source /xrk/shell_modules/menu_common.sh
+red="${color_red:-\033[31m}"
+yz="${yz:-$HOME/XRK-Yunzai}"
+
+# 非 root 时以 root 重新执行本脚本，保证后续菜单与安装有权限
 if [ "$(whoami)" != "root" ]; then
-    sudo -i
+    exec sudo bash /xrk/body/xrk "$@"
 fi
 
-response=$(curl -s "https://v1.hitokoto.cn")
-sentence=$(echo "$response" | jq -r '.hitokoto')
+response=$(curl -s "https://v1.hitokoto.cn" 2>/dev/null)
+sentence=$(echo "$response" | jq -r '.hitokoto // empty' 2>/dev/null)
 
-ver1=$(curl -s "https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/package.json" | jq -r '.version')
-ver2=$(jq -r '.version' /xrk/package.json)
+ver1=$(curl -s "$SCRIPT_RAW_BASE/package.json" 2>/dev/null | jq -r '.version // empty')
+ver2=$(jq -r '.version // empty' /xrk/package.json 2>/dev/null)
+[ -z "$ver1" ] && ver1="?"
+[ -z "$ver2" ] && ver2="?"
 
 if [ "$ver1" != "$ver2" ]; then
     zhuangtai="${color_red}[请更新]${bg}"
@@ -22,52 +30,61 @@ current_time=$(date "+%Y-%m-%d %H:%M:%S")
 
 echo -e "${caidan1}${sentence}${bg}"
 
-function clear_menu
-{
-for ((i=0;i<forin;i++));do
-    printf "\e[1A\e[K"
-done
-}
-
 function show_menu 
 {
-echo -e "${caidan2}现在的时间是 : $current_time${bg}"
-echo -e "${caidan1}任意键退出脚本，当前脚本主管的云崽为$yz${bg}"
-echo -e "${caidan2}更新请输入r${bg}"
-echo -e "${caidan3}                  __ _                        
+    # 自动计算主菜单宽度（标题和所有选项）
+    local menu_width=$(menu_calc_width "向日葵脚本" "集中营 1013495491" "安/重装云崽" "插件相关" "报错修复" "一键换签" "脚本相关" "安装 Napcat" "安装拉格朗日" "环境与模块")
+    local status_width=16  # 状态框固定16列
+    local prefix="        "  # 菜单前缀
+    
+    echo -e "${caidan2}现在的时间是 : $current_time${bg}"
+    echo -e "${caidan1}任意键退出脚本，当前脚本主管的云崽为$yz${bg}"
+    echo -e "${caidan2}更新请输入r${bg}"
+    echo -e "${caidan3}                  __ _                        
  ___ _   _ _ __  / _| | _____      _____ _ __ 
 / __| | | | '_ \| |_| |/ _ \ \ /\ / / _ \ '__|
 \__ \ |_| | | | |  _| | (_) \ V  V /  __/ |   
 |___/\__,_|_| |_|_| |_|\___/ \_/\_/ \___|_|   ${bg}"
-echo -e "${caidan1}        ╭─────────────────────────╮${bg}"
-echo -e "${caidan1}        │        向日葵脚本       │${bg}"
-echo -e "${caidan1}        ├─────────────────────────┤${bg}"
-echo -e "${caidan2}        │     集中营1013495491    │  ${bg}"
-echo -e "${caidan1}        ├─────────────────────────┤${bg}"
-echo -e "${caidan2}        │      1 安/重装云崽      │${bg}"
-echo -e "${caidan1}        ├─────────────────────────┤${bg}   ${caidan1}┌───────────────┐${bg}"
-echo -e "${caidan2}        │       2 插件相关        │${bg}   ${caidan1}│${bg}    ${caidan3}脚本状态${bg}   ${caidan1}│${bg}"
-echo -e "${caidan1}        ├─────────────────────────┤${bg}   ${caidan1}│${bg}${caidan2}最新版本: ${bg}$ver1${caidan1}│${bg}"
-echo -e "${caidan2}        │       3 报错修复        │${bg}  ${caidan1} │${bg}${caidan2}当前版本: ${bg}$ver2${caidan1}│${bg}"
-echo -e "${caidan1}        ├─────────────────────────┤${bg}  ${caidan1} │${bg}    ${zhuangtai}   ${caidan1}│${bg}"
-echo -e "${caidan2}        │       4 一键换签        │${bg}   ${caidan1}└───────────────┘${bg}"
-echo -e "${caidan1}        ├─────────────────────────┤${bg}"
-echo -e "${caidan2}        │       5 脚本相关        │${bg}"
-echo -e "${caidan1}        ├─────────────────────────┤${bg}"
-echo -e "${caidan2}        │      6 安装Napcat       │${bg}"
-echo -e "${caidan1}        ├─────────────────────────┤${bg}"
-echo -e "${caidan2}        │     7 安装拉格朗日      │${bg}"
-echo -e "${caidan1}        ╰─────────────────────────╯${bg}"
-echo
+    
+    # 动态生成边框
+    local border_top=$(menu_build_border "$menu_width" top)
+    local border_mid=$(menu_build_border "$menu_width" mid)
+    local border_bot=$(menu_build_border "$menu_width" bot)
+    local status_top=$(menu_build_border "$status_width" top)
+    local status_bot=$(menu_build_border "$status_width" bot)
+    
+    # 显示菜单（合并重复代码）
+    echo -e "${caidan1}${prefix}${border_top}${bg}"
+    echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "向日葵脚本" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}"
+    echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "集中营 1013495491" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}   ${caidan1}${status_top}${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 1 "安/重装云崽" "$menu_width")${caidan1}│${bg}   ${caidan1}│${caidan3}$(menu_center_title "脚本状态" "$status_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}   ${caidan1}│${caidan2}$(menu_center_title "最新: $ver1" "$status_width")${caidan1}│${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 2 "插件相关" "$menu_width")${caidan1}│${bg}   ${caidan1}│${caidan2}$(menu_center_title "当前: $ver2" "$status_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}   ${caidan1}│${caidan2}$(menu_center_title "$zhuangtai" "$status_width")${caidan1}│${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 3 "报错修复" "$menu_width")${caidan1}│${bg}   ${caidan1}${status_bot}${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 4 "一键换签" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 5 "脚本相关" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 6 "安装 Napcat" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 7 "安装拉格朗日" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_mid}${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 8 "环境与模块" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}${border_bot}${bg}"
+    echo
 }
 
 while true; do
     show_menu
     read -p "请从选项中选一个: " CHOICE
-    forin=27 clear_menu
+    forin=28 clear_menu
     case "$CHOICE" in
         1 )
-        bash <(curl -sL https://raw.gitcode.com/Xrkseek/sunflower-yunzai-scripts/raw/master/linuxinstall.sh)
+        bash /xrk/linuxinstall.sh
         ;;
         2 )
         bash /xrk/body/menu/plug-in
@@ -84,12 +101,15 @@ while true; do
         break
         ;;
         6 )
-        bash /xrk/Yunzai-install/NapCat.sh
+        run_software "Yunzai-install/NapCat.sh"
         break
         ;;
         7 )
-        bash /xrk/Yunzai-install/Lagrange.sh
+        run_software "Yunzai-install/Lagrange.sh"
         break
+        ;;
+        8 )
+        bash /xrk/body/modules/env
         ;;
         r )
     echo -e "开始更新至最新脚本"

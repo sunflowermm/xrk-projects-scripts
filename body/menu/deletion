@@ -1,27 +1,13 @@
 #!/bin/bash
-
-# 设置颜色变量
-red="\033[31m"
-green="\033[32m"
-yellow="\033[33m"
+# 文件/目录管理：插件、js、Bot、自定义目录删除
+[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+menu_init 0 0  # 初始化：不需要common，不需要check_changes
 
 function show_menu() {
-    local title=$1
+    local title="${1:-文件管理}"
     local options=("${@:2}")
-    echo -e "${caidan3}按q键退出程序，按回车返回菜单${bg}"
-    echo -e "${caidan1}╭──────────────────────────╮${bg}"
-    for i in "${!options[@]}"; do
-        echo -e "${caidan2} $((i+1)). ${options[i]} ${bg}"
-    done
-    echo -e "${caidan1}╰──────────────────────────╯${bg}"
-    echo -e "${caidan3}请输入要管理的文件夹序号${bg}"
-}
-
-function clear_lines() {
-    local lines=$1
-    for ((i = 0; i < lines; i++)); do
-        printf "\e[1A\e[K"
-    done
+    # 使用统一菜单显示函数（自动宽度、自动对齐）
+    menu_show "$title" "${options[@]}" "请输入要管理的序号"
 }
 
 # 删除文件/文件夹函数
@@ -64,10 +50,7 @@ function manage_files() {
     local folder_name=$2
     
     while true; do
-        if [ ! -d "$want_path" ]; then
-            echo -e "${red}错误: 目录 $want_path 不存在${bg}"
-            return
-        fi
+        menu_check_dir "$want_path" "目录 $want_path 不存在" || return
         
         IFS=$'\n'
         file_list=($(find "$want_path" -mindepth 1 -maxdepth 1 2>/dev/null))
@@ -84,17 +67,17 @@ function manage_files() {
             file_list[$i]=$(basename "${file_list[$i]}")
         done
         
-        # 显示文件列表
-        echo -e "${caidan3}$folder_name：${bg}"
-        echo -e "${caidan1}╭──────────────────────────╮${bg}"
-        for i in "${!file_list[@]}"; do
-            if [ -d "$want_path/${file_list[i]}" ]; then
-                echo -e "${caidan2} $((i+1)). 📁 ${file_list[i]} ${bg}"
+        # 使用统一菜单显示函数（动态文件列表）
+        local file_opts=()
+        for file in "${file_list[@]}"; do
+            if [ -d "$want_path/$file" ]; then
+                file_opts+=("📁 $file")
             else
-                echo -e "${caidan2} $((i+1)). 📄 ${file_list[i]} ${bg}"
+                file_opts+=("📄 $file")
             fi
         done
-        echo -e "${caidan1}╰──────────────────────────╯${bg}"
+        echo -e "${caidan3}$folder_name：${bg}"
+        menu_show "$folder_name" "${file_opts[@]}"
         
         # 处理用户输入
         echo -e "${caidan3}输入要删除的序号，多选用空格分隔${bg}"
@@ -106,7 +89,7 @@ function manage_files() {
             exit 0
         }
         [ -z "$input" ] && {
-            clear_lines $((${#file_list[@]} + 7))
+            forin=$((${#file_list[@]} + 7)) clear_menu
             return
         }
         
@@ -116,18 +99,12 @@ function manage_files() {
         local files_to_delete=()
         local invalid_input=false
         
-        # 处理每个输入
+        # 处理每个输入（使用统一验证函数）
         for num in "${inputs[@]}"; do
-            if [[ "$num" =~ ^[0-9]+$ ]]; then
+            if menu_validate_input "$num" 1 ${#file_list[@]} "序号 $num 超出范围"; then
                 index=$((num - 1))
-                if [ "$index" -ge 0 ] && [ "$index" -lt ${#file_list[@]} ]; then
-                    files_to_delete+=("${file_list[index]}")
-                else
-                    echo -e "${red}错误: 序号 $num 超出范围${bg}"
-                    invalid_input=true
-                fi
+                files_to_delete+=("${file_list[index]}")
             else
-                echo -e "${red}错误: 无效的输入 '$num'${bg}"
                 invalid_input=true
             fi
         done
@@ -135,7 +112,7 @@ function manage_files() {
         if [ ${#files_to_delete[@]} -gt 0 ] && [ "$invalid_input" = false ]; then
             delete_files "$want_path" "${files_to_delete[@]}"
             read -p "按回车键继续..."
-            clear_lines $((${#file_list[@]} + 7))
+            forin=$((${#file_list[@]} + 7)) clear_menu
         fi
     done
 }
@@ -168,10 +145,7 @@ function main() {
                 ;;
             4) 
                 read -p "输入你想要管理的文件目录: " want_path
-                if [ ! -d "$want_path" ]; then
-                    echo -e "${red}错误: 目录不存在${bg}"
-                    continue
-                fi
+                menu_check_dir "$want_path" "目录不存在" || continue
                 manage_files "$want_path" "自定义目录"
                 ;;
             *)
@@ -180,7 +154,7 @@ function main() {
         esac
         
         # 清理屏幕
-        clear_lines 9
+        forin=9 clear_menu
     done
 }
 

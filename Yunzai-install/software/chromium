@@ -1,366 +1,350 @@
 #!/usr/bin/env bash
-cd $HOME
+# Chromium 浏览器安装脚本（支持远程/本地执行，Ubuntu/Debian，国内外镜像自动选择）
+
+cd "$HOME" || exit
+
+# 支持远程执行：bash <(curl -sL https://raw.gitcode.com/.../chromium)
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
 
 # 颜色定义
-red="\033[31m"
-green="\033[32m"
-yellow="\033[33m"
-blue="\033[34m"
-purple="\033[35m"
-cyan="\033[36m"
-white="\033[37m"
-background="\033[0m"
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BLUE="\033[34m"
+CYAN="\033[36m"
+RESET="\033[0m"
 
-installed_package=""
-chromium_command=""
-uninstall_mode=false
+# 全局变量
+INSTALLED_PACKAGE=""
+UNINSTALL_MODE=false
+USE_MIRROR=true
+PPA_FINGERPRINT="82BB6851C64F6880"
+PPA_KEYSERVER="keyserver.ubuntu.com"
+PPA_MIRRORS=("launchpad.proxy.ustclug.org" "ppa.launchpadcontent.net" "mirrors.tuna.tsinghua.edu.cn")
+SELECTED_MIRROR=""
+SYSTEM_CODENAME=""
+
+# 日志函数（统一格式）
+log_info() { echo -e "${BLUE}[信息]${RESET} $1"; }
+log_success() { echo -e "${GREEN}[✓]${RESET} $1"; }
+log_warn() { echo -e "${YELLOW}[⚠]${RESET} $1"; }
+log_error() { echo -e "${RED}[✗]${RESET} $1"; exit 1; }
+log_step() { echo -e "${CYAN}▶ $1${RESET}"; }
 
 # 显示帮助信息
 show_help() {
-    echo -e "${green}Ubuntu Chromium PPA 安装脚本${background}"
-    echo -e "${blue}用途：通过PPA在Ubuntu/Debian系统上安装Chromium浏览器${background}"
+    echo -e "${GREEN}═══════════════════════════════════════════════════${RESET}"
+    echo -e "${GREEN}  Ubuntu/Debian Chromium 浏览器安装脚本 v3.2${RESET}"
+    echo -e "${GREEN}═══════════════════════════════════════════════════${RESET}"
     echo ""
-    echo -e "${yellow}支持的系统：${background}"
-    echo "- Ubuntu 18.04+ (所有LTS和标准版本)"
-    echo "- Debian 10+"
-    echo "- Linux Mint 19+"
-    echo "- Elementary OS 5+"
-    echo "- Pop!_OS 20.04+"
-    echo "- 其他基于Ubuntu/Debian的发行版"
+    echo -e "${YELLOW}支持的系统:${RESET}"
+    echo "  • Ubuntu 18.04+ (ARM64/armhf/amd64)"
+    echo "  • Debian 10+ (ARM/x86)"
+    echo "  • 基于 Ubuntu 的 ARM 发行版"
     echo ""
-    echo -e "${yellow}用法：${background}"
-    echo "sudo $0 [选项]"
+    echo -e "${YELLOW}使用方法:${RESET}"
+    echo "  sudo $0 [选项]"
     echo ""
-    echo -e "${yellow}选项：${background}"
-    echo "-h, --help     显示此帮助信息"
-    echo "-u, --uninstall 卸载后重新安装"
+    echo -e "${YELLOW}选项:${RESET}"
+    echo "  -h, --help         显示帮助信息"
+    echo "  -u, --uninstall    卸载并重新安装"
+    echo "  --no-mirror        使用官方源（国内用户不推荐）"
     echo ""
-    echo -e "${yellow}说明：${background}"
-    echo "此脚本只安装chromium包，并为chromium-browser创建软链接"
+    echo -e "${CYAN}说明: 本脚本使用 PPA 安装 Chromium，自动选择最快镜像，国内外均可使用。${RESET}"
     echo ""
 }
 
 # 检测系统架构
 detect_architecture() {
-    case $(uname -m) in
-        aarch64|arm64)
-            framework="arm64"
-            ;;
-        amd64|x86_64)
-            framework="amd64"
-            ;;
-        armv7l|armhf)
-            framework="armhf"
-            ;;
-        i386|i686)
-            framework="i386"
-            ;;
-        *)
-            echo -e "${yellow}警告：未识别的设备架构 $(uname -m)，将尝试继续安装${background}"
-            framework="unknown"
-            ;;
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        aarch64|arm64) FRAMEWORK="arm64" ;;
+        armv7l|armhf) FRAMEWORK="armhf" ;;
+        amd64|x86_64) FRAMEWORK="amd64" ;;
+        *) log_error "不支持的架构: $ARCH" ;;
     esac
-    echo -e "${blue}检测到系统架构: ${framework}${background}"
+    log_info "检测到架构: $FRAMEWORK"
 }
 
-# 检测系统版本（兼容多种Linux发行版）
+# 检测系统版本和代号
 detect_system_version() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        system_id="$ID"
-        system_version="$VERSION_ID"
-        system_codename="$VERSION_CODENAME"
-        system_name="$PRETTY_NAME"
-        
-        echo -e "${blue}检测到系统: ${system_name}${background}"
-        
-        case "$system_id" in
-            ubuntu|debian|linuxmint|elementary|pop|zorin|neon)
-                echo -e "${green}✓ 支持的系统类型${background}"
-                ;;
-            *)
-                if [ -f /etc/debian_version ] || command -v apt &> /dev/null; then
-                    echo -e "${yellow}检测到基于Debian/Ubuntu的系统，将尝试安装${background}"
-                else
-                    echo -e "${red}错误：此脚本仅支持基于Ubuntu/Debian的系统${background}"
-                    exit 1
-                fi
-                ;;
-        esac
-    else
-        echo -e "${red}错误：无法检测系统版本${background}"
-        exit 1
-    fi
+    [ ! -f /etc/os-release ] && log_error "无法检测系统版本"
+    . /etc/os-release
+    SYSTEM_ID="$ID"
+    SYSTEM_VERSION="$VERSION_ID"
+    SYSTEM_CODENAME="$VERSION_CODENAME"
+    SYSTEM_NAME="$PRETTY_NAME"
+    log_info "系统: $SYSTEM_NAME (代号: $SYSTEM_CODENAME)"
+    case "$SYSTEM_ID" in
+        ubuntu|debian|linuxmint|pop) log_success "支持的系统" ;;
+        *)
+            command -v apt >/dev/null && log_warn "未知的 Debian 系系统，尝试安装" || \
+            log_error "仅支持 Debian/Ubuntu 系系统"
+            ;;
+    esac
 }
 
 # 准备系统环境
 prepare_system() {
-    echo -e "${green}正在更新系统包列表...${background}"
-    apt update -y
-    
-    local required_tools="wget curl software-properties-common apt-transport-https ca-certificates gpg"
-    
-    for tool in $required_tools; do
-        if ! dpkg -l | grep -q "^ii  $tool "; then
-            echo -e "${yellow}安装 $tool...${background}"
-            apt install -y $tool
-        fi
+    log_step "准备系统环境"
+    apt update -y -qq 2>/dev/null || log_warn "apt update 有警告（忽略）"
+    local tools="wget curl gnupg ca-certificates apt-transport-https software-properties-common"
+    for tool in $tools; do
+        dpkg -l | grep -q "^ii  $tool " || {
+            log_info "安装 $tool"
+            apt install -y -qq "$tool" 2>/dev/null
+        }
     done
+    log_success "系统环境准备完成"
 }
 
-check_chromium_installation() {
-    if command -v chromium &> /dev/null; then
-        chromium_command="chromium"
-        installed_package="chromium"
-        return 0
-    elif dpkg -l | grep -q "^ii  chromium "; then
-        chromium_command="chromium"
-        installed_package="chromium"
-        return 0
+# 测试镜像速度并选择最快的
+test_mirror_speed() {
+    log_step "测试 PPA 镜像速度"
+    local fastest_mirror="" min_time=999999
+    for mirror in "${PPA_MIRRORS[@]}"; do
+        echo -ne "${CYAN}  测试 $mirror ... ${RESET}"
+        local start=$(date +%s%N)
+        if timeout 5 curl -s -I "https://$mirror" >/dev/null 2>&1; then
+            local end=$(date +%s%N)
+            local elapsed=$(( (end - start) / 1000000 ))
+            echo -e "${GREEN}${elapsed}ms${RESET}"
+            [ "$elapsed" -lt "$min_time" ] && { min_time=$elapsed; fastest_mirror=$mirror; }
+        else
+            echo -e "${RED}失败${RESET}"
+        fi
+    done
+    if [ -n "$fastest_mirror" ]; then
+        SELECTED_MIRROR="$fastest_mirror"
+        log_success "最快镜像: $SELECTED_MIRROR (${min_time}ms)"
     else
-        return 1
+        SELECTED_MIRROR="ppa.launchpadcontent.net"
+        log_warn "使用默认官方源"
     fi
 }
 
-create_chromium_browser_symlink() {
-    local chromium_path=$(which chromium)
+# 添加 GPG 密钥（多种方法确保成功）
+add_gpg_key() {
+    log_step "添加 GPG 密钥"
+    local temp_keyring="/tmp/xtradeb-temp.gpg"
+    local keyservers=("keyserver.ubuntu.com" "keys.openpgp.org" "pgp.mit.edu")
     
-    if [ -n "$chromium_path" ]; then
-        local symlink_dir=$(dirname "$chromium_path")
-        local symlink_path="$symlink_dir/chromium-browser"
-        
-        echo -e "${green}创建chromium-browser软链接...${background}"
-        
-        if [ -L "$symlink_path" ]; then
-            echo -e "${yellow}删除已存在的chromium-browser软链接...${background}"
-            rm -f "$symlink_path"
-        elif [ -f "$symlink_path" ]; then
-            echo -e "${yellow}警告：$symlink_path 已存在且不是软链接，跳过创建${background}"
-            return 1
+    # 方法1: gpg + keyserver
+    for server in "${keyservers[@]}"; do
+        if gpg --no-default-keyring --keyring "$temp_keyring" --keyserver "hkp://$server:80" --recv-keys "$PPA_FINGERPRINT" 2>/dev/null; then
+            gpg --no-default-keyring --keyring "$temp_keyring" --export "$PPA_FINGERPRINT" | apt-key add - 2>/dev/null && {
+                rm -f "$temp_keyring" "$temp_keyring~"
+                log_success "GPG 密钥添加成功 (keyserver: $server)"
+                return 0
+            }
         fi
-        
-        if ln -s "$chromium_path" "$symlink_path"; then
-            echo -e "${green}✓ 软链接创建成功: $symlink_path -> $chromium_path${background}"
+    done
+    
+    # 方法2: apt-key 直接添加
+    for server in "${keyservers[@]}"; do
+        apt-key adv --keyserver "hkp://$server:80" --recv-keys "$PPA_FINGERPRINT" 2>/dev/null && {
+            log_success "GPG 密钥添加成功 (apt-key: $server)"
             return 0
-        else
-            echo -e "${red}✗ 软链接创建失败${background}"
-            return 1
-        fi
+        }
+    done
+    
+    # 方法3: Web 获取
+    if wget -qO- "https://$PPA_KEYSERVER/pks/lookup?op=get&search=0x$PPA_FINGERPRINT" 2>/dev/null | apt-key add - 2>/dev/null; then
+        log_success "GPG 密钥添加成功 (web)"
+        return 0
+    fi
+    
+    log_error "所有 GPG 密钥添加方法均失败"
+}
+
+# 配置 PPA 源文件
+configure_ppa_source() {
+    log_step "配置 PPA 源"
+    local list_file="/etc/apt/sources.list.d/xtradeb-apps.list"
+    local ppa_url
+    
+    if [ "$USE_MIRROR" = true ] && [ "$SELECTED_MIRROR" != "ppa.launchpadcontent.net" ]; then
+        # 使用镜像
+        case "$SELECTED_MIRROR" in
+            launchpad.proxy.ustclug.org)
+                ppa_url="https://$SELECTED_MIRROR/xtradeb/apps/ubuntu"
+                ;;
+            mirrors.tuna.tsinghua.edu.cn)
+                ppa_url="https://$SELECTED_MIRROR/ubuntu-ports/xtradeb/apps/ubuntu"
+                ;;
+            *)
+                ppa_url="https://$SELECTED_MIRROR/xtradeb/apps/ubuntu"
+                ;;
+        esac
+        log_info "使用镜像: $SELECTED_MIRROR"
     else
-        echo -e "${red}错误：未找到chromium可执行文件${background}"
-        return 1
+        ppa_url="https://ppa.launchpadcontent.net/xtradeb/apps/ubuntu"
+        log_info "使用官方源"
+    fi
+    
+    echo "deb $ppa_url $SYSTEM_CODENAME main" > "$list_file"
+    log_success "PPA 源配置完成"
+}
+
+# 添加并验证 PPA 仓库
+add_ppa_repository() {
+    add_gpg_key
+    configure_ppa_source
+    
+    log_step "更新软件包列表"
+    apt update 2>&1 | tee /tmp/apt_update.log >/dev/null
+    
+    # 处理密钥问题
+    if grep -q "NO_PUBKEY" /tmp/apt_update.log; then
+        log_warn "检测到密钥问题，正在修复..."
+        grep "NO_PUBKEY" /tmp/apt_update.log | awk '{print $NF}' | sort -u | while read -r key; do
+            log_info "添加缺失的密钥: $key"
+            apt-key adv --keyserver "hkp://$PPA_KEYSERVER:80" --recv-keys "$key" 2>/dev/null
+        done
+        apt update -y -qq 2>/dev/null
+    fi
+    
+    # 验证 PPA（改进的验证逻辑）
+    log_step "验证 PPA 源"
+    local retry=0 max_retries=3
+    while [ $retry -lt $max_retries ]; do
+        if apt-cache policy chromium 2>/dev/null | grep -q "xtradeb\|$SELECTED_MIRROR"; then
+            log_success "PPA 源验证成功"
+            return 0
+        fi
+        [ $retry -eq 0 ] && {
+            log_info "等待 PPA 源同步..."
+            sleep 2
+            apt update -y -qq 2>/dev/null
+        }
+        retry=$((retry + 1))
+    done
+    
+    # 如果验证失败，尝试检查包是否存在
+    if apt-cache search chromium 2>/dev/null | grep -q "^chromium "; then
+        log_warn "PPA 验证未完全通过，但 chromium 包可用，继续安装"
+        return 0
+    fi
+    
+    log_error "PPA 源验证失败，请检查网络连接或稍后重试"
+}
+
+# 检查 Chromium 是否已安装
+check_chromium_installation() {
+    if dpkg -l | grep -q "^ii  chromium "; then
+        INSTALLED_PACKAGE="chromium"
+        return 0
+    fi
+    return 1
+}
+
+# 创建 chromium-browser 符号链接
+create_symlink() {
+    local symlink_path="/usr/bin/chromium-browser"
+    if command -v chromium >/dev/null && [ ! -e "$symlink_path" ]; then
+        ln -s "$(which chromium)" "$symlink_path" 2>/dev/null && \
+        log_success "已创建符号链接: chromium-browser"
     fi
 }
 
-# 卸载已安装的Chromium
+# 卸载 Chromium 并清理
 uninstall_chromium() {
-    echo -e "${yellow}正在卸载已安装的Chromium...${background}"
-    
-    # 删除可能存在的软链接
-    local possible_symlinks="/usr/bin/chromium-browser /usr/local/bin/chromium-browser"
-    for symlink in $possible_symlinks; do
-        if [ -L "$symlink" ]; then
-            echo -e "${yellow}删除软链接: $symlink${background}"
-            rm -f "$symlink"
+    log_step "卸载 Chromium"
+    rm -f /usr/bin/chromium-browser /usr/local/bin/chromium-browser 2>/dev/null
+    local packages="chromium chromium-browser chromium-codecs-ffmpeg"
+    for pkg in $packages; do
+        if dpkg -l | grep -q "^ii  $pkg "; then
+            log_info "卸载 $pkg"
+            apt remove --purge -y -qq "$pkg" 2>/dev/null
         fi
     done
-    
-    local packages_to_remove="chromium chromium-browser chromium-browser-l10n chromium-codecs-ffmpeg chromium-codecs-ffmpeg-extra"
-    
-    for package in $packages_to_remove; do
-        if dpkg -l | grep -q "^ii  $package "; then
-            echo -e "${yellow}卸载 $package...${background}"
-            apt remove --purge -y $package
-        fi
-    done
-    
-    apt autoremove -y
-    apt autoclean
-    
-    if [ -f /etc/apt/sources.list.d/xtradeb-ubuntu-apps-*.list ]; then
-        echo -e "${yellow}删除xtradeb PPA...${background}"
-        add-apt-repository --remove ppa:xtradeb/apps -y 2>/dev/null || true
-    fi
-    
-    apt update -y
-    
-    echo -e "${green}✓ 卸载完成${background}"
+    apt autoremove -y -qq 2>/dev/null
+    rm -f /etc/apt/sources.list.d/xtradeb-apps.list
+    apt update -y -qq 2>/dev/null
+    log_success "卸载完成"
 }
 
-# 通过PPA安装Chromium
+# 通过 PPA 安装 Chromium
 install_chromium_ppa() {
-    echo -e "${green}使用PPA安装Chromium...${background}"
+    log_step "通过 PPA 安装 Chromium"
+    [ "$USE_MIRROR" = true ] && test_mirror_speed
+    add_ppa_repository
     
-    case "$system_id" in
-        ubuntu)
-            case "$system_version" in
-                "18.04"|"20.04"|"22.04"|"24.04"|"24.10"|"25.04")
-                    echo -e "${blue}Ubuntu版本 $system_version 完全支持${background}"
-                    ;;
-                *)
-                    echo -e "${yellow}Ubuntu版本 $system_version 可能部分支持，将尝试安装${background}"
-                    ;;
-            esac
-            ;;
-        debian|linuxmint|elementary|pop|*)
-            echo -e "${blue}检测到 $system_id，将尝试使用Ubuntu PPA${background}"
-            ;;
-    esac
-    
-    echo -e "${green}添加xtradeb PPA仓库...${background}"
-    
-    if ! add-apt-repository ppa:xtradeb/apps -y; then
-        echo -e "${red}添加PPA失败，可能是网络问题或系统不兼容${background}"
-        echo -e "${yellow}尝试手动添加PPA...${background}"
-        
-        echo "deb https://ppa.launchpadcontent.net/xtradeb/apps/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/xtradeb-apps.list
-        
-        wget -qO- https://keyserver.ubuntu.com/pks/lookup?op=get\&search=0x9FD3B784BC1C6FC31A8A0A1C1655A0AB68576280 | gpg --dearmor | tee /etc/apt/trusted.gpg.d/xtradeb-apps.gpg > /dev/null
-        
-        if [ $? -ne 0 ]; then
-            echo -e "${red}手动添加PPA也失败了${background}"
-            return 1
-        fi
-    fi
-    
-    echo -e "${green}更新包列表...${background}"
-    apt update -y
-    
-    echo -e "${green}安装Chromium（仅chromium包）...${background}"
-    
-    # 只安装chromium包
-    if apt install -y chromium; then
-        installed_package="chromium"
-        echo -e "${green}✓ chromium包安装成功${background}"
-        
-        # 创建chromium-browser软链接
-        if create_chromium_browser_symlink; then
-            echo -e "${green}✓ chromium-browser软链接创建成功${background}"
-        else
-            echo -e "${yellow}警告：软链接创建失败，但chromium安装成功${background}"
-        fi
-        
+    log_info "正在安装 Chromium..."
+    if DEBIAN_FRONTEND=noninteractive apt install -y chromium 2>/dev/null; then
+        INSTALLED_PACKAGE="chromium"
+        log_success "Chromium 安装成功"
+        create_symlink
         return 0
     else
-        echo -e "${red}✗ chromium包安装失败${background}"
-        return 1
+        log_error "Chromium 安装失败，请检查错误信息"
     fi
 }
 
-# 主安装函数
+# 主安装逻辑
 main_install() {
-    # 检查是否已经安装
-    if check_chromium_installation && [ "$uninstall_mode" = false ]; then
-        echo -e "${green}✓ Chromium已经安装！${background}"
-        echo -e "${blue}安装的包: ${installed_package}${background}"
-        echo -e "${blue}启动命令: ${chromium_command}${background}"
-        
-        # 检查并创建软链接（如果不存在）
-        if ! command -v chromium-browser &> /dev/null; then
-            echo -e "${yellow}检测到chromium-browser命令不存在，尝试创建软链接...${background}"
-            create_chromium_browser_symlink
-        else
-            echo -e "${green}✓ chromium-browser命令可用${background}"
-        fi
-        
-        echo -e "${cyan}如需重新安装，请使用 -u 参数${background}"
+    if check_chromium_installation && [ "$UNINSTALL_MODE" = false ]; then
+        log_success "Chromium 已安装"
+        log_info "启动命令: chromium"
+        create_symlink
+        log_info "如需重新安装: sudo $0 -u"
         return 0
     fi
     
-    # 如果是卸载重装模式
-    if [ "$uninstall_mode" = true ]; then
-        if check_chromium_installation; then
-            uninstall_chromium
-        else
-            echo -e "${yellow}未检测到已安装的Chromium${background}"
-        fi
-    fi
-    
-    echo -e "${green}开始安装Chromium浏览器 (PPA版本)...${background}"
-    
-    if install_chromium_ppa; then
-        return 0
-    else
-        echo -e "${red}PPA安装失败${background}"
-        echo -e "${yellow}建议尝试以下替代方案：${background}"
-        echo -e "${cyan}1. Snap版本: sudo snap install chromium${background}"
-        echo -e "${cyan}2. Flatpak版本: flatpak install flathub org.chromium.Chromium${background}"
-        echo -e "${cyan}3. 官方Ubuntu软件中心安装${background}"
-        exit 1
-    fi
+    [ "$UNINSTALL_MODE" = true ] && check_chromium_installation && uninstall_chromium
+    install_chromium_ppa
 }
 
-# 验证安装
+# 验证安装并显示摘要
 verify_installation() {
+    echo -e "${GREEN}═══════════════════════════════════════════════════${RESET}"
     if check_chromium_installation; then
-        echo -e "${green}✓ Chromium浏览器安装成功！${background}"
-        echo -e "${blue}安装的包: ${installed_package}${background}"
-        echo -e "${blue}启动命令: ${chromium_command}${background}"
-        
-        if command -v chromium-browser &> /dev/null; then
-            local chromium_browser_path=$(which chromium-browser)
-            if [ -L "$chromium_browser_path" ]; then
-                echo -e "${green}✓ chromium-browser软链接: $chromium_browser_path${background}"
-            else
-                echo -e "${blue}chromium-browser: $chromium_browser_path (非软链接)${background}"
-            fi
-        else
-            echo -e "${yellow}⚠ chromium-browser命令不可用${background}"
-        fi
-        
-        echo -e "${blue}版本信息：${background}"
-        if $chromium_command --version &>/dev/null; then
-            $chromium_command --version
-        else
-            echo "无法获取版本信息（需要在图形界面中运行）"
-        fi
-        
-        echo -e "${cyan}使用说明：${background}"
-        echo -e "${cyan}- 在终端中运行: chromium 或 chromium-browser${background}"
-        echo -e "${cyan}- 或在应用程序菜单中找到Chromium${background}"
-        echo -e "${cyan}- 卸载命令: sudo apt remove ${installed_package}${background}"
-        echo -e "${cyan}- 删除软链接: sudo rm -f \$(which chromium-browser)${background}"
-        
+        log_success "Chromium 验证成功"
+        log_info "软件包: $INSTALLED_PACKAGE"
+        log_info "启动命令: chromium 或 chromium-browser"
+        local version=$(chromium --version 2>/dev/null || echo "未知")
+        log_info "版本: $version"
+        echo -e "${CYAN}使用说明:${RESET}"
+        echo "  启动: chromium"
+        echo "  卸载: sudo apt remove chromium"
+        [ "$USE_MIRROR" = true ] && log_info "已使用镜像加速安装"
     else
-        echo -e "${red}✗ Chromium浏览器安装验证失败${background}"
-        exit 1
+        log_error "验证失败，安装可能未成功"
     fi
+    echo -e "${GREEN}═══════════════════════════════════════════════════${RESET}"
 }
 
 # 清理函数
-cleanup_on_exit() {
-    cd $HOME
-    rm -f chromium*.deb 2>/dev/null || true
+cleanup() {
+    rm -f /tmp/apt_update.log /tmp/xtradeb-temp.gpg* 2>/dev/null
+    cd "$HOME" || true
 }
 
-# 主程序流程
+# 主函数
 main() {
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -h|--help)
-                show_help
-                exit 0
-                ;;
-            -u|--uninstall)
-                uninstall_mode=true
-                shift
-                ;;
-            *)
-                echo -e "${red}未知参数: $1${background}"
-                echo -e "${yellow}使用 -h 查看帮助信息${background}"
-                exit 1
-                ;;
+    # 解析参数
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h|--help) show_help; exit 0 ;;
+            -u|--uninstall) UNINSTALL_MODE=true ;;
+            --no-mirror) USE_MIRROR=false ;;
+            *) log_error "未知选项: $1\n使用 -h 查看帮助" ;;
         esac
+        shift
     done
     
-    if [[ $EUID -ne 0 ]]; then
-        echo -e "${red}错误：此脚本需要root权限运行${background}"
-        echo -e "${yellow}请使用: sudo $0${background}"
-        exit 1
-    fi
+    # 检查 root 权限
+    [ "$EUID" -ne 0 ] && log_error "请使用 sudo 运行此脚本"
     
-    trap cleanup_on_exit EXIT
+    # 设置退出时清理
+    trap cleanup EXIT
     
+    # 显示标题
+    echo -e "${GREEN}═══════════════════════════════════════════════════${RESET}"
+    echo -e "${GREEN}  Ubuntu/Debian Chromium 浏览器安装脚本${RESET}"
+    echo -e "${GREEN}═══════════════════════════════════════════════════${RESET}"
+    
+    # 执行安装流程
     detect_architecture
     detect_system_version
     prepare_system
@@ -368,6 +352,6 @@ main() {
     verify_installation
 }
 
+# 执行主函数
 set -e
-
 main "$@"
