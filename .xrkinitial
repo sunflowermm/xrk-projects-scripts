@@ -23,10 +23,10 @@ if [ "$DO_CN_MIRROR" = 1 ]; then
         sed -i 's/ports.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g; s/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g; s/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list 2>/dev/null || true
     fi
     if [ -d /etc/yum.repos.d ]; then
-        for f in /etc/yum.repos.d/fedora.repo /etc/yum.repos.d/fedora-updates.repo 2>/dev/null; do
+        for f in /etc/yum.repos.d/fedora.repo /etc/yum.repos.d/fedora-updates.repo; do
             [ -f "$f" ] && sed -e 's|^metalink=|#metalink=|g' -e 's|https\?://download\.fedoraproject\.org/pub/fedora/linux|https://mirrors.tuna.tsinghua.edu.cn/fedora|g' -e 's|https\?://mirrors\.fedoraproject\.org[^[:space:]]*|https://mirrors.tuna.tsinghua.edu.cn/fedora|g' -i "$f" 2>/dev/null || true
         done
-        for f in /etc/yum.repos.d/*.repo 2>/dev/null; do
+        for f in /etc/yum.repos.d/*.repo; do
             [ -f "$f" ] && sed -i 's|https\?://[^/]*\.centos\.org/centos|https://mirrors.tuna.tsinghua.edu.cn/centos|g; s|https\?://[^/]*\.centos\.org|https://mirrors.tuna.tsinghua.edu.cn/centos|g' "$f" 2>/dev/null || true
         done
     fi
