@@ -150,7 +150,7 @@ case "$1" in
     xrk)
         shift
         cd $yz
-        git clone --depth=1 https://gitcode.com/Xrkseek/xrk-plugin.git ./plugins/xrk-plugin/
+        git clone --depth=1 https://gitcode.com/Xrkseek/XRK-plugin.git ./plugins/XRK-plugin/
         pnpm i --prefix ./plugins/xrk-plugin
         ;;
     ncqq | nc)

@@ -117,7 +117,6 @@ function 云崽安装菜单 {
             git clone --depth=1 https://github.com/yoimiya-kokomi/miao-plugin.git ./plugins/miao-plugin/
             git clone https://gitee.com/TimeRainStarSky/Yunzai-genshin.git ./plugins/genshin/
             export PUPPETEER_SKIP_DOWNLOAD='true'
-            cd /xrk && pnpm i && cd $HOME/XRK-Yunzai
             pnpm update puppeteer@19.8.3 -w
             cd $HOME
             bash /xrk/body/xrkwrite.sh
