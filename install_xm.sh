@@ -60,5 +60,5 @@ curl -sL "$SCRIPT_RAW_BASE/body/xm" -o "$XM_DEST" && chmod +x "$XM_DEST" || {
     exit 1
 }
 
-echo "[xm] 安装完成，输入 xm 启动"
-exec "$XM_DEST"
+echo "[xm] 安装完成。"
+echo "[xm] 请输入 xm 启动主菜单。"

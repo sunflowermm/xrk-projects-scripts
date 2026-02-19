@@ -86,7 +86,7 @@ show_menu() {
     else
         echo ""
         echo "  ╭────────────────────────────╮"
-        echo "  │          xm 主菜单          │"
+        echo "  │          xm 主菜单         │"
         echo "  ├────────────────────────────┤"
         echo "  │  1  换源（apt 镜像）       │"
         echo "  │  2  安装 Git               │"
@@ -103,8 +103,15 @@ show_menu() {
 
 while true; do
     show_menu
-    read -rp "请选择: " raw_choice
+    # 读取用户输入；若遇到 EOF（例如管道/非交互环境），则优雅退出
+    if ! read -rp "请选择: " raw_choice; then
+        echo "再见"; exit 0
+    fi
     choice=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    # 空输入直接重绘菜单，不再刷“无效选择”
+    if [ -z "$choice" ]; then
+        continue
+    fi
     case "$choice" in
         1)
             change_source_linux
