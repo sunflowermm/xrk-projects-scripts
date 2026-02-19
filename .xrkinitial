@@ -1,9 +1,57 @@
 #!/bin/bash
 # 容器首次进入：安装 curl/git、换源(自动) → 安装 xm → 启动 xm 菜单
 # 支持 Debian/Ubuntu/Alpine/Arch/Fedora/CentOS
+
+# 1. 先给容器做一次「无 curl」的临时换源，再安装 curl（所有系统尽量走国内镜像）
+if ! command -v curl &>/dev/null; then
+    echo "[xm] 安装 curl..."
+    os_id=""
+    if [ -f /etc/os-release ]; then
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        os_id="$ID"
+    fi
+
+    if [ -f /etc/alpine-release ]; then
+        # Alpine：预先写入国内镜像，加速 apk
+        if [ -f /etc/apk/repositories ]; then
+            echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/main" > /etc/apk/repositories
+            echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/community" >> /etc/apk/repositories
+        fi
+        apk add --no-cache curl
+
+    elif [ -f /etc/arch-release ]; then
+        # Arch：写入清华镜像
+        if [ -f /etc/pacman.d/mirrorlist ]; then
+            grep -q "mirrors.tuna.tsinghua.edu.cn" /etc/pacman.d/mirrorlist 2>/dev/null || \
+            echo "Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist
+        fi
+        pacman -Sy --noconfirm curl
+
+    elif command -v dnf &>/dev/null; then
+        # Fedora/RHEL：直接用 dnf，后续再细化换源
+        dnf install -y curl
+
+    elif command -v yum &>/dev/null; then
+        # CentOS：直接用 yum，后续再细化换源
+        yum install -y curl
+
+    else
+        # Debian/Ubuntu：先把源替换为国内镜像，再 apt-get 安装 curl
+        if [ "$os_id" = "ubuntu" ] && [ -f /etc/apt/sources.list ]; then
+            sed -i 's/ports.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list 2>/dev/null || true
+            sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list 2>/dev/null || true
+        elif [ "$os_id" = "debian" ] && [ -f /etc/apt/sources.list ]; then
+            sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list 2>/dev/null || true
+        fi
+        apt-get update -qq && apt-get install -y curl
+    fi
+fi
+
+# 2. 统一 XRK_SOURCE 与 bootstrap 源（默认 3=Gitee）
 XRK_SOURCE="${XRK_SOURCE:-3}"
-# 与 bootstrap 统一：get_base_from_arg 确定仓库源（默认 3=Gitee）
 if [ -f /xrk/shell_modules/bootstrap.sh ]; then
+    # 容器内已安装脚本仓库，直接复用本地 bootstrap
     source /xrk/shell_modules/bootstrap.sh
 else
     # 首次引导：根据 XRK_SOURCE 选择 bootstrap 所在源，默认 3=Gitee
@@ -16,22 +64,6 @@ else
 fi
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg "$XRK_SOURCE")}"
 export SCRIPT_RAW_BASE
-
-# 按发行版安装 curl（无 curl 时无法拉取 common.sh）
-if ! command -v curl &>/dev/null; then
-    echo "[xm] 安装 curl..."
-    if [ -f /etc/alpine-release ]; then
-        apk add --no-cache curl
-    elif [ -f /etc/arch-release ]; then
-        pacman -Sy --noconfirm curl
-    elif command -v dnf &>/dev/null; then
-        dnf install -y curl
-    elif command -v yum &>/dev/null; then
-        yum install -y curl
-    else
-        apt-get update -qq && apt-get install -y curl
-    fi
-fi
 # shellcheck source=/dev/null
 source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
 change_source_linux_auto
