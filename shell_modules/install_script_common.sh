@@ -1,6 +1,6 @@
 #!/bin/bash
 # 安装脚本公共模块：统一远程/本地执行支持、模块加载、路径检测
-# 供 NapCat.sh、Lagrange.sh、chromium 等独立安装脚本复用
+# 供 NapCat.sh、chromium 等独立安装脚本复用
 
 # 检测是否远程执行（通过 $0 和 BASH_SOURCE 判断）
 _is_remote_exec() {

@@ -21,6 +21,3 @@ echo -e "${caidan1}向日葵软件包命令为 xrkk${bg}"
 if [ -d "/opt/QQ" ]; then
    echo -e "${caidan3}输入‘nt’启动 ncqq 客户端${bg}"
 fi
-if [ -d "/root/lagelan" ]; then
-   echo -e "${caidan3}输入‘lg’启动 拉格朗日 客户端${bg}"
-fi

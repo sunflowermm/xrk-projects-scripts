@@ -3,7 +3,6 @@
 function 葵崽升级 {
     declare -A files=(
         ["/usr/local/bin/nt"]="/xrk/body/writeto/nt"
-        ["/usr/local/bin/lg"]="/xrk/body/writeto/lg"
         ["/usr/local/bin/xyz"]="/xrk/body/writeto/xrk/xyz"
         ["/usr/local/bin/xyzlogin"]="/xrk/body/writeto/xrk/xyzlogin"
         ["/usr/local/bin/xrk"]="/xrk/body/xrk"

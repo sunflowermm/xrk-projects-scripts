@@ -1,5 +1,5 @@
 #!/bin/bash
-# 主菜单：云崽安装、插件、报错修复、换签、脚本、NapCat、拉格朗日、环境
+# 主菜单：云崽安装、插件、报错修复、换签、脚本、NapCat、环境
 cd "$HOME" || true
 source /xrk/shell_modules/repo_source.sh
 source /xrk/shell_modules/update.sh
@@ -33,7 +33,7 @@ echo -e "${caidan1}${sentence}${bg}"
 function show_menu 
 {
     # 自动计算主菜单宽度（标题和所有选项）
-    local menu_width=$(menu_calc_width "向日葵脚本" "集中营 1013495491" "安/重装云崽" "插件相关" "报错修复" "一键换签" "脚本相关" "安装 Napcat" "安装拉格朗日" "环境与模块")
+    local menu_width=$(menu_calc_width "向日葵脚本" "集中营 1013495491" "安/重装云崽" "插件相关" "报错修复" "一键换签" "脚本相关" "安装 Napcat" "环境与模块")
     local status_width=16  # 状态框固定16列
     local prefix="        "  # 菜单前缀
     
@@ -71,9 +71,7 @@ function show_menu
     echo -e "${caidan1}${prefix}${border_mid}${bg}"
     echo -e "${caidan2}${prefix}│$(menu_line_option 6 "安装 Napcat" "$menu_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_mid}${bg}"
-    echo -e "${caidan2}${prefix}│$(menu_line_option 7 "安装拉格朗日" "$menu_width")${caidan1}│${bg}"
-    echo -e "${caidan1}${prefix}${border_mid}${bg}"
-    echo -e "${caidan2}${prefix}│$(menu_line_option 8 "环境与模块" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan2}${prefix}│$(menu_line_option 7 "环境与模块" "$menu_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_bot}${bg}"
     echo
 }
@@ -105,10 +103,6 @@ while true; do
         break
         ;;
         7 )
-        run_software "Yunzai-install/Lagrange.sh"
-        break
-        ;;
-        8 )
         bash /xrk/body/modules/env
         ;;
         r )
