@@ -45,7 +45,8 @@ detect_os() {
         case "${ID:-}" in
             ubuntu) echo "ubuntu" ;;
             debian) echo "debian" ;;
-            arch|manjaro) echo "arch" ;;
+            # 统一将 Arch 家族（包括 arm 变种）归为 arch，供 install_pkg 使用 pacman
+            arch|archarm|archlinuxarm|manjaro) echo "arch" ;;
             centos|rhel|fedora|rocky|almalinux) echo "centos" ;;
             opensuse*|sles) echo "opensuse" ;;
             alpine) echo "alpine" ;;
