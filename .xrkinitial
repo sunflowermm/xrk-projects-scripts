@@ -48,6 +48,22 @@ if ! command -v curl &>/dev/null; then
     fi
 fi
 
+# 1.5 再确保容器内有 bash（部分精简镜像默认只有 /bin/sh，但后续脚本需要 bash）
+if ! command -v bash &>/dev/null; then
+    echo "[xm] 安装 bash..."
+    if [ -f /etc/alpine-release ]; then
+        apk add --no-cache bash
+    elif [ -f /etc/arch-release ]; then
+        pacman -Sy --noconfirm bash
+    elif command -v dnf &>/dev/null; then
+        dnf install -y bash
+    elif command -v yum &>/dev/null; then
+        yum install -y bash
+    else
+        apt-get update -qq && apt-get install -y bash
+    fi
+fi
+
 # 2. 统一 XRK_SOURCE 与 bootstrap 源（默认 3=Gitee）
 XRK_SOURCE="${XRK_SOURCE:-3}"
 if [ -f /xrk/shell_modules/bootstrap.sh ]; then
