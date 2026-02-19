@@ -16,16 +16,6 @@ if [ -f /etc/alpine-release ] && [ -f /etc/apk/repositories ]; then
     echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/community" >> /etc/apk/repositories
 fi
 
-# Arch / ArchARM：优先在现有 mirrorlist 中替换为 TUNA 镜像，保留原有结构
-if [ -f /etc/arch-release ] && [ -f /etc/pacman.d/mirrorlist ]; then
-    # Arch Linux ARM 默认使用 mirror.archlinuxarm.org，替换为 TUNA
-    sed -i 's#https\?://[^/]*archlinuxarm\.org#https://mirrors.tuna.tsinghua.edu.cn/archlinuxarm#g' /etc/pacman.d/mirrorlist 2>/dev/null || true
-    # 常规 Arch 默认使用 *.archlinux.org，替换为 TUNA
-    sed -i 's#https\?://[^/]*archlinux\.org#https://mirrors.tuna.tsinghua.edu.cn/archlinux#g' /etc/pacman.d/mirrorlist 2>/dev/null || true
-    # 如果仍未包含 TUNA，则写入一个最小可用的 TUNA 源行作为兜底
-    grep -q "mirrors.tuna.tsinghua.edu.cn" /etc/pacman.d/mirrorlist 2>/dev/null || \
-      echo "Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxarm/\$arch/\$repo" > /etc/pacman.d/mirrorlist
-fi
 
 if ! command -v curl &>/dev/null; then
     echo "[xm] 安装 curl..."
@@ -69,6 +59,34 @@ export SCRIPT_RAW_BASE
 source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
 change_source_linux_auto
 ensure_cmd git git
+
+# 2. 统一美化交互式 Shell 提示符（解决只显示一个 # 的问题）
+# 当前会话：如果是交互式终端，则直接设置一个带用户名/主机名/路径的彩色 PS1
+if [ -t 0 ] && [ -t 1 ]; then
+    if [ -n "$BASH_VERSION" ]; then
+        PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
+    else
+        PS1='\u@\h:\w\$ '
+    fi
+    export PS1
+fi
+
+# 后续新开的 bash 交互 Shell：向 root 的 bashrc 追加一次性 PS1 配置
+if [ -d /root ]; then
+    if ! grep -q "XRK custom PS1" /root/.bashrc 2>/dev/null; then
+        cat <<'EOF' >> /root/.bashrc
+# XRK custom PS1
+if [ -n "$PS1" ]; then
+  if [ -n "$BASH_VERSION" ]; then
+    PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
+  else
+    PS1='\u@\h:\w\$ '
+  fi
+  export PS1
+fi
+EOF
+    fi
+fi
 
 # 下载并运行 install_xm，然后启动 xm
 echo "[xm] 安装 xm..."
