@@ -91,9 +91,9 @@ flowchart TB
 
 ---
 
-## 📦 工具脚本列表
+## 📦 独立工具脚本
 
-以下脚本支持**直接远程执行**，无需先安装。每个脚本提供三个源的完整命令。
+以下脚本可**独立使用**，支持直接远程执行，无需先安装。
 
 ### 一、主入口脚本
 
@@ -114,43 +114,11 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/instal
 
 ---
 
-#### linuxinstall.sh - Linux 安装入口
-
-自动检测 Linux 发行版并执行对应安装脚本。
-
-```bash
-# GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/linuxinstall.sh)
-
-# GitHub
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/linuxinstall.sh)
-
-# Gitee
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/linuxinstall.sh)
-```
-
----
-
-#### install_xm.sh - 安装 xm 菜单
-
-将 xm 命令安装到系统，安装后输入 `xm` 使用菜单。
-
-```bash
-# GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/install_xm.sh)
-
-# GitHub
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/install_xm.sh)
-
-# Gitee
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/install_xm.sh)
-```
-
----
+### 二、实用工具脚本
 
 #### ssh.sh - Termux SSH 配置
 
-在 Termux 环境下配置 SSH 连接。
+在 Termux 环境下快速配置 SSH 连接。
 
 ```bash
 # GitCode
@@ -165,84 +133,66 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/ssh.sh
 
 ---
 
-### 二、发行版安装脚本
-
-#### Ubuntu
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/ubuntuinstall.sh)
-```
-
-#### Debian
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/debianinstall.sh)
-```
-
-#### CentOS/RHEL/Fedora
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/centosinstall.sh)
-```
-
-#### Arch Linux
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/archinstall.sh)
-```
-
-#### Alpine Linux
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/alpineinstall.sh)
-```
-
-#### OpenSUSE
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/opensuseinstall.sh)
-```
-
-#### 通用（Void/Gentoo/其他）
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/genericinstall.sh)
-```
-
-> 💡 **提示**：以上命令使用 GitCode 源，如需使用 GitHub 或 Gitee，将 URL 中的 `raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master` 替换为：
-> - GitHub: `raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master`
-> - Gitee: `gitee.com/xrkseek/xrk-projects-scripts/raw/master`
-
----
-
 ### 三、软件安装脚本
-
-#### NapCat
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/NapCat.sh)
-```
-
-#### Lagrange.Core
-```bash
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/Lagrange.sh)
-```
 
 #### Node.js
 ```bash
+# GitCode
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/node)
+
+# GitHub
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/node)
+
+# Gitee
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/node)
 ```
 
 #### pnpm
 ```bash
+# GitCode
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/pnpm)
+
+# GitHub
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/pnpm)
+
+# Gitee
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/pnpm)
 ```
 
 #### Chromium
 ```bash
+# GitCode
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/chromium)
+
+# GitHub
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/chromium)
+
+# Gitee
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/chromium)
 ```
 
 #### FFmpeg
 ```bash
+# GitCode
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/ffmpeg)
+
+# GitHub
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/ffmpeg)
+
+# Gitee
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/ffmpeg)
 ```
 
 #### yq
 ```bash
+# GitCode
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/yq)
+
+# GitHub
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/yq)
+
+# Gitee
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/yq)
 ```
 
 ---
@@ -251,12 +201,26 @@ bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/
 
 #### Python + uv
 ```bash
+# GitCode
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/body/modules/python_uv)
+
+# GitHub
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/body/modules/python_uv)
+
+# Gitee
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/python_uv)
 ```
 
 #### FFmpeg 模块
 ```bash
+# GitCode
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/body/modules/ffmpeg)
+
+# GitHub
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/body/modules/ffmpeg)
+
+# Gitee
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/ffmpeg)
 ```
 
 ---
@@ -265,8 +229,14 @@ bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/
 
 #### Linux 容器安装
 ```bash
-# Ubuntu 示例
+# GitCode（Ubuntu 示例）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Termux-container/xrk.sh) --ubuntu
+
+# GitHub（Ubuntu 示例）
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Termux-container/xrk.sh) --ubuntu
+
+# Gitee（Ubuntu 示例）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Termux-container/xrk.sh) --ubuntu
 ```
 
 **支持的发行版**：`--ubuntu` `--debian` `--alpine` `--arch` `--fedora` `--centos`
@@ -276,15 +246,15 @@ bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/
 ## 📋 脚本分类统计
 
 ```mermaid
-pie title 脚本分类统计
-    "主入口脚本" : 4
-    "发行版安装" : 7
+pie title 独立工具脚本统计
+    "主入口脚本" : 1
+    "实用工具" : 1
     "软件安装" : 5
     "模块脚本" : 2
     "Termux容器" : 1
 ```
 
-**总计：19 个支持远程执行的脚本**
+**总计：10 个独立工具脚本**
 
 ---
 
