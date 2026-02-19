@@ -13,7 +13,7 @@ else
     exit 1
 fi
 
-[ -f /xrk/Yunzai-install/software/yq ] && bash /xrk/Yunzai-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/yq")
+[ -f /xrk/project-install/software/yq ] && bash /xrk/project-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/yq")
 # 安装基本工具
 for package in git wget tar xz jq go-yq sudo nodejs-lts-iron npm redis wqy-bitmapfont wqy-zenhei ttf-arphic-ukai ttf-arphic-uming; do
     install_package "$package"

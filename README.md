@@ -138,61 +138,61 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/ssh.sh
 #### Node.js
 ```bash
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/node)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/node)
 
 # GitHub
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/node)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/node)
 
 # Gitee
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/node)
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/node)
 ```
 
 #### pnpm
 ```bash
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/pnpm)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/pnpm)
 
 # GitHub
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/pnpm)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/pnpm)
 
 # Gitee
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/pnpm)
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/pnpm)
 ```
 
 #### Chromium
 ```bash
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/chromium)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/chromium)
 
 # GitHub
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/chromium)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/chromium)
 
 # Gitee
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/chromium)
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/chromium)
 ```
 
 #### FFmpeg
 ```bash
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/ffmpeg)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/ffmpeg)
 
 # GitHub
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/ffmpeg)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/ffmpeg)
 
 # Gitee
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/ffmpeg)
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/ffmpeg)
 ```
 
 #### yq
 ```bash
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/yq)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/yq)
 
 # GitHub
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Yunzai-install/software/yq)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/yq)
 
 # Gitee
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Yunzai-install/software/yq)
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/yq)
 ```
 
 ---

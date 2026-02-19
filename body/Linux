@@ -155,7 +155,7 @@ case "$1" in
         ;;
     ncqq | nc)
         shift
-        run_software "Yunzai-install/NapCat.sh"
+        run_software "project-install/NapCat.sh"
         ;;
     *)
         show_help

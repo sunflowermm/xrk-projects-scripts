@@ -331,7 +331,7 @@ menu_validate_input() {
 }
 
 # 统一执行安装脚本：优先本地，否则远程（支持复杂场景：代理、网络重试、错误处理）
-# 用法：run_software "Yunzai-install/software/chromium" [参数...]
+# 用法：run_software "project-install/software/chromium" [参数...]
 run_software() {
     local path="$1"
     shift

@@ -20,17 +20,17 @@ _run_install() {
 
 os=$(detect_os)
 case "$os" in
-    ubuntu)     _run_install "Yunzai-install/ubuntuinstall.sh" ;;
-    debian)     _run_install "Yunzai-install/debianinstall.sh" ;;
-    arch)       _run_install "Yunzai-install/archinstall.sh" ;;
-    centos)     _run_install "Yunzai-install/centosinstall.sh" ;;
-    opensuse)   _run_install "Yunzai-install/opensuseinstall.sh" ;;
-    alpine)     _run_install "Yunzai-install/alpineinstall.sh" ;;
-    void)       _run_install "Yunzai-install/genericinstall.sh" ;;
-    gentoo)     _run_install "Yunzai-install/genericinstall.sh" ;;
+    ubuntu)     _run_install "project-install/ubuntuinstall.sh" ;;
+    debian)     _run_install "project-install/debianinstall.sh" ;;
+    arch)       _run_install "project-install/archinstall.sh" ;;
+    centos)     _run_install "project-install/centosinstall.sh" ;;
+    opensuse)   _run_install "project-install/opensuseinstall.sh" ;;
+    alpine)     _run_install "project-install/alpineinstall.sh" ;;
+    void)       _run_install "project-install/genericinstall.sh" ;;
+    gentoo)     _run_install "project-install/genericinstall.sh" ;;
     *)
         echo "未显式支持的发行版: $os"
         echo "尝试通用安装流程..."
-        _run_install "Yunzai-install/genericinstall.sh"
+        _run_install "project-install/genericinstall.sh"
         ;;
 esac

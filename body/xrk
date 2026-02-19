@@ -101,7 +101,7 @@ while true; do
         break
         ;;
         6 )
-        run_software "Yunzai-install/NapCat.sh"
+        run_software "project-install/NapCat.sh"
         break
         ;;
         7 )

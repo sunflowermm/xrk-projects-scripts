@@ -57,11 +57,11 @@ env_install_menu() {
         read -rp "请选择 [0-6]: " c
         c=$(echo "$c" | tr -d '[:space:]')
         case "$c" in
-            1) run_software "Yunzai-install/software/yq" ;;
-            2) run_software "Yunzai-install/software/chromium" ;;
-            3) run_software "Yunzai-install/software/node" ;;
-            4) run_software "Yunzai-install/software/pnpm" ;;
-            5) run_software "Yunzai-install/software/ffmpeg" ;;
+            1) run_software "project-install/software/yq" ;;
+            2) run_software "project-install/software/chromium" ;;
+            3) run_software "project-install/software/node" ;;
+            4) run_software "project-install/software/pnpm" ;;
+            5) run_software "project-install/software/ffmpeg" ;;
             6) run_software "body/modules/python_uv" ;;
             0) return 0 ;;
             *) echo "无效选择" ;;

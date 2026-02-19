@@ -29,9 +29,9 @@ function tmux配置检查 {
 function ffmpeg配置检查 {
     # 使用 run_software 统一执行（支持远程/本地）
     if type run_software &>/dev/null; then
-        run_software "body/modules/ffmpeg" || run_software "Yunzai-install/software/ffmpeg"
+        run_software "body/modules/ffmpeg" || run_software "project-install/software/ffmpeg"
     else
-        [ -f /xrk/body/modules/ffmpeg ] && bash /xrk/body/modules/ffmpeg || [ -f /xrk/Yunzai-install/software/ffmpeg ] && bash /xrk/Yunzai-install/software/ffmpeg
+        [ -f /xrk/body/modules/ffmpeg ] && bash /xrk/body/modules/ffmpeg || [ -f /xrk/project-install/software/ffmpeg ] && bash /xrk/project-install/software/ffmpeg
     fi
 }
 

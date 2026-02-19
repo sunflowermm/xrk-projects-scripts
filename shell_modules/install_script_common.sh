@@ -87,7 +87,7 @@ init_install_env() {
 }
 
 # 统一执行安装脚本：优先本地，否则远程
-# 用法：run_install_script "Yunzai-install/NapCat.sh" [参数...]
+# 用法：run_install_script "project-install/NapCat.sh" [参数...]
 run_install_script() {
     local script_path="$1"
     shift

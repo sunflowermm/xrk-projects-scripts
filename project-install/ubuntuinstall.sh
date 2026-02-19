@@ -13,7 +13,7 @@ else
     exit 1
 fi
 
-[ -f /xrk/Yunzai-install/software/yq ] && bash /xrk/Yunzai-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/yq")
+[ -f /xrk/project-install/software/yq ] && bash /xrk/project-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/yq")
 # 安装基本工具
 for package in git wget tar dialog xz-utils jq redis sudo tmux fonts-wqy*; do
     install_package "$package"
@@ -30,7 +30,7 @@ done
 
 # 检查浏览器
 log_info "开始检查 Chromium ..."
-[ -f /xrk/Yunzai-install/software/chromium ] && bash /xrk/Yunzai-install/software/chromium || bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/chromium")
+[ -f /xrk/project-install/software/chromium ] && bash /xrk/project-install/software/chromium || bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/chromium")
 
 # 启动 Redis
 检测redis安装

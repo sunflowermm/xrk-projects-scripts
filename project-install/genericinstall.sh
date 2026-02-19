@@ -4,7 +4,7 @@ SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects
 [ -f /xrk/shell_modules/distro_install_head.sh ] && source /xrk/shell_modules/distro_install_head.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/distro_install_head.sh")
 
 log_info "通用安装 (OS: $(detect_os))"
-[ -f /xrk/Yunzai-install/software/yq ] && bash /xrk/Yunzai-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/yq")
+[ -f /xrk/project-install/software/yq ] && bash /xrk/project-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/yq")
 for pkg in git wget tar xz jq redis; do install_package "$pkg"; done
 安装xrk脚本
 检测云崽存在魔法

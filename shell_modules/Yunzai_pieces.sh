@@ -71,18 +71,18 @@ function 检测云崽存在魔法 {
 
 # 检查并安装 npm、node 和 pnpm（优先本地）
 function 检测npm-node-pnpm安装 {
-    if [ -f /xrk/Yunzai-install/software/node ]; then
+    if [ -f /xrk/project-install/software/node ]; then
         # 使用 run_software 统一执行（支持远程/本地）
         if type run_software &>/dev/null; then
-            run_software "Yunzai-install/software/node"
-            run_software "Yunzai-install/software/pnpm"
+            run_software "project-install/software/node"
+            run_software "project-install/software/pnpm"
         else
-            bash /xrk/Yunzai-install/software/node
-            bash /xrk/Yunzai-install/software/pnpm
+            bash /xrk/project-install/software/node
+            bash /xrk/project-install/software/pnpm
         fi
     else
-        bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/node")
-        bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/pnpm")
+        bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/node")
+        bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/pnpm")
     fi
 }
 

@@ -21,9 +21,9 @@ install_chromium() {
     clean_existing "chromium"
     os=$(detect_os)
     if [ "$os" = "ubuntu" ]; then
-        run_software "Yunzai-install/software/chromium"
+        run_software "project-install/software/chromium"
     else
-        install_pkg chromium 2>/dev/null || run_software "Yunzai-install/software/chromium"
+        install_pkg chromium 2>/dev/null || run_software "project-install/software/chromium"
     fi
 }
 
@@ -32,18 +32,18 @@ clean_and_install_node() {
     clean_existing "npm"
     rm -rf /usr/local/bin/npm /usr/local/lib/node_modules /opt/node 2>/dev/null
     find / -name npm -type f 2>/dev/null | head -5 | xargs -r rm -f 2>/dev/null
-    run_software "Yunzai-install/software/node"
+    run_software "project-install/software/node"
 }
 
 clean_and_install_pnpm() {
     npm uninstall -g pnpm 2>/dev/null
     rm -rf ~/.pnpm-store 2>/dev/null
-    run_software "Yunzai-install/software/pnpm"
+    run_software "project-install/software/pnpm"
 }
 
 clean_and_install_yq() {
     clean_existing "yq"
-    run_software "Yunzai-install/software/yq"
+    run_software "project-install/software/yq"
 }
 
 fix_puppeteer() {
@@ -76,7 +76,7 @@ while true; do
         4) clean_and_install_node ;;
         5) clean_and_install_pnpm ;;
         6) clean_and_install_yq ;;
-        7) run_software "Yunzai-install/software/ffmpeg" ;;
+        7) run_software "project-install/software/ffmpeg" ;;
         q|Q) echo "退出脚本"; exit 0 ;;
         *) echo "无效选择，请重新输入" ;;
     esac

@@ -1,26 +1,21 @@
 #!/bin/bash
-# CentOS/RHEL/Fedora 主流程安装
+# Debian 主流程安装
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
 [ -f /xrk/shell_modules/distro_install_head.sh ] && source /xrk/shell_modules/distro_install_head.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/distro_install_head.sh")
 
-log_success "CentOS/RHEL/Fedora 主流程"
+log_success "Debian/Ubuntu 主流程"
 
-# 更新系统（dnf 优先）
+# 更新系统
 log_info "正在更新系统软件包..."
-if command -v dnf &>/dev/null; then
-    dnf update -y
-else
-    yum update -y
-fi
-if [ $? -eq 0 ]; then
+if apt-get update && apt-get upgrade -y; then
     log_success "系统更新完成"
 else
     log_error "系统更新失败，请重新运行脚本"
     exit 1
 fi
 
-[ -f /xrk/Yunzai-install/software/yq ] && bash /xrk/Yunzai-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/Yunzai-install/software/yq")
-for package in git wget tar xz jq epel-release redis fontconfig wqy-zenhei; do
+[ -f /xrk/project-install/software/yq ] && bash /xrk/project-install/software/yq || bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/yq")
+for package in git wget dialog tar xz-utils jq redis tmux fontconfig fonts-wqy-zenhei; do
     install_package "$package"
 done
 

@@ -13,12 +13,12 @@ fi
 
 # 使用 run_software 或直接执行（支持远程/本地）
 if type run_software &>/dev/null; then
-    run_software "Yunzai-install/software/ffmpeg"
+    run_software "project-install/software/ffmpeg"
 else
-    if [ -f /xrk/Yunzai-install/software/ffmpeg ]; then
-        bash /xrk/Yunzai-install/software/ffmpeg
+    if [ -f /xrk/project-install/software/ffmpeg ]; then
+        bash /xrk/project-install/software/ffmpeg
     else
-        bash <(curl -sL "${SCRIPT_RAW_BASE}/Yunzai-install/software/ffmpeg")
+        bash <(curl -sL "${SCRIPT_RAW_BASE}/project-install/software/ffmpeg")
     fi
 fi
 echo "[ffmpeg] 安装完成"
