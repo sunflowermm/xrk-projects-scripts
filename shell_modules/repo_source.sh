@@ -7,8 +7,8 @@ if [ -f /xrk/shell_modules/bootstrap.sh ]; then
 else
     # 首次引导：按传入参数 1/2/3 选择源，否则默认 3=Gitee
     case "${1#-}" in
-        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master" ;;
-        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master" ;;
+        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
+        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
         3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
     esac
     source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")

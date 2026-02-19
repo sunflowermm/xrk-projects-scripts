@@ -8,8 +8,8 @@ if [ -f /xrk/shell_modules/bootstrap.sh ]; then
     source /xrk/shell_modules/bootstrap.sh
 else
     case "${XRK_SOURCE#-}" in
-        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master" ;;
-        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master" ;;
+        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
+        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
         3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
     esac
     source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")

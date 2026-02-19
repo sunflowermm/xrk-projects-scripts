@@ -41,7 +41,7 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/instal
 
 **GitHub（国外）：**
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/install.sh)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/install.sh)
 ```
 
 **Gitee（国内备用）：**
@@ -106,10 +106,10 @@ flowchart TB
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/install.sh)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/install.sh)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/install.sh)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/install.sh)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/install.sh)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/install.sh)
@@ -128,10 +128,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/instal
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/ssh.sh)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/ssh.sh)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/ssh.sh)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/ssh.sh)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/ssh.sh)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/ssh.sh)
@@ -147,10 +147,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/ssh.sh
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/node)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/node)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/node)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/node)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/node)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/node)
@@ -162,10 +162,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/projec
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/pnpm)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/pnpm)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/pnpm)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/pnpm)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/pnpm)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/pnpm)
@@ -177,10 +177,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/projec
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/chromium)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/chromium)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/chromium)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/chromium)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/chromium)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/chromium)
@@ -192,10 +192,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/projec
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/ffmpeg)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/ffmpeg)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/ffmpeg)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/ffmpeg)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/ffmpeg)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/ffmpeg)
@@ -207,10 +207,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/projec
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/yq)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/project-install/software/yq)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/yq)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/project-install/software/yq)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/yq)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/yq)
@@ -226,10 +226,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/projec
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/python_uv)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/body/modules/python_uv)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/body/modules/python_uv)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/body/modules/python_uv)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/body/modules/python_uv)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/python_uv)
@@ -241,10 +241,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/m
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/ffmpeg)
 
 # GitCode
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/body/modules/ffmpeg)
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/body/modules/ffmpeg)
 
 # GitHub（国外）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/body/modules/ffmpeg)
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/body/modules/ffmpeg)
 
 # Gitee
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/ffmpeg)
@@ -260,10 +260,10 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/m
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Termux-container/xrk.sh) --ubuntu
 
 # GitCode（Ubuntu 示例）
-bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master/Termux-container/xrk.sh) --ubuntu
+bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/Termux-container/xrk.sh) --ubuntu
 
 # GitHub（Ubuntu 示例）
-bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master/Termux-container/xrk.sh) --ubuntu
+bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/Termux-container/xrk.sh) --ubuntu
 
 # Gitee（Ubuntu 示例）
 bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Termux-container/xrk.sh) --ubuntu

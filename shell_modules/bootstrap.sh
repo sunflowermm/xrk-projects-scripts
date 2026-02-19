@@ -6,8 +6,8 @@
 get_base_from_arg() {
     local arg="${1:-$XRK_SOURCE}"
     case "${arg#-}" in
-        1) echo "https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master" ;;
-        2) echo "https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/master" ;;
+        1) echo "https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
+        2) echo "https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
         3) echo "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
         # 默认走 Gitee
         *) echo "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
