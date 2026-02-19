@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Xrkseek
+# Licensed under MIT License
 # 统一入口：Termux→容器安装 | Linux→xm 安装
 # 参数：1=GitCode 2=GitHub 3=Gitee（默认 1）
 

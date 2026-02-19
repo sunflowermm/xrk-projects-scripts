@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Xrkseek
+# Licensed under MIT License
 # NapCat 安装脚本（支持远程/本地执行，复用底层 github.sh 代理、common.sh 架构/包管理）
 
 # 统一初始化：加载 install_script_common.sh 并初始化环境

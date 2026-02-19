@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Xrkseek
+# Licensed under MIT License
 # 主流程依赖：克隆脚本/云崽、检测、安装 Node/pnpm、Redis、菜单（依赖 bootstrap 的 get_clone_from_raw）
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"
 [ -z "$SCRIPT_CLONE_URL" ] && type get_clone_from_raw &>/dev/null && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"

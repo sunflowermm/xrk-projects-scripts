@@ -1,4 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
+# Copyright (c) 2026 Xrkseek
+# Licensed under MIT License
 
 TERMUX_DIR="$PREFIX"
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/master}"

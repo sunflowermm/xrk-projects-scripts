@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Xrkseek
+# Licensed under MIT License
 # 安装脚本公共模块：统一远程/本地执行支持、模块加载、路径检测
 # 供 NapCat.sh、chromium 等独立安装脚本复用
 

@@ -285,7 +285,11 @@ pie title 独立工具脚本统计
 
 ## 📄 许可证
 
-本项目采用开源许可证，详见项目仓库。
+本项目采用 [MIT License](LICENSE) 开源许可证。
+
+**Copyright (c) 2026 Xrkseek**
+
+本项目遵循 MIT 许可证条款，您可以自由使用、修改、分发和商业使用本项目代码，只需保留版权声明和许可证文本。
 
 ---
 
@@ -294,5 +298,7 @@ pie title 独立工具脚本统计
 **⭐ 如果这个项目对你有帮助，欢迎 Star！**
 
 Made with ❤️ by 向日葵团队
+
+Copyright © 2026 Xrkseek. All rights reserved.
 
 </div>

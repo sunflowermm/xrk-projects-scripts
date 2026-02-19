@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Xrkseek
+# Licensed under MIT License
 # 主菜单：云崽安装、插件、报错修复、换签、脚本、NapCat、环境
 cd "$HOME" || true
 source /xrk/shell_modules/repo_source.sh
