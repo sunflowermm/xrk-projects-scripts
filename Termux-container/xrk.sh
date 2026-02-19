@@ -235,17 +235,18 @@ EOM
     curl -o "$INSTALL_DIR/root/.xrk" "$INITIAL_SCRIPT_URL"
     info "配置一次性启动脚本..."
     printf 'XRK_SOURCE="%s"\n' "$XRK_SOURCE" > "$INSTALL_DIR/root/.xrk_env"
+    # 生成一次性 profile 脚本（使用 POSIX 兼容写法，避免 Alpine /bin/sh 报 bad substitution）
     if [ "$DISTRO" = "alpine" ]; then
-        cat >> "$INSTALL_DIR/etc/profile.d/1.sh" <<- EOM
-rm -f \${BASH_SOURCE[0]}
-[ -f /root/.xrk_env ] && source /root/.xrk_env && rm -f /root/.xrk_env
+        cat > "$INSTALL_DIR/etc/profile.d/1.sh" <<- 'EOM'
+rm -f /etc/profile.d/1.sh
+[ -f /root/.xrk_env ] && . /root/.xrk_env && rm -f /root/.xrk_env
 export LANG=zh_CN.UTF-8
 bash .xrk 2>/dev/null || sh .xrk
 EOM
     else
-        cat >> "$INSTALL_DIR/etc/profile.d/1.sh" <<- EOM
-rm -f \${BASH_SOURCE[0]}
-[ -f /root/.xrk_env ] && source /root/.xrk_env && rm -f /root/.xrk_env
+        cat > "$INSTALL_DIR/etc/profile.d/1.sh" <<- 'EOM'
+rm -f /etc/profile.d/1.sh
+[ -f /root/.xrk_env ] && . /root/.xrk_env && rm -f /root/.xrk_env
 locale-gen 2>/dev/null || true
 update-locale LANG=zh_CN.UTF-8 2>/dev/null || true
 bash .xrk
