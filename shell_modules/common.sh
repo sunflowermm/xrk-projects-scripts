@@ -106,7 +106,8 @@ install_pkg() {
                 fi
                 ;;
             arch)
-                if pacman -Sy --noconfirm "$pkg"; then
+                # proot/容器内的 Arch（含 archarm）内核一般不支持 Landlock，需要关闭 pacman 沙盒
+                if pacman --disable-sandbox -Sy --noconfirm "$pkg"; then
                     echo -e "\033[0;32m$pkg 安装成功\033[0m"
                     return 0
                 fi
