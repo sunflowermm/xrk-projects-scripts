@@ -5,9 +5,9 @@ SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scrip
 if [[ "$SCRIPT_RAW_BASE" == *"raw.gitcode.com"* ]]; then
     FONT_URL="https://gitcode.com/Xrkseek/xrk-projects-scripts/releases/download/font"
 elif [[ "$SCRIPT_RAW_BASE" == *"raw.githubusercontent.com"* ]]; then
-    FONT_URL="https://github.com/sunflowermm/xrk-projects-scripts/releases/download/font"
+    FONT_URL="https://github.com/sunflowermm/xrk-projects-scripts/releases/download/fonts"
 else
-    FONT_URL="https://gitee.com/xrkseek/xrk-projects-scripts/releases/download/font"
+    FONT_URL="https://gitee.com/xrkseek/xrk-projects-scripts/releases/download/fonts"
 fi
 Termux_URL="$SCRIPT_RAW_BASE/Termux-container"
 
