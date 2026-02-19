@@ -37,7 +37,7 @@ case "$1" in
   --alpine)
     DISTRO="alpine"
     RELEASE="3.22"
-    SHORTCUT="a"
+    SHORTCUT="al"
     ;;
   --arch)
     DISTRO="archlinux"
