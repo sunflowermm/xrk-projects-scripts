@@ -2,45 +2,41 @@
 # 容器首次进入：安装 curl/git、换源(自动) → 安装 xm → 启动 xm 菜单
 # 支持 Debian/Ubuntu/Alpine/Arch/Fedora/CentOS
 
-# 1. 先给容器做一次「无 curl」的临时换源，再安装 curl（所有系统尽量走国内镜像）
+# 1. 先根据 /etc/os-release 做一次基础换源（不依赖 curl），再按系统安装 curl
+os_id=""
+if [ -f /etc/os-release ]; then
+    # shellcheck source=/dev/null
+    . /etc/os-release
+    os_id="$ID"
+fi
+
+# Alpine：重写 apk 源为 TUNA
+if [ -f /etc/alpine-release ] && [ -f /etc/apk/repositories ]; then
+    echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/main" > /etc/apk/repositories
+    echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/community" >> /etc/apk/repositories
+fi
+
+# Arch / ArchARM：优先在现有 mirrorlist 中替换为 TUNA 镜像，保留原有结构
+if [ -f /etc/arch-release ] && [ -f /etc/pacman.d/mirrorlist ]; then
+    # Arch Linux ARM 默认使用 mirror.archlinuxarm.org，替换为 TUNA
+    sed -i 's#https\?://[^/]*archlinuxarm\.org#https://mirrors.tuna.tsinghua.edu.cn/archlinuxarm#g' /etc/pacman.d/mirrorlist 2>/dev/null || true
+    # 常规 Arch 默认使用 *.archlinux.org，替换为 TUNA
+    sed -i 's#https\?://[^/]*archlinux\.org#https://mirrors.tuna.tsinghua.edu.cn/archlinux#g' /etc/pacman.d/mirrorlist 2>/dev/null || true
+    # 如果仍未包含 TUNA，则写入一个最小可用的 TUNA 源行作为兜底
+    grep -q "mirrors.tuna.tsinghua.edu.cn" /etc/pacman.d/mirrorlist 2>/dev/null || \
+      echo "Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxarm/\$arch/\$repo" > /etc/pacman.d/mirrorlist
+fi
+
 if ! command -v curl &>/dev/null; then
     echo "[xm] 安装 curl..."
-    os_id=""
-    if [ -f /etc/os-release ]; then
-        # shellcheck source=/dev/null
-        . /etc/os-release
-        os_id="$ID"
-    fi
-
     if [ -f /etc/alpine-release ]; then
-        # Alpine：预先写入国内镜像，加速 apk
-        if [ -f /etc/apk/repositories ]; then
-            echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/main" > /etc/apk/repositories
-            echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/community" >> /etc/apk/repositories
-        fi
         apk add --no-cache curl
-
     elif [ -f /etc/arch-release ]; then
-        # Arch / ArchARM：优先在现有 mirrorlist 中替换为 TUNA 镜像，保留原有结构
-        if [ -f /etc/pacman.d/mirrorlist ]; then
-            # Arch Linux ARM 默认使用 mirror.archlinuxarm.org，替换为 TUNA
-            sed -i 's#https\?://[^/]*archlinuxarm\.org#https://mirrors.tuna.tsinghua.edu.cn/archlinuxarm#g' /etc/pacman.d/mirrorlist 2>/dev/null || true
-            # 常规 Arch 默认使用 *.archlinux.org，替换为 TUNA
-            sed -i 's#https\?://[^/]*archlinux\.org#https://mirrors.tuna.tsinghua.edu.cn/archlinux#g' /etc/pacman.d/mirrorlist 2>/dev/null || true
-            # 如果仍未包含 TUNA，则写入一个最小可用的 TUNA 源行作为兜底
-            grep -q "mirrors.tuna.tsinghua.edu.cn" /etc/pacman.d/mirrorlist 2>/dev/null || \
-              echo "Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxarm/\$arch/\$repo" > /etc/pacman.d/mirrorlist
-        fi
         pacman -Sy --noconfirm curl
-
     elif command -v dnf &>/dev/null; then
-        # Fedora/RHEL：直接用 dnf，后续再细化换源
         dnf install -y curl
-
     elif command -v yum &>/dev/null; then
-        # CentOS：直接用 yum，后续再细化换源
         yum install -y curl
-
     else
         # Debian/Ubuntu：先把源替换为国内镜像，再 apt-get 安装 curl
         if [ "$os_id" = "ubuntu" ] && [ -f /etc/apt/sources.list ]; then
