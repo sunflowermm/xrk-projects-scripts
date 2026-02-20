@@ -34,21 +34,18 @@ get_clone_from_raw() {
         *raw.gitcode.com*) echo "https://gitcode.com/Xrkseek/xrk-projects-scripts.git" ;;
         *raw.githubusercontent.com*) echo "https://github.com/sunflowermm/xrk-projects-scripts.git" ;;
         *gitee.com*) echo "https://gitee.com/xrkseek/xrk-projects-scripts.git" ;;
-        *) echo "https://gitcode.com/Xrkseek/xrk-projects-scripts.git" ;;
+        *) echo "https://gitee.com/xrkseek/xrk-projects-scripts.git" ;;
     esac
 }
 
 init_repo_source() {
-    local arg="$1" root="${XRK_ROOT:-/xrk}" region
+    local arg="$1" root="${XRK_ROOT:-/xrk}"
     [ -f "$root/.repo_source" ] && source "$root/.repo_source"
     [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
-    # 未指定源时自动检测：CN 用 GitCode，非 CN 用 GitHub（检测失败视为 overseas）
-    if [ -z "$SCRIPT_RAW_BASE" ] && [ -z "$arg" ]; then
-        region=$(detect_region 2>/dev/null || echo "overseas")
-        [ "$region" = "cn" ] && arg="1" || arg="2"
-    fi
+    # 未指定源时：统一优先 Gitee（3）
+    [ -z "$arg" ] && arg="3"
     [ -z "$SCRIPT_RAW_BASE" ] && SCRIPT_RAW_BASE="$(get_base_from_arg "$arg")"
-    [[ "$SCRIPT_RAW_BASE" != https://* ]] && SCRIPT_RAW_BASE="$(get_base_from_arg 1)"
+    [[ "$SCRIPT_RAW_BASE" != https://* ]] && SCRIPT_RAW_BASE="$(get_base_from_arg 3)"
     [ -z "$SCRIPT_CLONE_URL" ] && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"
     [[ "$SCRIPT_CLONE_URL" != https://* ]] && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"
     export SCRIPT_RAW_BASE SCRIPT_CLONE_URL
@@ -71,7 +68,7 @@ safe_source() {
 }
 
 load_distro_deps() {
-    SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg 1)}"
+    SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg 3)}"
     safe_source "shell_modules/color.sh"
     safe_source "shell_modules/Yunzai_pieces.sh"
     safe_source "shell_modules/install.sh"

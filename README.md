@@ -4,9 +4,9 @@
 
 **一键安装脚本集合 | 支持远程执行 | 多源镜像**
 
-[![GitCode](https://img.shields.io/badge/GitCode-默认源-blue)](https://gitcode.com/Xrkseek/xrk-projects-scripts)
-[![GitHub](https://img.shields.io/badge/GitHub-国外源-black)](https://github.com/sunflowermm/xrk-projects-scripts)
-[![Gitee](https://img.shields.io/badge/Gitee-国内源-red)](https://gitee.com/xrkseek/xrk-projects-scripts)
+[![Gitee](https://img.shields.io/badge/Gitee-默认推荐-red)](https://gitee.com/xrkseek/xrk-projects-scripts)
+[![GitCode](https://img.shields.io/badge/GitCode-备用-blue)](https://gitcode.com/Xrkseek/xrk-projects-scripts)
+[![GitHub](https://img.shields.io/badge/GitHub-备用-black)](https://github.com/sunflowermm/xrk-projects-scripts)
 
 </div>
 
@@ -22,9 +22,9 @@
 
 | 源 | 适用场景 | 一键命令 |
 |:---:|:---:|:---:|
-| **GitCode** | 🇨🇳 国内用户（推荐） | 见下方 |
-| **GitHub** | 🌍 国外用户 | 见下方 |
-| **Gitee** | 🇨🇳 国内备用 | 见下方 |
+| **Gitee** | ✅ 默认推荐（优先） | 见下方 |
+| **GitCode** | 备用 | 见下方 |
+| **GitHub** | 备用 | 见下方 |
 
 </div>
 
@@ -34,19 +34,19 @@
 
 <div align="center">
 
-**GitCode（国内推荐）：**
+**Gitee（默认推荐）：**
+```bash
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/install.sh)
+```
+
+**GitCode（备用）：**
 ```bash
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/install.sh)
 ```
 
-**GitHub（国外）：**
+**GitHub（备用）：**
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/install.sh)
-```
-
-**Gitee（国内备用）：**
-```bash
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/install.sh)
 ```
 
 </div>
@@ -70,8 +70,8 @@ xm
 ```mermaid
 flowchart TB
     A[开始] --> B{选择镜像源}
-    B -->|国内| C[GitCode/Gitee]
-    B -->|国外| D[GitHub]
+    B --> C[Gitee(默认推荐)]
+    B --> D[GitCode/GitHub(备用)]
     C --> E[执行 install.sh]
     D --> E
     E --> F{检测系统}
@@ -102,14 +102,14 @@ flowchart TB
 自动检测系统类型，Termux 用户安装 Linux 容器，Linux 用户安装 xm 菜单。
 
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/install.sh)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/install.sh)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/install.sh)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/install.sh)
 ```
 
 ---
@@ -121,14 +121,14 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/instal
 在 Termux 环境下快速配置 SSH 连接。
 
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/ssh.sh)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/ssh.sh)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/ssh.sh)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/ssh.sh)
 ```
 
 ---
@@ -137,62 +137,62 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/ssh.sh
 
 #### Node.js
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/node)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/node)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/node)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/node)
 ```
 
 #### pnpm
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/pnpm)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/pnpm)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/pnpm)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/pnpm)
 ```
 
 #### Chromium
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/chromium)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/chromium)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/chromium)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/chromium)
 ```
 
 #### FFmpeg
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/ffmpeg)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/ffmpeg)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/ffmpeg)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/ffmpeg)
 ```
 
 #### yq
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/yq)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/project-install/software/yq)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/project-install/software/yq)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/project-install/software/yq)
 ```
 
 ---
@@ -201,26 +201,26 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/projec
 
 #### Python + uv
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/python_uv.sh)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/body/modules/python_uv.sh)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/body/modules/python_uv.sh)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/python_uv.sh)
 ```
 
 #### FFmpeg 模块
 ```bash
-# GitCode（国内推荐）
+# Gitee（默认推荐）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/ffmpeg.sh)
+
+# GitCode（备用）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/body/modules/ffmpeg.sh)
 
-# GitHub（国外）
+# GitHub（备用）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/body/modules/ffmpeg.sh)
-
-# Gitee（国内备用）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/modules/ffmpeg.sh)
 ```
 
 ---
@@ -229,14 +229,14 @@ bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/body/m
 
 #### Linux 容器安装
 ```bash
-# GitCode（国内推荐，Ubuntu 示例）
+# Gitee（默认推荐，Ubuntu 示例）
+bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Termux-container/xrk.sh) --ubuntu
+
+# GitCode（备用，Ubuntu 示例）
 bash <(curl -sL https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main/Termux-container/xrk.sh) --ubuntu
 
-# GitHub（国外，Ubuntu 示例）
+# GitHub（备用，Ubuntu 示例）
 bash <(curl -sL https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main/Termux-container/xrk.sh) --ubuntu
-
-# Gitee（国内备用，Ubuntu 示例）
-bash <(curl -sL https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/Termux-container/xrk.sh) --ubuntu
 ```
 
 **支持的发行版**：`--ubuntu` `--debian` `--alpine` `--arch` `--fedora` `--centos`
@@ -262,8 +262,8 @@ pie title 独立工具脚本统计
 
 ### Q1: 如何选择镜像源？
 
-- **国内用户**：优先使用 **GitCode** 或 **Gitee**
-- **国外用户**：使用 **GitHub**
+- **默认推荐**：优先使用 **Gitee**
+- **备用**：如 Gitee 不稳定，可改用 **GitCode / GitHub**
 - **网络不稳定**：尝试切换不同源
 
 ### Q2: 脚本执行失败怎么办？
