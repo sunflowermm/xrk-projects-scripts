@@ -81,10 +81,11 @@ show_menu() {
 MENU_OPT_COUNT=4
 while true; do
     show_menu
-    read -rp "请选择 [1-${MENU_OPT_COUNT}]，r 更新脚本: " raw_choice
+    read -rp "请选择 [1-${MENU_OPT_COUNT}]，0/q 退出，r 更新脚本: " raw_choice
     CHOICE=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     clear_menu
     [ -z "$CHOICE" ] && continue
+    [ "$CHOICE" = "0" ] || [ "$CHOICE" = "q" ] && exit 0
     case "$CHOICE" in
         1) bash "$XRK_ROOT/body/menu/kuizai.sh" ;;
         2) bash "$XRK_ROOT/body/menu/advanced.sh" ;;

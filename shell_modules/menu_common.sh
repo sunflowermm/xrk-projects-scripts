@@ -130,7 +130,6 @@ menu_show() {
     done
     echo -e "${prefix}$MENU_BOT"
     MENU_OPT_COUNT=${#opts[@]}
-    MENU_LINES=$((MENU_OPT_COUNT + 5))
 }
 
 menu_is_exit_choice() {
@@ -159,20 +158,21 @@ menu_show_double() {
     echo -e "${caidan1}${border_bot}${bg}"
     echo
     MENU_OPT_COUNT=${#opts[@]}
-    MENU_LINES=$((MENU_OPT_COUNT + 6))
 }
 
 clear_menu() {
-    local n="${1:-${MENU_LINES:-0}}"
-    # 没有可用的行数时，直接清屏，保证菜单/GUI 关闭后不残留
-    if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -le 0 ]; then
+    local n="$1"
+    # 更智能的策略：
+    # - 如显式传入行数，则只回收指定行（兼容特殊需求）
+    # - 否则直接整屏清理，避免因额外 echo / 注释性输出导致的行数误差
+    if [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -gt 0 ]; then
+        local i
+        for ((i=0; i<n; i++)); do
+            printf "\e[1A\e[K"
+        done
+    else
         command -v clear &>/dev/null && clear || printf "\033[2J\033[H"
-        return 0
     fi
-    local i
-    for ((i=0; i<n; i++)); do
-        printf "\e[1A\e[K"
-    done
 }
 
 menu_init() {

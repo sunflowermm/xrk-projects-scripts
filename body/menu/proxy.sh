@@ -149,9 +149,9 @@ function manage_plugins() {
         done
         menu_show "插件包目录" "${plugin_opts[@]}"
         
-        read -rp "输入要切换代理的插件序号 [1-${MENU_OPT_COUNT}]，q 退出: " raw_input
+    read -rp "输入要切换代理的插件序号 [1-${MENU_OPT_COUNT}]，0 或 q 退出: " raw_input
         input=$(echo "$raw_input" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-        [ "$input" = "q" ] && { echo "程序已退出"; exit 0; }
+        [ "$input" = "0" ] || [ "$input" = "q" ] && { echo "程序已退出"; exit 0; }
         
         if menu_validate_input "$input" 1 ${#plugin_names[@]} "序号 $input 超出范围"; then
             index=$((input - 1))
