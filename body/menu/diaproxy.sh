@@ -1,9 +1,10 @@
 #!/bin/bash
 # GitHub 代理切换（whiptail 触屏版），共用 github.sh 的 PROXIES
-[ -f /xrk/.init ] && source /xrk/.init  # 先加载.init（提供颜色）
-[ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh
-[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
-menu_init 0 0  # 初始化：不需要common，不需要check_changes（但保留颜色变量）
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/.init" ] && source "$root/.init"
+[ -f "$root/shell_modules/github.sh" ] && source "$root/shell_modules/github.sh"
+[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
+menu_init 0 0
 
 RED="$RED"
 GREEN="$GREEN"
@@ -23,7 +24,6 @@ title=blue,black
 
 FILTER_DIRS=('example' 'other' 'system' 'adapter')
 
-# 显示加载动画
 show_loading() {
     local message=$1
     local frames=("◐" "◓" "◑" "◒")
@@ -40,16 +40,13 @@ show_loading() {
     SPIN_PID=$!
 }
 
-# 停止加载动画
 stop_loading() {
     kill $SPIN_PID 2>/dev/null
     printf "\r%*s\r" $(($(tput cols))) ""
 }
 
-# 清理代理URL - 修复版
 clean_url() {
     local url=$1
-    # 修复后的正则表达式
     url=$(echo "$url" | sed -E '
         s|^https?://[^/]+/https://github\.com|https://github.com|;
         s|^https?://[^/]+/github\.com|https://github.com|;
@@ -59,7 +56,6 @@ clean_url() {
     echo "$url"
 }
 
-# 测试并获取可用代理
 get_proxy() {
     local var_name="$1"
     local original_url="${!var_name}"
@@ -68,7 +64,6 @@ get_proxy() {
     local speed_threshold=2
     local curl_timeout=3
 
-    # 随机化代理列表
     local shuffled_proxies=($(printf "%s\n" "${PROXIES[@]}" | shuf))
 
     echo -e "${BLUE}🔍 正在检测原始URL: ${clean_url}${NC}"
@@ -97,7 +92,6 @@ get_proxy() {
     return 1
 }
 
-# 管理插件目录
 manage_plugins() {
     local plugins_path="$yz/plugins"
     
@@ -109,7 +103,6 @@ manage_plugins() {
             exit 1
         fi
         
-        # 获取并过滤插件目录
         local all_dirs=($(find "$plugins_path" -mindepth 1 -maxdepth 1 -type d 2>/dev/null))
         local filtered_dirs=()
         local menu_items=()
@@ -127,7 +120,6 @@ manage_plugins() {
             
             if [ "$should_filter" = false ]; then
                 filtered_dirs+=("$dir")
-                # 检查是否为git仓库
                 if [ -d "$dir/.git" ]; then
                     menu_items+=("$base_name" "📦 Git仓库")
                 else
@@ -169,7 +161,6 @@ manage_plugins() {
             continue
         fi
         
-        # 获取当前远程URL
         local current_url=$(cd "$selected_dir" && git config --get remote.origin.url)
         if [ -z "$current_url" ]; then
             whiptail --title "错误提示" \
@@ -213,7 +204,6 @@ manage_plugins() {
     done
 }
 
-# git命令重写函数
 function git() {
     local args=("$@")
     local proxied=false

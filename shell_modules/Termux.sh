@@ -11,8 +11,7 @@ else
 fi
 Termux_URL="$SCRIPT_RAW_BASE/Termux-container"
 
-# 修改键盘和字体布局
-function 字体键盘魔法() {
+字体键盘魔法() {
     local font_dir="$HOME/.termux"
     local font_file="$font_dir/font.ttf"
     local prop_file="$font_dir/termux.properties"
@@ -59,17 +58,13 @@ function 字体键盘魔法() {
         rm -f "$temp_prop"
     fi
 
-    # 只在有更新时才reload
-    if [ "$need_reload" = true ]; then
+    [ "$need_reload" = "true" ] && {
         termux-reload-settings
         echo "设置已更新并重载"
-    else
-        echo "无需重载"
-    fi
+    } || echo "无需重载"
 }
 
-# 换源与安装必备软件包
-function 换源魔法() {
+换源魔法() {
     bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/repo.sh")
     yes | apt update -y || { echo "更新失败"; return 1; }
     

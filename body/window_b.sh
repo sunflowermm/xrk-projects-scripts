@@ -1,8 +1,9 @@
 #!/bin/bash
 # tmux 窗格占位
-[ -f /xrk/.init ] && source /xrk/.init
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/.init" ] && source "$root/.init"
 cd /root
-source /xrk/shell_modules/init.sh
-source /xrk/shell_modules/github.sh
+source "$root/shell_modules/init.sh"
+source "$root/shell_modules/github.sh"
 check_changes
 search_directories

@@ -1,8 +1,9 @@
 #!/bin/bash
 # tmux 窗格：复制提示（需 .init 提供 caidan/bg）
-[ -f /xrk/.init ] && source /xrk/.init
-source /xrk/shell_modules/init.sh
-source /xrk/shell_modules/github.sh
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/.init" ] && source "$root/.init"
+source "$root/shell_modules/init.sh"
+source "$root/shell_modules/github.sh"
 check_changes
 search_directories
 

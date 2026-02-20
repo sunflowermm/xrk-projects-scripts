@@ -1,33 +1,28 @@
 #!/bin/bash
 # 文件/目录删除（dialog 触屏版），依赖 yz
-[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
-menu_init 0 0  # 初始化：不需要common，不需要check_changes
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
+menu_init 0 0
 
-# 设置 dialog 颜色
 export DIALOGRC="/dev/null"
 export DIALOG_OK=0
 export DIALOG_CANCEL=1
 export DIALOG_ESC=255
 
-# 临时文件
 temp_file=$(mktemp)
 trap 'rm -f $temp_file' EXIT
 
-# 显示文件选择菜单
 function show_file_menu() {
     local want_path=$1
     local title=$2
     
-    # 检查目录是否存在
     if [ ! -d "$want_path" ]; then
         dialog --title "错误" --msgbox "目录 $want_path 不存在" 8 40
         return 1
     fi
     
-    # 获取文件列表
     local files=($(find "$want_path" -mindepth 1 -maxdepth 1 -printf "%f\n" 2>/dev/null))
     
-    # 检查目录是否为空
     if [ ${#files[@]} -eq 0 ]; then
         dialog --title "提示" --msgbox "当前目录为空" 8 40
         return 1
@@ -42,19 +37,16 @@ function show_file_menu() {
         fi
     done
     
-    # 显示文件选择对话框
     dialog --title "$title" \
            --checklist "使用空格键选择要删除的文件/文件夹" \
            20 70 15 \
            "${dialog_options[@]}" \
            2>$temp_file
     
-    # 检查用户选择
     if [ $? -eq 0 ]; then
         local selected_files=($(cat $temp_file))
         
         if [ ${#selected_files[@]} -gt 0 ]; then
-            # 确认删除
             local files_list=""
             for file in "${selected_files[@]}"; do
                 files_list="$files_list\n$file"
@@ -65,7 +57,6 @@ function show_file_menu() {
                    15 60
             
             if [ $? -eq 0 ]; then
-                # 执行删除
                 local deleted=0
                 local failed=0
                 local error_msg=""
@@ -79,7 +70,6 @@ function show_file_menu() {
                     fi
                 done
                 
-                # 显示结果
                 local result_msg="成功删除 $deleted 个文件/文件夹"
                 [ $failed -gt 0 ] && result_msg="$result_msg\n删除失败 $failed 个：$error_msg"
                 
@@ -89,7 +79,6 @@ function show_file_menu() {
     fi
 }
 
-# 主菜单函数
 function main_menu() {
     while true; do
         dialog --title "文件管理器" \
@@ -104,7 +93,7 @@ function main_menu() {
         local choice=$(cat $temp_file)
         case $choice in
             1) show_file_menu "$yz/plugins" "插件包目录" ;;
-            2) show_file_menu "$yz/plugins/example" "js插件目录" ;;
+            2) show_file_menu "$yz/plugins/other" "js插件目录" ;;
             3) show_file_menu "$yz" "Bot目录" ;;
             4)
                 dialog --title "自定义目录" \
@@ -122,5 +111,4 @@ function main_menu() {
     done
 }
 
-# 启动主程序
 main_menu

@@ -1,5 +1,6 @@
 #!/bin/bash
-[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
 menu_init 0 1  # 初始化：不需要common，需要check_changes（检测xyz路径，.init会加载init.sh）
 
 # 显示帮助信息

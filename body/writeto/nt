@@ -1,8 +1,9 @@
 #!/bin/bash
 # NapCat QQ 多开启动器（可复制到 /usr/local/bin/nt）
-[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/shell_modules/common.sh" ] && source "$root/shell_modules/common.sh"
 
-BASE_DIR="/xrk/body"
+BASE_DIR="$root/body"
 CONFIG_DIR="/opt/QQ/resources/app/app_launcher/napcat/config"
 
 check_dependencies() {

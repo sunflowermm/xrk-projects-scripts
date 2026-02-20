@@ -34,25 +34,15 @@ _get_script_base() {
     fi
 }
 
-# 统一加载模块：优先本地 /xrk，其次脚本相对路径，最后远程
+# 统一加载模块：优先本地 XRK_ROOT，其次脚本相对路径，最后远程
 # 用法：load_install_module "shell_modules/github.sh"
 load_install_module() {
-    local path="$1"
-    local base
-    
-    # 优先 /xrk（已安装环境）
-    [ -f "/xrk/$path" ] && { source "/xrk/$path"; return 0; }
-    
-    # 其次脚本相对路径（本地仓库执行）
+    local path="$1" root="${XRK_ROOT:-/xrk}" base
+    [ -f "$root/$path" ] && { source "$root/$path"; return 0; }
     base="$(_get_script_base)"
     [ -n "$base" ] && [ -f "${base}/$path" ] && { source "${base}/$path"; return 0; }
-    
-    # 最后远程加载（需要 SCRIPT_RAW_BASE）
-    local base_url="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-    if source <(curl -sL --connect-timeout 5 --max-time 30 "${base_url}/$path" 2>/dev/null); then
-        return 0
-    fi
-    
+    local base_url="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}}"
+    source <(curl -sL --connect-timeout 5 --max-time 30 "${base_url}/$path" 2>/dev/null) && return 0
     return 1
 }
 
@@ -61,22 +51,10 @@ load_install_module() {
 init_install_env() {
     local source_arg="${1:-}"
     
-    # 加载 bootstrap.sh（提供 get_base_from_arg、init_repo_source）
-    load_install_module "shell_modules/bootstrap.sh" 2>/dev/null || {
-        # 如果加载失败，直接设置默认值
-        SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-    }
-    
-    # 初始化仓库源（如果 bootstrap 加载成功）
-    if type init_repo_source &>/dev/null; then
-        init_repo_source "$source_arg"
-    elif [ -z "$SCRIPT_RAW_BASE" ]; then
-        if type get_base_from_arg &>/dev/null; then
-            SCRIPT_RAW_BASE="$(get_base_from_arg "$source_arg")"
-        else
-            SCRIPT_RAW_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master"
-        fi
-    fi
+    _DEFAULT_RAW="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master"
+    load_install_module "shell_modules/bootstrap.sh" 2>/dev/null || true
+    type init_repo_source &>/dev/null && init_repo_source "$source_arg"
+    SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$_DEFAULT_RAW}"
     export SCRIPT_RAW_BASE
     
     # 加载 github.sh（代理支持）
@@ -89,24 +67,12 @@ init_install_env() {
 # 统一执行安装脚本：优先本地，否则远程
 # 用法：run_install_script "project-install/NapCat.sh" [参数...]
 run_install_script() {
-    local script_path="$1"
+    local script_path="$1" root="${XRK_ROOT:-/xrk}"
     shift
     local args=("$@")
-    
-    # 优先本地 /xrk
-    if [ -f "/xrk/$script_path" ]; then
-        bash "/xrk/$script_path" "${args[@]}"
-        return $?
-    fi
-    
-    # 其次脚本相对路径
+    [ -f "$root/$script_path" ] && { bash "$root/$script_path" "${args[@]}"; return $?; }
     local base="$(_get_script_base)"
-    if [ -f "${base}/$script_path" ]; then
-        bash "${base}/$script_path" "${args[@]}"
-        return $?
-    fi
-    
-    # 最后远程执行
-    local base_url="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
+    [ -f "${base}/$script_path" ] && { bash "${base}/$script_path" "${args[@]}"; return $?; }
+    local base_url="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}}"
     bash <(curl -sL "${base_url}/$script_path") "${args[@]}"
 }

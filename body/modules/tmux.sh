@@ -1,32 +1,29 @@
 #!/bin/bash
 # 独立模块：安装并配置 tmux（oh-my-tmux + tpm + 脚本自带 .tmux.conf）
-# 可单独执行：bash /xrk/body/modules/tmux 或 xrk-tmux
+# 可单独执行：bash $XRK_ROOT/body/modules/tmux.sh 或 xrk-tmux
 
 set -e
-[ -d /xrk ] || { echo "请先安装脚本仓库到 /xrk"; exit 1; }
+XRK_ROOT="${XRK_ROOT:-/xrk}"
+[ -d "$XRK_ROOT" ] || { echo "请先安装脚本仓库到 $XRK_ROOT"; exit 1; }
 
-# 安装 tmux 包（统一走 install_pkg）
 install_tmux_pkg() {
     if command -v tmux &>/dev/null; then
         echo "[tmux] 已安装: $(tmux -V)"
         return 0
     fi
     echo "[tmux] 安装 tmux 包..."
-    [ -f /xrk/shell_modules/install.sh ] && source /xrk/shell_modules/install.sh
-    确定系统安装器魔法 2>/dev/null || true
+    [ -f "$XRK_ROOT/shell_modules/install.sh" ] && source "$XRK_ROOT/shell_modules/install.sh"
     install_package "tmux" 2>/dev/null || true
-    command -v tmux &>/dev/null || { [ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh && ensure_cmd tmux tmux; }
+    command -v tmux &>/dev/null || { [ -f "$XRK_ROOT/shell_modules/common.sh" ] && source "$XRK_ROOT/shell_modules/common.sh" && ensure_cmd tmux tmux; }
 }
 
-# 克隆 GitHub 仓库（若存在 github.sh 则走其代理/直连逻辑）
 git_clone_gh() {
     local url="$1" dest="$2"
-    [ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh
+    [ -f "$XRK_ROOT/shell_modules/github.sh" ] && source "$XRK_ROOT/shell_modules/github.sh"
     type git &>/dev/null || { echo "[tmux] 未找到 git"; return 1; }
     git clone --depth=1 "$url" "$dest"
 }
 
-# oh-my-tmux
 setup_oh_my_tmux() {
     if [ ! -d "$HOME/.tmux" ]; then
         echo "[tmux] 克隆 oh-my-tmux..."
@@ -34,24 +31,22 @@ setup_oh_my_tmux() {
     fi
 }
 
-# tpm 插件
 setup_tpm() {
     mkdir -p "$HOME/.tmux/plugins"
     if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
         echo "[tmux] 安装 tpm..."
         git_clone_gh "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm"
     else
-        [ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh
+        [ -f "$XRK_ROOT/shell_modules/github.sh" ] && source "$XRK_ROOT/shell_modules/github.sh"
         (cd "$HOME/.tmux/plugins/tpm" && git pull --rebase --autostash)
     fi
     chmod -R 755 "$HOME/.tmux/plugins" 2>/dev/null || true
 }
 
-# 使用脚本自带配置（链接到 ~/.tmux.conf）
 link_conf() {
-    [ -f /xrk/body/.tmux.conf ] || { echo "[tmux] 未找到 /xrk/body/.tmux.conf"; return 1; }
-    ln -sf /xrk/body/.tmux.conf "$HOME/.tmux.conf"
-    echo "[tmux] 已链接 ~/.tmux.conf -> /xrk/body/.tmux.conf"
+    [ -f "$XRK_ROOT/body/.tmux.conf" ] || { echo "[tmux] 未找到 $XRK_ROOT/body/.tmux.conf"; return 1; }
+    ln -sf "$XRK_ROOT/body/.tmux.conf" "$HOME/.tmux.conf"
+    echo "[tmux] 已链接 ~/.tmux.conf -> $XRK_ROOT/body/.tmux.conf"
 }
 
 install_tmux_pkg

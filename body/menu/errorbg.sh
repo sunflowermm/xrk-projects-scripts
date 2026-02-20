@@ -1,9 +1,9 @@
 #!/bin/bash
 # 报错修复：浏览器/Node/pnpm/yq/ffmpeg 重装
-[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
-menu_init 1 0  # 初始化：需要common（install_pkg），不需要check_changes
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
+menu_init 1 0
 
-# 清理现有安装（按系统）
 clean_existing() {
     local package=$1
     local os
@@ -52,32 +52,31 @@ fix_puppeteer() {
     if [ -d "$yz" ]; then
         (cd "$yz" && pnpm update puppeteer@19.8.3 -w && pnpm i)
     else
-        echo "未找到云崽目录"; return 1
+        echo "未找到葵崽目录"; return 1
     fi
 }
 
 show_menu() {
-    # 使用双色边框菜单显示函数（自动宽度、自动对齐）
     menu_show_double "报错修复菜单" "浏览器修复 [多系统支持]" "修复依赖项1 [智能诊断]" "修复依赖项2 [深度重装]" "Node.js 完整重装" "PNPM 完整重装" "YQ 完整重装" "FFMPEG"
 }
 
-# 确保基础依赖（使用统一函数）
 menu_check_deps curl wget git
 
 while true; do
     show_menu
-    read -p "请选择要执行的操作 [1-7/q]: " CHOICE
+    read -rp "请选择 [1-${MENU_OPT_COUNT}]，q 退出: " raw_choice
+    CHOICE=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     forin=13 clear_menu
+    [ "$CHOICE" = "0" ] || [ "$CHOICE" = "q" ] && { echo "退出"; exit 0; }
     case "$CHOICE" in
-        1) read -p "确认删除并重装浏览器？[y/N]: " confirm
+        1) read -rp "确认删除并重装浏览器？[y/N]: " confirm
            [[ "$confirm" =~ ^[Yy]$ ]] && install_chromium && fix_puppeteer && echo "浏览器修复完成" ;;
         2) fix_puppeteer; echo "基础依赖修复完成" ;;
-        3) [ -d "$yz" ] && { rm -rf "$HOME/.pm2" "$yz/node_modules"; clean_and_install_node; clean_and_install_pnpm; fix_puppeteer; echo "修复完成，请使用 yz 启动云崽"; } || echo "未检测到云崽安装" ;;
+        3) [ -d "$yz" ] && { rm -rf "$HOME/.pm2" "$yz/node_modules"; clean_and_install_node; clean_and_install_pnpm; fix_puppeteer; echo "修复完成，请使用 xyz 启动葵崽"; } || echo "未检测到葵崽安装" ;;
         4) clean_and_install_node ;;
         5) clean_and_install_pnpm ;;
         6) clean_and_install_yq ;;
         7) run_software "project-install/software/ffmpeg" ;;
-        q|Q) echo "退出脚本"; exit 0 ;;
-        *) echo "无效选择，请重新输入" ;;
+        *) echo "无效选择" ;;
     esac
 done

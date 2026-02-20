@@ -81,7 +81,7 @@ PROXIES=(
     ""
 )
 
-function getgh() {
+getgh() {
     local var_name="$1"
     local original_url="${!var_name}"
     local check_path="NapNeko/NapCatQQ/main/package.json"
@@ -153,18 +153,13 @@ function getgh() {
     echo -e "${YELLOW}未找到合适的代理，继续使用原始地址: ${original_url}${NC}"
 }
 
-function git() {
-    local args=("$@")
-    local proxied=false
+git() {
+    local args=("$@") proxied=false i
     for ((i=0; i<${#args[@]}; i++)); do
         if [[ "${args[i]}" == https://github.com/* || "${args[i]}" == https://raw.githubusercontent.com/* ]]; then
             getgh "args[$i]"
             proxied=true
         fi
     done
-    if [ "$proxied" = true ]; then
-        command git "${args[@]}"
-    else
-        command git "$@"
-    fi
+    command git "${args[@]}"
 }

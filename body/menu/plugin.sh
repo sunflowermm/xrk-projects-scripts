@@ -1,9 +1,10 @@
 #!/bin/bash
 # 插件菜单：安装/管理插件、Python 环境、代理
-[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
 menu_init 1 0  # 初始化：需要common（install_pkg），不需要check_changes
-
-MENU_DIR="$yz/plugins/XRK/resources/plugins"
+YZ_DIR="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}"
+MENU_DIR="$YZ_DIR/plugins/XRK/resources/plugins"
 CATEGORIES=(
     "推荐插件:recommended_plugins.json"
     "文娱插件:entertainment_plugins.json"
@@ -11,7 +12,6 @@ CATEGORIES=(
     "游戏插件:game_plugins.json"
     "JS插件:js.json"
 )
-YZ_DIR="$yz"
 
 # 检查依赖（使用统一函数）
 check_dependencies() {
@@ -21,17 +21,17 @@ check_dependencies() {
 
 # 统一执行 pnpm 安装（合并重复逻辑）
 run_pnpm_install() {
-    [ -d "$YZ_DIR" ] && (cd "$YZ_DIR" && pnpm i) || echo -e "${red}云崽目录不存在${bg}"
+    [ -d "$YZ_DIR" ] && (cd "$YZ_DIR" && pnpm i) || echo -e "${red}葵崽目录不存在${bg}"
 }
 
 # 配置 Python 环境：统一走 uv 模块
 install_python_env() {
-    if [ -f /xrk/body/modules/python_uv ]; then
-        bash /xrk/body/modules/python_uv
+    if [ -f "$root/body/modules/python_uv.sh" ]; then
+        bash "$root/body/modules/python_uv.sh"
     else
         echo -e "${red}未找到 python_uv 模块${bg}"
     fi
-    read -p "按Enter继续..."
+    read -rp "按Enter继续..." _
 }
 
 # 加载插件数据（使用统一文件检查）
@@ -46,7 +46,6 @@ load_plugins() {
 
 # 显示插件选择界面（使用统一函数）
 show_plugin_selection() {
-    # 收集所有类别名称
     local category_names=()
     for category in "${CATEGORIES[@]}"; do
         IFS=":" read -r name _ <<< "$category"
@@ -62,7 +61,6 @@ install_normal_plugin() {
     local cn_name="$3"
     local target_dir="$YZ_DIR/plugins/$name"
     
-    # GitHub 链接走代理（getgh 会改写同名变量）
     [[ "$git_url" == *"github.com"* ]] && getgh "git_url"
 
     if [ -d "$target_dir" ]; then
@@ -80,11 +78,11 @@ install_normal_plugin() {
     fi
 }
 
-# 安装JS插件
+# 安装 js 插件（目录 plugins/other）
 install_js_plugin() {
     local cn_name="$1"
     local git_url="$2"
-    local target_dir="$YZ_DIR/plugins/example"
+    local target_dir="$YZ_DIR/plugins/other"
     local target_file="$target_dir/${cn_name}.js"
 
     [[ "$git_url" == *"github.com"* ]] && getgh "git_url"
@@ -127,7 +125,7 @@ show_dialog_plugins() {
            "${options[@]}" 2>/tmp/plugin_selections
            
     if [ $? -eq 0 ]; then
-        clear  # 清除dialog残余
+        clear
         local selections=$(cat /tmp/plugin_selections)
         rm -f /tmp/plugin_selections
         
@@ -146,14 +144,13 @@ show_dialog_plugins() {
     fi
 }
 
-# 文字界面显示插件 (简化版)
+# 文字界面显示插件
 show_text_plugins() {
     local category_name="$1"
     local category_file="$2"
     
     while true; do
         clear
-        # 先读取所有插件名称
         local plugins_data=() plugin_names=()
         while IFS="|" read -r cn_name name description git; do
             if [ -n "$cn_name" ]; then
@@ -161,17 +158,13 @@ show_text_plugins() {
                 plugin_names+=("$cn_name")
             fi
         done < <(load_plugins "$category_file")
-        # 使用统一菜单显示函数
         menu_show "${category_name} 插件" "${plugin_names[@]}"
-        echo -e "${caidan3}输入插件编号安装 (多选用空格)，0 返回${bg}"
-        read -p "请选择: " selections
-        
-        if [ "$selections" = "0" ]; then
-            break
-        fi
+        read -rp "请选择 [1-${MENU_OPT_COUNT}] 多选用空格，0 返回: " raw_sel
+        selections=$(echo "$raw_sel" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+        [ "$selections" = "0" ] || [ "$selections" = "q" ] && break
         
         for selection in $selections; do
-            if [[ $selection =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le ${#plugins_data[@]} ]; then
+            if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${MENU_OPT_COUNT}" ]; then
                 IFS="|" read -r cn_name name description git <<< "${plugins_data[$selection-1]}"
                 
                 if [ "$category_file" = "js.json" ]; then
@@ -190,94 +183,84 @@ show_text_plugins() {
     done
 }
 
-# 显示主菜单（使用统一函数，自动宽度、自动对齐）
 show_main_menu() {
-    menu_show "向日葵插件菜单" "安装插件(触屏版)" "安装插件(文字版)" "李诗雅 js(触屏版)" "李诗雅 js(文字版)" "插件文件管理(触屏)" "插件文件管理(文字)" "配置 Python 环境" "切换插件代理(触屏)" "切换插件代理(文字)"
+    menu_show "葵崽插件菜单" "安装插件(触屏版)" "安装插件(文字版)" "js插件(触屏版)" "js插件(文字版)" "插件文件管理(触屏)" "插件文件管理(文字)" "配置 Python 环境" "切换插件代理(触屏)" "切换插件代理(文字)"
 }
 
-# 主程序
 main() {
     check_dependencies
     
     while true; do
         clear
         show_main_menu
-        read -p "请选择操作: " choice
-        
+        read -rp "请选择 [0-${MENU_OPT_COUNT}]: " raw_choice
+        choice=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+        [ "$choice" = "0" ] || [ "$choice" = "q" ] && { echo -e "${caidan2}感谢使用，再见！${bg}"; run_pnpm_install; exit 0; }
         case "$choice" in
             1|2)
                 clear
                 show_plugin_selection
-                read -p "请选择插件类别 (0-${#CATEGORIES[@]}): " category_choice
-                if [ -z "$category_choice" ]; then
-                  echo -e "${red}已取消选择${bg}"
-                  sleep 2
-                elif [ "$category_choice" -ge 1 ] && [ "$category_choice" -le ${#CATEGORIES[@]} ]; then
-                  IFS=":" read -r category_name category_file <<< "${CATEGORIES[$category_choice-1]}"
-                  if [ "$choice" = "1" ]; then
-                    show_dialog_plugins "$category_name" "$category_file"
+                read -rp "请选择类别 [0-${MENU_OPT_COUNT}]: " raw_cat
+                category_choice=$(echo "$raw_cat" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+                if [ -z "$category_choice" ] || [ "$category_choice" = "0" ] || [ "$category_choice" = "q" ]; then
+                    echo -e "${red}已取消${bg}"; sleep 2
+                elif [[ "$category_choice" =~ ^[0-9]+$ ]] && [ "$category_choice" -ge 1 ] && [ "$category_choice" -le "${MENU_OPT_COUNT}" ]; then
+                    IFS=":" read -r category_name category_file <<< "${CATEGORIES[$category_choice-1]}"
+                    if [ "$choice" = "1" ]; then
+                        show_dialog_plugins "$category_name" "$category_file"
                     else
-                    show_text_plugins "$category_name" "$category_file"
-                  fi
+                        show_text_plugins "$category_name" "$category_file"
+                    fi
                     clear
                     run_pnpm_install
-                  else
-                  echo -e "${red}无效的选择${bg}"
-                  sleep 2
+                else
+                    echo -e "${red}无效选择${bg}"; sleep 2
                 fi
                 ;;
             3)
                 clear
-                bash /xrk/body/menu/jsdialog
+                bash "$root/body/menu/jsdialog.sh"
                 clear
                 run_pnpm_install
                 ;;
             4)
                 clear
-                bash /xrk/body/menu/js
+                bash "$root/body/menu/js.sh"
                 clear
-                [ -d "$YZ_DIR" ] && (cd "$YZ_DIR" && pnpm add axios -w && pnpm i) || echo -e "${red}云崽目录不存在${bg}"
+                [ -d "$YZ_DIR" ] && (cd "$YZ_DIR" && pnpm add axios -w && pnpm i) || echo -e "${red}葵崽目录不存在${bg}"
                 ;;
             5)
                 clear
-                bash /xrk/body/menu/deletiondialog
+                bash "$root/body/menu/deletiondialog.sh"
                 clear
                 run_pnpm_install
                 ;;
             6)
                 clear
-                bash /xrk/body/menu/deletion
+                bash "$root/body/menu/deletion.sh"
                 clear
                 run_pnpm_install
                 ;;
-
             7)
                 clear
                 install_python_env
                 ;;
             8)
                 clear
-                bash /xrk/body/menu/diaproxy
+                bash "$root/body/menu/diaproxy.sh"
                 clear
                 ;;
             9)
                 clear
-                bash /xrk/body/menu/proxy
+                bash "$root/body/menu/proxy.sh"
                 clear
-                ;;
-            q|0)
-                clear
-                echo -e "${caidan2}感谢使用，再见！${bg}"
-                run_pnpm_install
-                exit 0
                 ;;
             *)
-                echo -e "${red}无效选择，请重试${bg}"
+                echo -e "${red}无效选择 [0-${MENU_OPT_COUNT}]${bg}"
                 sleep 1
                 ;;
         esac
     done
 }
 
-# 启动主程序
 main "$@"

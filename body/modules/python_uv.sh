@@ -1,18 +1,16 @@
 #!/bin/bash
-# 独立模块：安装 uv + Python（无 /xrk 依赖）
+# 独立模块：安装 uv + Python（可选依赖 XRK_ROOT）
 
 UV_INSTALL_URL="https://astral.sh/uv/install.sh"
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-[ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh" 2>/dev/null)
+root="${XRK_ROOT:-/xrk}"
+SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}}"
+[ -f "$root/shell_modules/versions.sh" ] && source "$root/shell_modules/versions.sh" || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh" 2>/dev/null)
 PYTHON_VERSION="${UV_PYTHON_VERSION:-${PYTHON_LTS_VERSION:-3.12}}"
 export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:$PATH"
 
-# 加载公共模块并确保 curl（支持 /xrk 或远程）
-if [ -f /xrk/shell_modules/common.sh ]; then
-    # shellcheck source=/dev/null
-    source /xrk/shell_modules/common.sh
+if [ -f "$root/shell_modules/common.sh" ]; then
+    source "$root/shell_modules/common.sh"
 else
-    # shellcheck source=/dev/null
     source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
 fi
 ensure_cmd curl curl

@@ -1,10 +1,12 @@
 #!/bin/bash
-# 李素裳 JS 插件：克隆仓库、选择安装、名称回复
-[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
-menu_init 0 0  # 初始化：不需要common，不需要check_changes
+# js 插件：克隆仓库、选择安装、名称回复（目录 plugins/other）
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
+menu_init 0 0
 
-xrk=$HOME/xrk
-jh="$yz/plugins/example"
+xrk="$HOME/xrk"
+YZ_PLUGINS_JS="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}/plugins/other"
+jh="$YZ_PLUGINS_JS"
 
 move_vocal(){
     local woaini=$1
@@ -18,17 +20,19 @@ move_vocal(){
     fi
     
     sleep 1
+    mkdir -p "$jh"
     if [ -d "$jh/$wogeng" ]; then
         echo -e "${caidan2}已经安装过${wogeng}了，正在跳过${bg}"
     else
-        mv -f $xrk/shell-js/$wogeng $jh/
+        mv -f "$xrk/shell-js/$wogeng" "$jh/"
         echo -e "${caidan3}已安装 ${wogeng}${bg}"
     fi
 }
 
 select_js_plugins() {
     echo -e "${caidan3}获取 JS 插件列表...${bg}"
-    local js_files=($(find $xrk/shell-js/ -maxdepth 1 -type f -name "*.js"))
+    mkdir -p "$jh"
+    local js_files=($(find "$xrk/shell-js/" -maxdepth 1 -type f -name "*.js" 2>/dev/null))
     
     if [ ${#js_files[@]} -eq 0 ]; then
         echo -e "${caidan1}未找到任何 JS 插件${bg}"
@@ -56,7 +60,7 @@ select_js_plugins() {
             if [ "${selected_file##*/}" == "名称回复.js" ]; then
                 selected_name_reply_js=true
             fi
-            mv -n "$selected_file" $jh/
+            mv -n "$selected_file" "$jh/"
             echo -e "${caidan3}已安装 $(basename "$selected_file")${bg}"
         else
             echo -e "${caidan1}无效的选择: $i${bg}"
@@ -65,24 +69,24 @@ select_js_plugins() {
     
     if [ "$selected_name_reply_js" = true ]; then
         echo -e "${caidan3}检测到名称回复插件，请配置机器人名字${bg}"
-        read -p "输入你想要的机器人名字: " add_text
-        sed -i "11 s/'[^']*'/'${add_text}'/" "$jh/名称回复.js"
+        read -rp "输入你想要的机器人名字: " add_text
+        [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${add_text}'/" "$jh/名称回复.js"
         echo -e "${caidan2}机器人名字已更新为: ${add_text}${bg}"
     fi
 }
 
 show_menu() {
-    # 使用统一菜单显示函数（自动宽度、自动对齐）
-    menu_show "落魄插件列表" "安装李素裳所有 js 插件" "安装或更新向日葵插件" "修改名称回复机器人名字"
+    menu_show "js插件" "安装全部 js 插件" "安装或更新向日葵插件" "修改名称回复机器人名字"
 }
 
 while true; do
     forin=10 clear_menu
     show_menu
-    read -p "请选择操作 [0-3]: " mainmenu
+    read -rp "请选择 [0-${MENU_OPT_COUNT}]: " raw_menu
+    mainmenu=$(echo "$raw_menu" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     echo
-    
-    case $mainmenu in
+    [ "$mainmenu" = "0" ] || [ "$mainmenu" = "q" ] && { echo -e "${caidan2}感谢使用！${bg}"; exit 0; }
+    case "$mainmenu" in
         1)
             echo -e "${caidan3}正在克隆插件仓库...${bg}"
             git clone --depth=1 https://gitcode.com/Xrkseek/collection-of-jses.git $xrk
@@ -95,16 +99,12 @@ while true; do
             echo -e "${caidan2}去下载xrk-plugin吧，见鬼吧你，还在这安装${bg}"
             ;;
         3)
-            read -p "输入你想要的机器人名字: " add_text
-            sed -i "11 s/'[^']*'/'${add_text}'/" "$jh/名称回复.js"
+            read -rp "输入你想要的机器人名字: " add_text
+            [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${add_text}'/" "$jh/名称回复.js"
             echo -e "${caidan2}机器人名字已更新为: ${add_text}${bg}"
             ;;
-        0 | q | Q)
-            echo -e "${caidan2}感谢使用！${bg}"
-            exit 0
-            ;;
         *)
-            echo -e "${caidan1}请输入有效的选项 [0-3]${bg}"
+            echo -e "${caidan1}无效选择 [0-${MENU_OPT_COUNT}]${bg}"
             ;;
     esac
     echo

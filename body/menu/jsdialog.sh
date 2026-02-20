@@ -1,15 +1,15 @@
 #!/bin/bash
-# 李素裳 JS 插件（dialog 触屏版）
-[ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
-menu_init 1 0  # 初始化：需要common（install_pkg），不需要check_changes
+# js 插件（dialog 触屏版），目录 plugins/other
+root="${XRK_ROOT:-/xrk}"
+[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
+menu_init 1 0
 
-xrk=$HOME/xrk
-jh="$yz/plugins/example"
+xrk="$HOME/xrk"
+YZ_PLUGINS_JS="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}/plugins/other"
+jh="$YZ_PLUGINS_JS"
 
-# 检查 dialog 是否安装（使用统一函数）
-menu_check_deps dialog 1  # exit_on_fail=1
+menu_check_deps dialog 1
 
-# 初始化 dialog 设置
 DIALOG_BACKTITLE="插件安装助手"
 DIALOG_HEIGHT=20
 DIALOG_WIDTH=60
@@ -18,7 +18,8 @@ move_vocal(){
     local woaini=$1
     local wogeng=$2
     sleep 1
-    
+    mkdir -p "$jh"
+
     dialog --infobox "正在检查 $woaini 安装状态..." 3 40
     if [ -d "$yz/resources/$woaini" ]; then
         dialog --msgbox "已经安装过 ${woaini} 了，正在跳过" 6 40
@@ -71,7 +72,7 @@ select_js_plugins() {
             2>&1 >/dev/tty)
             
         if [ $? -eq 0 ]; then
-            sed -i "11 s/'[^']*'/'${bot_name}'/" "$jh/名称回复.js"
+            [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${bot_name}'/" "$jh/名称回复.js"
             dialog --msgbox "机器人名字已更新为: $bot_name" 6 40
         fi
     fi
@@ -81,12 +82,12 @@ while true; do
     exec 3>&1
     selection=$(dialog \
         --backtitle "$DIALOG_BACKTITLE" \
-        --title "落魄插件列表" \
+        --title "js插件" \
         --clear \
         --cancel-label "退出" \
         --menu "请选择一个选项:" \
         $DIALOG_HEIGHT $DIALOG_WIDTH 4 \
-        "1" "安装李素裳所有的js插件" \
+        "1" "安装全部 js 插件" \
         "2" "安装或更新向日葵插件" \
         "3" "修改名称回复机器人名字" \
         2>&1 1>&3)
@@ -118,7 +119,7 @@ while true; do
                 2>&1 >/dev/tty)
             
             if [ $? -eq 0 ]; then
-                sed -i "11 s/'[^']*'/'${bot_name}'/" "$jh/名称回复.js"
+                [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${bot_name}'/" "$jh/名称回复.js"
                 dialog --msgbox "机器人名字已更新为: $bot_name" 6 40
             fi
             ;;

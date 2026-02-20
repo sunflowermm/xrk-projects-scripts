@@ -1,12 +1,13 @@
-# 脚本仓库源（与克隆时一致，供后续 curl 使用）
-source /xrk/shell_modules/repo_source.sh
-# 全局颜色变量
-source /xrk/shell_modules/color.sh
-# 全局云崽变量
-source /xrk/shell_modules/init.sh
-source /xrk/shell_modules/github.sh
-# 主逻辑（仅环境与路径，无副作用）
+# 供 xrk/菜单/子脚本 使用：源 + 颜色 + 葵崽路径(yz/xyz) + 主题（仅当从 /xrk 内 source 时有效）
+[ -f /xrk/shell_modules/xrk_config.sh ] && source /xrk/shell_modules/xrk_config.sh
+XRK_ROOT="${XRK_ROOT:-/xrk}"
+XRK_BIN="${XRK_BIN:-/usr/local/bin}"
+export XRK_ROOT XRK_BIN
+source "$XRK_ROOT/shell_modules/repo_source.sh"
+source "$XRK_ROOT/shell_modules/color.sh"
+source "$XRK_ROOT/shell_modules/init.sh"
+source "$XRK_ROOT/shell_modules/github.sh"
 check_changes
 search_directories
-[ -d /xrk ] && [ ! -f /xrk/system.yaml ] && echo 'color: .theme' > /xrk/system.yaml
-source /xrk/.color
+[ -d "$XRK_ROOT" ] && [ ! -f "$XRK_ROOT/system.yaml" ] && echo 'color: .theme' > "$XRK_ROOT/system.yaml"
+source "$XRK_ROOT/.color"

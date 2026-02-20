@@ -1,42 +1,44 @@
 #!/bin/bash
 # xm：脚本仓库统一入口（换源 / 安装仓库 / 主流程 / 主菜单 / 环境安装）
 #
-# 正常安装 Yunzai（从 xm 开始）：
-#   1. 输入 xm → 国内建议先选 1 换源、2 安装 Git
-#   2. 选 3 安装脚本仓库（克隆到 /xrk，必做）
-#   3. 选 4 安装主流程（脚本+环境+云崽一条龙，含 Node/pnpm/Redis/Chromium 与 XRK-Yunzai）
-#   4. 完成后按提示用 xyz 或 xyzlogin 启动；选 6 可进主菜单做插件/报错/换签等
+# 正常安装 Yunzai：进 xm 自动检查/安装 Git → 选 2 安装脚本仓库 → 选 3 安装主流程（环境+云崽一条龙）→ 用 xyz 启动；国内可先选 1 换源
 
 cd "$HOME" || exit
 
-# 加载源配置与公共模块（bootstrap 提供 init_repo_source、load_module）
-if [ -f /xrk/shell_modules/bootstrap.sh ]; then
-    source /xrk/shell_modules/bootstrap.sh
+XRK_ROOT="${XRK_ROOT:-/xrk}"
+_DEFAULT_RAW_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master"
+if [ -f "$XRK_ROOT/shell_modules/bootstrap.sh" ]; then
+    source "$XRK_ROOT/shell_modules/bootstrap.sh"
 else
-    # 首次引导：若已有 XRK_SOURCE 按参数选源，否则默认 3=Gitee
     case "${XRK_SOURCE#-}" in
-        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
-        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
-        3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
+        1) _B="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
+        2) _B="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
+        3|*) _B="$_DEFAULT_RAW_BASE" ;;
     esac
-    source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")
+    source <(curl -sL "${_B}/shell_modules/bootstrap.sh"); unset _B
 fi
 init_repo_source
 load_module "shell_modules/common.sh"
-# 菜单公共（自动宽度、选项数）：优先 /xrk，否则远程拉取
-if [ -d /xrk ] && [ -f /xrk/shell_modules/menu_common.sh ]; then
-    [ -f /xrk/.init ] && source /xrk/.init
-    source /xrk/shell_modules/menu_common.sh
+command -v git &>/dev/null || ensure_cmd git git 2>/dev/null || true
+[ -f "$XRK_ROOT/.init" ] && source "$XRK_ROOT/.init"
+if [ -d "$XRK_ROOT" ] && [ -f "$XRK_ROOT/shell_modules/menu_common.sh" ]; then
+    source "$XRK_ROOT/shell_modules/menu_common.sh"
 elif ! type menu_show &>/dev/null && [ -n "${SCRIPT_RAW_BASE:-}" ]; then
-    [ -f /xrk/.init ] && source /xrk/.init
     source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/menu_common.sh" 2>/dev/null) 2>/dev/null || true
 fi
 
 require_xrk() {
-    [ -d /xrk ] || { echo "请先执行 3 安装脚本仓库"; return 1; }
+    [ -d "$XRK_ROOT" ] || { echo "请先执行 2 安装脚本仓库"; return 1; }
 }
 
-# xm 自更新：重拉 body/xm 到当前 xm 所在路径，若有 /xrk 则 git pull 脚本仓库
+# 无 menu_common 时提供简易 run_software（有 menu 时用其带重试版本）
+type run_software &>/dev/null || run_software() {
+    [ -d "$XRK_ROOT" ] && [ -f "$XRK_ROOT/$1" ] && { bash "$XRK_ROOT/$1"; return $?; }
+    ensure_cmd curl curl
+    bash <(curl -sL "${SCRIPT_RAW_BASE}/$1")
+}
+
+# xm 自更新：重拉 body/xm 到当前 xm 所在路径，若有脚本仓库则 git pull
 update_xm() {
     local xm_path
     xm_path=$(type -p xm 2>/dev/null || command -v xm)
@@ -49,21 +51,10 @@ update_xm() {
         echo "[xm] 更新失败，请检查网络或 SCRIPT_RAW_BASE"
         return 1
     fi
-    if [ -d /xrk ]; then
-        (cd /xrk && git pull --no-rebase) && echo "[xm] 脚本仓库 /xrk 已更新" || echo "[xm] /xrk 更新失败或非 git 目录"
+    if [ -d "$XRK_ROOT" ]; then
+        (cd "$XRK_ROOT" && git pull --no-rebase) && echo "[xm] 脚本仓库 $XRK_ROOT 已更新" || echo "[xm] $XRK_ROOT 更新失败或非 git 目录"
     fi
     echo "[xm] 更新完成"
-}
-
-# 优先本地，否则远程拉取（不依赖 /xrk）
-run_software() {
-    local path="$1"
-    if [ -d /xrk ] && [ -f "/xrk/$path" ]; then
-        bash "/xrk/$path"
-    else
-        ensure_cmd curl curl
-        bash <(curl -sL "$SCRIPT_RAW_BASE/$path")
-    fi
 }
 
 env_install_menu() {
@@ -81,15 +72,15 @@ env_install_menu() {
             3) run_software "project-install/software/node" ;;
             4) run_software "project-install/software/pnpm" ;;
             5) run_software "project-install/software/ffmpeg" ;;
-            6) run_software "body/modules/python_uv" ;;
+            6) run_software "body/modules/python_uv.sh" ;;
             *) echo "无效选择" ;;
         esac
     done
 }
 
 show_menu() {
-    local opts=("换源(apt 镜像)" "安装 Git" "安装脚本仓库" "安装主流程(机器人等)" "环境安装(yq/chromium)")
-    [ -d /xrk ] && opts+=("进入主菜单(xrk)" "环境与模块(tmux等)")
+    local opts=("换源(apt 镜像)" "安装脚本仓库" "安装主流程(机器人等)" "环境安装(yq/chromium)")
+    [ -d "$XRK_ROOT" ] && opts+=("进入主菜单(xrk)" "环境与模块(tmux等)")
     opts+=("退出")
     echo ""
     menu_show "xm 主菜单" "  " "${opts[@]}" "输入 0/q 或最后一档退出，r 更新 xm"
@@ -99,13 +90,11 @@ show_menu() {
 while true; do
     show_menu
     # 读取用户输入；若遇到 EOF（例如管道/非交互环境），则优雅退出
-    if ! read -rp "请选择 [0-${MENU_OPT_COUNT:-8}]: " raw_choice; then
+    if ! read -rp "请选择 [0-${MENU_OPT_COUNT:-7}]: " raw_choice; then
         echo "再见"; exit 0
     fi
     choice=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-    if [ -z "$choice" ]; then
-        continue
-    fi
+    [ -z "$choice" ] && continue
     [ "$choice" = "r" ] && { update_xm; continue; }
     [ "$choice" = "0" ] || [ "$choice" = "q" ] || [ "$choice" = "${MENU_OPT_COUNT}" ] && { echo "再见"; exit 0; }
     case "$choice" in
@@ -113,36 +102,34 @@ while true; do
             change_source_linux
             ;;
         2)
-            install_pkg git && echo "Git 安装完成"
+            [ -z "${SCRIPT_CLONE_URL:-}" ] && init_repo_source && [ -z "${SCRIPT_CLONE_URL:-}" ] && { echo "无法获取克隆地址"; continue; }
+            if [ -d "$XRK_ROOT" ]; then
+                read -rp "$XRK_ROOT 已存在，是否删除并重新克隆? (y/N): " confirm
+                [[ "$confirm" =~ ^[yY]$ ]] || { echo "已取消"; continue; }
+                rm -rf "$XRK_ROOT"
+            fi
+            if git clone --depth=1 "$SCRIPT_CLONE_URL" "$XRK_ROOT"; then
+                printf 'SCRIPT_RAW_BASE="%s"\nSCRIPT_CLONE_URL="%s"\n' "$SCRIPT_RAW_BASE" "$SCRIPT_CLONE_URL" > "$XRK_ROOT/.repo_source"
+                echo "脚本仓库已安装到 $XRK_ROOT"
+            else
+                echo "克隆失败，请检查网络"
+            fi
             ;;
         3)
-            if [ -d /xrk ]; then
-                read -rp "/xrk 已存在，是否删除并重新克隆? (y/N): " confirm
-                [[ "$confirm" =~ ^[yY]$ ]] || { echo "已取消"; continue; }
-                rm -rf /xrk
-            fi
-            if git clone --depth=1 "$SCRIPT_CLONE_URL" /xrk; then
-                printf 'SCRIPT_RAW_BASE="%s"\nSCRIPT_CLONE_URL="%s"\n' "$SCRIPT_RAW_BASE" "$SCRIPT_CLONE_URL" > /xrk/.repo_source
-                echo "脚本仓库已安装到 /xrk"
-            else
-                echo "克隆失败，请检查网络或 Git"
-            fi
-            ;;
-        4)
             require_xrk || continue
             echo "[xm] 主流程：脚本与命令 → 环境与云崽"
-            bash /xrk/body/xrkwrite.sh && echo "[xm] 正在安装环境与云崽…" && bash /xrk/linuxinstall.sh || continue
+            bash "$XRK_ROOT/body/xrkwrite.sh" && echo "[xm] 正在安装环境与云崽…" && bash "$XRK_ROOT/linuxinstall.sh" || continue
+            ;;
+        4)
+            env_install_menu
             ;;
         5)
-            env_install_menu
+            require_xrk || continue
+            exec bash "$XRK_ROOT/body/xrk"
             ;;
         6)
             require_xrk || continue
-            exec bash /xrk/body/xrk
-            ;;
-        7)
-            require_xrk || continue
-            bash /xrk/body/modules/env_module
+            bash "$XRK_ROOT/body/modules/env_module.sh"
             ;;
         *)
             echo "无效选择"
