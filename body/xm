@@ -93,8 +93,8 @@ show_menu() {
         echo "  │  3  安装脚本仓库           │"
         echo "  │  4  安装主流程(机器人等)   │"
         echo "  │  5  环境安装(yq/chromium)  │"
-        [ -d /xrk ] && echo "  │  6  进入主菜单(xrk)       │"
-        [ -d /xrk ] && echo "  │  7  环境与模块(tmux等)   │"
+        [ -d /xrk ] && echo "  │  6  进入主菜单(xrk)        │"
+        [ -d /xrk ] && echo "  │  7  环境与模块(tmux等)     │"
         echo "  │  0  退出                   │"
         echo "  ╰────────────────────────────╯"
     fi

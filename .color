@@ -1,2 +1,5 @@
-export theme=$(yq -r '.color' /xrk/system.yaml)
-source /xrk/body/theme/${theme}
+# 主题：默认 .theme，有 system.yaml 且 yq 可用则读取，仅当主题文件存在时 source
+theme=".theme"
+[ -f /xrk/system.yaml ] && command -v yq &>/dev/null && theme=$(yq -r '.color // ".theme"' /xrk/system.yaml 2>/dev/null)
+export theme="${theme:-.theme}"
+[ -f "/xrk/body/theme/${theme}" ] && source "/xrk/body/theme/${theme}"
