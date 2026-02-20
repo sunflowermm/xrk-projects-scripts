@@ -69,24 +69,24 @@ xm
 
 ```mermaid
 flowchart TB
-    A[开始] --> B{选择镜像源}
-    B --> C[Gitee(默认推荐)]
-    B --> D[GitCode/GitHub(备用)]
-    C --> E[执行 install.sh]
-    D --> E
-    E --> F{检测系统}
-    F -->|Termux| G[安装Linux容器]
-    F -->|Linux| H[安装xm菜单]
-    G --> I[选择发行版]
-    H --> J[输入 xm]
-    I --> K[完成]
-    J --> K
-    
-    style A fill:#FFE4B5
-    style B fill:#E6E6FA
-    style C fill:#90EE90
-    style D fill:#87CEEB
-    style K fill:#98FB98
+A[开始] --> B{选择镜像源}
+B --> C["Gitee（默认推荐）"]
+B --> D["GitCode/GitHub（备用）"]
+C --> E["执行 install.sh"]
+D --> E
+E --> F{检测系统}
+F -->|Termux| G["安装 Linux 容器"]
+F -->|Linux| H["安装 xm 菜单"]
+G --> I["选择发行版"]
+H --> J["输入 xm"]
+I --> K[完成]
+J --> K
+
+style A fill:#FFE4B5
+style B fill:#E6E6FA
+style C fill:#90EE90
+style D fill:#87CEEB
+style K fill:#98FB98
 ```
 
 ---
