@@ -10,6 +10,11 @@ ensure_menu_colors() {
 }
 ensure_menu_colors
 
+# 统一 dialog 主题（供 jsdialog / 插件等触屏菜单复用）
+XRK_DIALOG_BACKTITLE="${XRK_DIALOG_BACKTITLE:-向日葵脚本助手}"
+XRK_DIALOG_HEIGHT="${XRK_DIALOG_HEIGHT:-20}"
+XRK_DIALOG_WIDTH="${XRK_DIALOG_WIDTH:-60}"
+
 _menu_width_method() {
     if command -v wc &>/dev/null && wc -L <<< "测试" &>/dev/null 2>&1; then
         echo "wc_L"; return 0

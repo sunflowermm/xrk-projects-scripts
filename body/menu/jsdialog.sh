@@ -10,10 +10,6 @@ jh="$YZ_PLUGINS_JS"
 
 menu_check_deps dialog 1
 
-DIALOG_BACKTITLE="插件安装助手"
-DIALOG_HEIGHT=20
-DIALOG_WIDTH=60
-
 move_vocal(){
     local woaini=$1
     local wogeng=$2
@@ -36,7 +32,7 @@ move_vocal(){
 }
 
 select_js_plugins() {
-    local js_files=($(find $xrk/shell-js/ -maxdepth 1 -type f -name "*.js"))
+    local js_files=($(find "$xrk/shell-js/" -maxdepth 1 -type f -name "*.js" 2>/dev/null))
     local options=""
     local i=0
     
@@ -47,8 +43,9 @@ select_js_plugins() {
     done
     
     local selected_plugins=$(dialog --separate-output \
+        --backtitle "$XRK_DIALOG_BACKTITLE" \
         --checklist "选择要安装的插件:" \
-        $DIALOG_HEIGHT $DIALOG_WIDTH 10 \
+        "$XRK_DIALOG_HEIGHT" "$XRK_DIALOG_WIDTH" 10 \
         $options \
         2>&1 >/dev/tty)
     
@@ -81,12 +78,12 @@ select_js_plugins() {
 while true; do
     exec 3>&1
     selection=$(dialog \
-        --backtitle "$DIALOG_BACKTITLE" \
+        --backtitle "$XRK_DIALOG_BACKTITLE" \
         --title "js插件" \
         --clear \
         --cancel-label "退出" \
         --menu "请选择一个选项:" \
-        $DIALOG_HEIGHT $DIALOG_WIDTH 4 \
+        "$XRK_DIALOG_HEIGHT" "$XRK_DIALOG_WIDTH" 4 \
         "1" "安装全部 js 插件" \
         "2" "安装或更新向日葵插件" \
         "3" "修改名称回复机器人名字" \

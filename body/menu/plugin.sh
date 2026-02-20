@@ -125,7 +125,7 @@ show_dialog_plugins() {
     done < <(load_plugins "$category_file")
     
     dialog --title "向日葵插件安装 - $category_name" \
-           --backtitle "向日葵Bot插件管理系统" \
+           --backtitle "$XRK_DIALOG_BACKTITLE" \
            --checklist "请选择要安装的插件 [空格选择，回车确认]：" 20 70 15 \
            "${options[@]}" 2>/tmp/plugin_selections
            
