@@ -21,6 +21,8 @@ git_clone_gh() {
     local url="$1" dest="$2"
     [ -f "$XRK_ROOT/shell_modules/github.sh" ] && source "$XRK_ROOT/shell_modules/github.sh"
     type git &>/dev/null || { echo "[tmux] 未找到 git"; return 1; }
+    # 国内时区：git() 函数会自动处理（不加代理，保持原样）
+    # 国外时区：保持原样
     git clone --depth=1 "$url" "$dest"
 }
 

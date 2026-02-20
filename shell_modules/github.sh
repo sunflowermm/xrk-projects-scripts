@@ -1,165 +1,108 @@
 #!/bin/bash
+# GitHub 访问优化：
+# - 中国大陆（detect_region=cn）：随机测试代理，命中一个可用就用（proxy/原URL）
+# - 海外（detect_region=overseas）：默认保持原样（如需强制可手动 proxy_num）
 
-RED='\033[0;1;31;91m'
-GREEN='\033[0;1;32;92m'
-YELLOW='\033[0;1;33;93m'
-NC='\033[0m'
+# 检测区域（复用 bootstrap 的 detect_region；唯一依据 countryCode==CN）
+_is_cn_region() {
+    local region
+    type detect_region &>/dev/null && region=$(detect_region 2>/dev/null) || region="overseas"
+    [ "$region" = "cn" ]
+}
 
+# 代理列表：建议保留多条以便失效自动切换（此列表来自一次环境内可用性测试）
 PROXIES=(
-    "http://124.156.150.245:10086"
-    "http://140.83.60.48:8081"
     "https://gh-proxy.com"
-    "http://43.154.105.8:8888"
-    "http://8.210.153.246:9000"
-    "http://gh.smiek.top:8080"
     "https://cf2.algin.cn"
-    "https://dl.fastconnect.cc"
     "https://dl.nzjk.cf"
-    "https://fast.zhaishis.cn"
     "https://fastgh.lainbo.com"
     "https://file.sweatent.top"
-    "https://firewall.lxstd.org"
     "https://g.blfrp.cn"
     "https://g.in0.re"
-    "https://get.2sb.org"
-    "https://gh-proxy.llyke.com"
-    "https://gh.222322.xyz"
     "https://gh.b52m.cn"
     "https://gh.chjina.com"
-    "https://gh.gpuminer.org"
-    "https://gh.hoa.moe"
     "https://gh.idayer.com"
     "https://gh.llkk.cc"
-    "https://gh.meiqiu.net.cn"
-    "https://gh.pylogmon.com"
-    "https://gh.tangyuewei.com"
-    "https://gh.tlhub.cn"
-    "https://gh.tryxd.cn"
     "https://gh.whjpd.top/gh"
-    "https://ghjs.us.kg"
-    "https://ghp.aaaaaaaaaaaaaa.top"
-    "https://ghp.ci"
-    "https://ghp.miaostay.com"
-    "https://ghpr.cc"
-    "https://ghproxy.homeboyc.cn"
     "https://ghproxy.imciel.com"
     "https://ghproxy.kokomi0728.eu.org"
-    "https://ghproxy.lyln.us.kg"
     "https://git.669966.xyz"
-    "https://git.886.be"
-    "https://git.ikxiuxin.com"
     "https://git.linrol.cn"
     "https://git.smartapi.com.cn"
-    "https://git.snoweven.com"
-    "https://git.speed-ssr.tech"
-    "https://git.xiandan.uk"
     "https://git.xkii.cc"
     "https://git.z23.cc"
     "https://gitcdn.uiisc.org"
     "https://github.aci1.com"
-    "https://github.bachang.org"
     "https://github.bef841ca.cn"
     "https://github.blogonly.cn"
     "https://github.codecho.cc"
-    "https://github.cutemic.cn"
-    "https://github.ffffffff0x.com"
     "https://github.jianrry.plus"
-    "https://github.moeyy.xyz"
-    "https://github.ur1.fun"
     "https://github.wper.club"
-    "https://github.wuzhij.com"
     "https://github.xiaoning223.top"
     "https://github.xxlab.tech"
     "https://githubacc.caiaiwan.com"
-    "https://githubapi.jjchizha.com"
-    "https://jisuan.xyz"
     "https://ken.canaan.io"
-    "https://mirror.ghproxy.com"
-    "https://moeyy.cn/gh-proxy"
     "https://static.yiwangmeng.com"
-    "https://www.ghproxy.cn"
-    ""
 )
 
-getgh() {
-    local var_name="$1"
-    local original_url="${!var_name}"
-    local check_path="NapNeko/NapCatQQ/main/package.json"
-    local speed_threshold=2
-    local curl_timeout=3
+# 轻量可用性探测：HTTP 200 才算成功
+_xrk_http_ok() {
+    curl -s --fail --connect-timeout 2 --max-time 4 -o /dev/null "$1" 2>/dev/null
+}
 
-    # 手动代理选择：proxy_num 全局变量
-    # 0 = 不使用代理；1-N = 使用对应序号的内置代理
-    if [ -n "${proxy_num}" ]; then
-        if [ "${proxy_num}" = "0" ]; then
-            # 强制直连
-            echo -e "${YELLOW}已关闭代理，直接使用原始地址: ${original_url}${NC}"
-            return 0
-        fi
-        if [[ "${proxy_num}" =~ ^[0-9]+$ ]] && [ "${proxy_num}" -ge 1 ] && [ "${proxy_num}" -le ${#PROXIES[@]} ]; then
-            local manual_proxy="${PROXIES[$((proxy_num-1))]}"
-            if [ -n "${manual_proxy}" ]; then
-                local proxied_url="${manual_proxy}/${original_url}"
-                eval "$var_name=\"$proxied_url\""
-                echo -e "${GREEN}使用手动指定的代理: ${manual_proxy}${NC}"
-                return 0
-            fi
-        fi
+# 随机挑选可用代理（不缓存）
+_xrk_pick_github_proxy() {
+    local test_url="https://raw.githubusercontent.com/NapNeko/NapCatQQ/main/package.json" proxy
+    # 尽量随机：有 shuf 用 shuf，否则保持原顺序
+    if command -v shuf &>/dev/null; then
+        while IFS= read -r proxy; do
+            _xrk_http_ok "${proxy}/${test_url}" && { echo "$proxy"; return 0; }
+        done < <(printf "%s\n" "${PROXIES[@]}" | shuf)
+    else
+        for proxy in "${PROXIES[@]}"; do
+            _xrk_http_ok "${proxy}/${test_url}" && { echo "$proxy"; return 0; }
+        done
     fi
+    echo ""
+}
 
-    # 打乱代理列表（每次调用时随机顺序）
-    local shuffled_proxies=($(printf "%s\n" "${PROXIES[@]}" | shuf))
-    local temp_file
-    temp_file=$(mktemp)
+# GitHub URL 处理：cn 自动加速（proxy/原URL），overseas 保持原样
+getgh() {
+    local var_name="$1" original_url="${!var_name}" proxy=""
 
-    # 并行测试代理
-    for proxy in "${shuffled_proxies[@]}"; do
-        if [ -z "$proxy" ]; then
-            continue
+    # 仅处理 GitHub 相关 URL；其他 URL 保持原样
+    case "$original_url" in
+        https://github.com/*|https://raw.githubusercontent.com/*) ;;
+        *) return 0 ;;
+    esac
+
+    if _is_cn_region; then
+        # 手动指定 proxy_num 优先；否则随机挑一个可用的
+        if [ -n "${proxy_num:-}" ] && [ "${proxy_num}" != "0" ]; then
+            proxy="${PROXIES[$((proxy_num-1))]:-}"
+        else
+            proxy="$(_xrk_pick_github_proxy)"
         fi
-        local proxied_check_url="${proxy}/https://raw.githubusercontent.com/${check_path}"
-        (curl --silent --fail --max-time $curl_timeout -w "%{http_code} %{time_total} ${proxy}\n" -o /dev/null "$proxied_check_url" >> "$temp_file") &
-    done
-    wait
-
-    # 读取测试结果并选择最优代理
-    local best_proxy=""
-    local best_time=""
-
-    while read -r line; do
-        local http_code=$(echo "$line" | awk '{print $1}')
-        local time_total=$(echo "$line" | awk '{print $2}')
-        local proxy=$(echo "$line" | awk '{print $3}')
-        if [ "$http_code" = "200" ]; then
-            # 只接受在阈值内的结果
-            if awk "BEGIN{exit($time_total<$speed_threshold?0:1)}"; then
-                if [ -z "$best_time" ] || awk "BEGIN{exit($time_total<$best_time?0:1)}"; then
-                    best_time="$time_total"
-                    best_proxy="$proxy"
-                fi
-            fi
-        fi
-    done < "$temp_file"
-
-    rm "$temp_file"
-
-    if [ -n "$best_proxy" ]; then
-        local proxied_url="${best_proxy}/${original_url}"
-        eval "$var_name=\"$proxied_url\""
-        echo -e "${GREEN}已选择代理: ${best_proxy}，响应时间约 ${best_time}s${NC}"
+        [ -z "$proxy" ] && return 0
+        printf -v "$var_name" '%s/%s' "$proxy" "$original_url"
         return 0
     fi
 
-    echo -e "${YELLOW}未找到合适的代理，继续使用原始地址: ${original_url}${NC}"
+    # overseas：不加代理；如果用户强制 proxy_num（非0），也按其指定加代理
+    if [ -n "${proxy_num:-}" ] && [ "${proxy_num}" != "0" ]; then
+        proxy="${PROXIES[$((proxy_num-1))]:-}"
+        [ -z "$proxy" ] && return 0
+        printf -v "$var_name" '%s/%s' "$proxy" "$original_url"
+    fi
 }
 
+# git 命令包装：国内时区自动换源，国外保持原样
 git() {
-    local args=("$@") proxied=false i
+    local args=("$@") i
+    # 国内时区：自动将 GitHub URL 换为镜像
+    # 国外时区：保持原样，仅在手动指定 proxy_num 时加代理
     for ((i=0; i<${#args[@]}; i++)); do
-        if [[ "${args[i]}" == https://github.com/* || "${args[i]}" == https://raw.githubusercontent.com/* ]]; then
-            getgh "args[$i]"
-            proxied=true
-        fi
+        [[ "${args[i]}" == https://github.com/* || "${args[i]}" == https://raw.githubusercontent.com/* ]] && getgh "args[$i]"
     done
     command git "${args[@]}"
 }

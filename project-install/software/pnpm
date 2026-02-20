@@ -16,7 +16,8 @@ case "$arch" in
 esac
 
 url="https://github.com/pnpm/pnpm/releases/download/$PNPM_VERSION/$pnpm_bin"
-getgh "url" 2>/dev/null || url="https://github.moeyy.xyz/$url"
+# getgh 会自动处理：国内时区换源，国外保持原样
+getgh "url" 2>/dev/null || true
 cd "$HOME" || exit 1
 echo "开始安装 pnpm $PNPM_VERSION..."
 wget --tries=3 --timeout=30 -O "$pnpm_bin" "$url" || { echo "下载失败"; exit 1; }

@@ -4,6 +4,22 @@
 [ -f "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh" ] && source "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh"
 _XRK_DEFAULT_BASE="${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
 
+# 检测是否在国内：唯一依据 countryCode == CN（中国大陆）
+# 支持覆盖：XRK_REGION=cn|overseas（用于测试/特殊网络）
+detect_region() {
+    local json country
+
+    case "${XRK_REGION:-}" in
+        cn|overseas) echo "$XRK_REGION"; return 0 ;;
+    esac
+
+    # 唯一依据：countryCode == CN
+    json=$(curl -s --connect-timeout 3 --max-time 5 "http://ip-api.com/json" 2>/dev/null || true)
+    country=$(printf '%s' "$json" | grep -oE '"countryCode":"[^"]*"' | cut -d'"' -f4)
+    [ "$country" = "CN" ] && { echo "cn"; return 0; }
+    echo "overseas"
+}
+
 get_base_from_arg() {
     local arg="${1:-$XRK_SOURCE}"
     case "${arg#-}" in
@@ -23,9 +39,14 @@ get_clone_from_raw() {
 }
 
 init_repo_source() {
-    local arg="$1" root="${XRK_ROOT:-/xrk}"
+    local arg="$1" root="${XRK_ROOT:-/xrk}" region
     [ -f "$root/.repo_source" ] && source "$root/.repo_source"
     [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+    # 未指定源时自动检测：CN 用 GitCode，非 CN 用 GitHub（检测失败视为 overseas）
+    if [ -z "$SCRIPT_RAW_BASE" ] && [ -z "$arg" ]; then
+        region=$(detect_region 2>/dev/null || echo "overseas")
+        [ "$region" = "cn" ] && arg="1" || arg="2"
+    fi
     [ -z "$SCRIPT_RAW_BASE" ] && SCRIPT_RAW_BASE="$(get_base_from_arg "$arg")"
     [[ "$SCRIPT_RAW_BASE" != https://* ]] && SCRIPT_RAW_BASE="$(get_base_from_arg 1)"
     [ -z "$SCRIPT_CLONE_URL" ] && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"

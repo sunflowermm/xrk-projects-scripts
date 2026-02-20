@@ -9,9 +9,9 @@ else
 fi
 load_distro_deps
 
-run_yq() {
-    [ -f "$root/project-install/software/yq" ] && bash "$root/project-install/software/yq" || bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/yq")
+_run_install_script() {
+    local script="$1"
+    [ -f "$root/project-install/software/$script" ] && bash "$root/project-install/software/$script" || bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/$script")
 }
-run_chromium() {
-    [ -f "$root/project-install/software/chromium" ] && bash "$root/project-install/software/chromium" || bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/chromium")
-}
+run_yq() { _run_install_script "yq"; }
+run_chromium() { _run_install_script "chromium"; }

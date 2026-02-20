@@ -61,6 +61,7 @@ install_normal_plugin() {
     local cn_name="$3"
     local target_dir="$YZ_DIR/plugins/$name"
     
+    # CN：getgh 会把 GitHub URL 转为可用代理 URL；非 CN 保持原样
     [[ "$git_url" == *"github.com"* ]] && getgh "git_url"
 
     if [ -d "$target_dir" ]; then
@@ -85,6 +86,7 @@ install_js_plugin() {
     local target_dir="$YZ_DIR/plugins/other"
     local target_file="$target_dir/${cn_name}.js"
 
+    # CN：getgh 会把 GitHub URL 转为可用代理 URL；非 CN 保持原样
     [[ "$git_url" == *"github.com"* ]] && getgh "git_url"
 
     mkdir -p "$target_dir"

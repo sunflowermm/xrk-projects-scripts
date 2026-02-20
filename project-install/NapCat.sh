@@ -118,42 +118,15 @@ function download_napcat() {
     create_tmp_folder
     default_file="NapCat.Shell.zip"
     if [ -f "${default_file}" ]; then
+        # 默认使用原始 GitHub 地址，并尽量通过 github.sh 自动加代理
         log "检测到已下载NapCat安装包,跳过下载..."
     else
         log "开始下载NapCat安装包,请稍等..."
-        # 默认使用原始 GitHub 地址，并尽量通过 github.sh 自动加代理
         napcat_download_url="https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCat.Shell.zip"
-        # proxy_num=0 时关闭代理，其余情况交给 getgh 自动选择可用代理
-        if [ "${proxy_num}" != "0" ] && command -v getgh >/dev/null 2>&1; then
-            getgh napcat_download_url
-        fi
-
-        curl -L -# "${napcat_download_url}" -o "${default_file}"
-        if [ $? -ne 0 ]; then
-            log "文件下载失败, 请检查错误。或者手动下载压缩包并放在脚本同目录下"
-            clean
-            exit 1
-        fi
-
-        if [ -f "${default_file}" ]; then
-            log "${default_file} 成功下载。"
-        else
-            ext_file=$(basename "${napcat_download_url}")
-            if [ -f "${ext_file}" ]; then
-                mv "${ext_file}" "${default_file}"
-                if [ $? -ne 0 ]; then
-                    log "文件更名失败, 请检查错误。"
-                    clean
-                    exit 1
-                else
-                    log "${default_file} 成功重命名。"
-                fi
-            else
-                log "文件下载失败, 请检查错误。或者手动下载压缩包并放在脚本同目录下"
-                clean
-                exit 1
-            fi
-        fi
+        # getgh 会自动处理：国内时区换源，国外保持原样
+        command -v getgh &>/dev/null && getgh napcat_download_url
+        curl -L -# "${napcat_download_url}" -o "${default_file}" || { log "文件下载失败"; clean; exit 1; }
+        log "${default_file} 成功下载"
     fi
 
     log "正在验证 ${default_file}..."
@@ -503,52 +476,14 @@ function check_napcat_cli() {
 
 function install_napcat_cli() {
     log "安装NapCatQQ CLI..."   
-    # 默认使用原始 GitHub 地址，并尽量通过 github.sh 自动加代理
     napcat_cli_download_url="https://raw.githubusercontent.com/NapNeko/NapCat-Installer/refs/heads/main/script/napcat"
-    if [ "${proxy_num}" != "0" ] && command -v getgh >/dev/null 2>&1; then
-        getgh napcat_cli_download_url
-    fi
+    # getgh 会自动处理：国内时区换源，国外保持原样
+    command -v getgh &>/dev/null && getgh napcat_cli_download_url
     default_file="napcatcli"
     log "NapCatQQ CLI 下载链接: ${napcat_cli_download_url}"
-    curl -L -# "${napcat_cli_download_url}" -o "./${default_file}"
-
-    if [ $? -ne 0 ]; then
-        log "文件下载失败, 请检查错误。"
-        clean
-        exit 1
-    fi
-
-    if [ -f "./${default_file}" ]; then
-        log "${default_file} 成功下载。"
-    else
-        ext_file=$(basename "${napcat_cli_download_url}")
-        if [ -f "${ext_file}" ]; then
-            mv "${ext_file}" "./${default_file}"
-            if [ $? -ne 0 ]; then
-                log "文件更名失败, 请检查错误。"
-                clean
-                exit 1
-            else
-                log "${default_file} 成功重命名。"
-            fi
-        else
-            log "文件下载失败, 请检查错误。"
-            clean
-            exit 1
-        fi
-    fi
-
-    log "正在移动文件..."
-    cp -f ./${default_file} /usr/local/bin/napcat
-    if [ $? -ne 0 -a $? -ne 1 ]; then
-        log "文件移动失败, 请以root身份运行。"
-        clean
-        exit 1
-    else
-        log "移动文件成功"
-    fi
-    chmod +x /usr/local/bin/napcat
-    rm -rf ./${default_file}
+    curl -L -# "${napcat_cli_download_url}" -o "./${default_file}" || { log "文件下载失败"; clean; exit 1; }
+    cp -f "./${default_file}" /usr/local/bin/napcat && chmod +x /usr/local/bin/napcat || { log "文件移动失败，请以root身份运行"; clean; exit 1; }
+    rm -f "./${default_file}"
 }
 
 function show_main_info() {
