@@ -4,7 +4,6 @@ root="${XRK_ROOT:-/xrk}"
 [ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
 menu_init 0 0
 
-export DIALOGRC="/dev/null"
 export DIALOG_OK=0
 export DIALOG_CANCEL=1
 export DIALOG_ESC=255
@@ -17,14 +16,14 @@ function show_file_menu() {
     local title=$2
     
     if [ ! -d "$want_path" ]; then
-        dialog --title "错误" --msgbox "目录 $want_path 不存在" 8 40
+        dialog --backtitle "$XRK_DIALOG_BACKTITLE" --title "错误" --msgbox "目录 $want_path 不存在" 8 40
         return 1
     fi
     
     local files=($(find "$want_path" -mindepth 1 -maxdepth 1 -printf "%f\n" 2>/dev/null))
     
     if [ ${#files[@]} -eq 0 ]; then
-        dialog --title "提示" --msgbox "当前目录为空" 8 40
+        dialog --backtitle "$XRK_DIALOG_BACKTITLE" --title "提示" --msgbox "当前目录为空" 8 40
         return 1
     fi
     
@@ -37,7 +36,7 @@ function show_file_menu() {
         fi
     done
     
-    dialog --title "$title" \
+    dialog --backtitle "$XRK_DIALOG_BACKTITLE" --title "$title" \
            --checklist "使用空格键选择要删除的文件/文件夹" \
            20 70 15 \
            "${dialog_options[@]}" \
@@ -52,7 +51,7 @@ function show_file_menu() {
                 files_list="$files_list\n$file"
             done
             
-            dialog --title "确认删除" \
+            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --title "确认删除" \
                    --yesno "确定要删除以下文件/文件夹吗？$files_list" \
                    15 60
             
@@ -73,7 +72,7 @@ function show_file_menu() {
                 local result_msg="成功删除 $deleted 个文件/文件夹"
                 [ $failed -gt 0 ] && result_msg="$result_msg\n删除失败 $failed 个：$error_msg"
                 
-                dialog --title "删除结果" --msgbox "$result_msg" 15 60
+                dialog --backtitle "$XRK_DIALOG_BACKTITLE" --title "删除结果" --msgbox "$result_msg" 15 60
             fi
         fi
     fi
@@ -81,7 +80,7 @@ function show_file_menu() {
 
 function main_menu() {
     while true; do
-        dialog --title "文件管理器" \
+        dialog --backtitle "$XRK_DIALOG_BACKTITLE" --title "文件管理器" \
                --menu "选择要管理的目录" \
                15 60 4 \
                1 "插件包目录" \
@@ -96,7 +95,7 @@ function main_menu() {
             2) show_file_menu "$yz/plugins/other" "js插件目录" ;;
             3) show_file_menu "$yz" "Bot目录" ;;
             4)
-                dialog --title "自定义目录" \
+                dialog --backtitle "$XRK_DIALOG_BACKTITLE" --title "自定义目录" \
                        --inputbox "输入要管理的目录路径：" \
                        8 60 \
                        2>$temp_file

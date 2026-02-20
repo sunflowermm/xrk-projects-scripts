@@ -16,16 +16,16 @@ move_vocal(){
     sleep 1
     mkdir -p "$jh"
 
-    dialog --infobox "正在检查 $woaini 安装状态..." 3 40
+    dialog --backtitle "$XRK_DIALOG_BACKTITLE" --infobox "正在检查 $woaini 安装状态..." 3 40
     if [ -d "$yz/resources/$woaini" ]; then
-        dialog --msgbox "已经安装过 ${woaini} 了，正在跳过" 6 40
+        dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "已经安装过 ${woaini} 了，正在跳过" 6 40
     else
         mv -f $xrk/shell-js/$woaini $yz/resources/
     fi
     
-    dialog --infobox "正在检查 $wogeng 安装状态..." 3 40
+    dialog --backtitle "$XRK_DIALOG_BACKTITLE" --infobox "正在检查 $wogeng 安装状态..." 3 40
     if [ -d "$jh/$wogeng" ]; then
-        dialog --msgbox "已经安装过 ${wogeng} 了，正在跳过" 6 40
+        dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "已经安装过 ${wogeng} 了，正在跳过" 6 40
     else
         mv -f $xrk/shell-js/$wogeng $jh/
     fi
@@ -58,19 +58,19 @@ select_js_plugins() {
                 selected_name_reply_js=true
             fi
             mv -n "$selected_file" $jh/
-            dialog --infobox "已安装 $(basename "$selected_file")" 3 40
+            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --infobox "已安装 $(basename "$selected_file")" 3 40
             sleep 1
         fi
     done
     
     if [ "$selected_name_reply_js" = true ]; then
-        local bot_name=$(dialog --inputbox "输入你想要的机器人名字:" \
+        local bot_name=$(dialog --backtitle "$XRK_DIALOG_BACKTITLE" --inputbox "输入你想要的机器人名字:" \
             8 40 \
             2>&1 >/dev/tty)
             
         if [ $? -eq 0 ]; then
             [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${bot_name}'/" "$jh/名称回复.js"
-            dialog --msgbox "机器人名字已更新为: $bot_name" 6 40
+            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "机器人名字已更新为: $bot_name" 6 40
         fi
     fi
 }
@@ -101,23 +101,23 @@ while true; do
     
     case $selection in
         1)
-            dialog --infobox "正在克隆插件仓库..." 3 40
+            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --infobox "正在克隆插件仓库..." 3 40
             git clone --depth=1 https://gitcode.com/Xrkseek/collection-of-jses.git $xrk
             select_js_plugins
             chmod 755 $xrk
             rm -rf $xrk
             ;;
         2)
-            dialog --msgbox "去下载xrk-plugin吧，见鬼吧你，还在这安装" 6 40
+            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "去下载xrk-plugin吧，见鬼吧你，还在这安装" 6 40
             ;;
         3)
-            bot_name=$(dialog --inputbox "输入你想要的机器人名字:" \
+            bot_name=$(dialog --backtitle "$XRK_DIALOG_BACKTITLE" --inputbox "输入你想要的机器人名字:" \
                 8 40 \
                 2>&1 >/dev/tty)
             
             if [ $? -eq 0 ]; then
                 [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${bot_name}'/" "$jh/名称回复.js"
-                dialog --msgbox "机器人名字已更新为: $bot_name" 6 40
+                dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "机器人名字已更新为: $bot_name" 6 40
             fi
             ;;
     esac
