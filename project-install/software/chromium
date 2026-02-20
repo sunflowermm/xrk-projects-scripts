@@ -20,7 +20,7 @@ UNINSTALL_MODE=false
 USE_MIRROR=true
 PPA_FINGERPRINT="82BB6851C64F6880"
 PPA_KEYSERVER="keyserver.ubuntu.com"
-PPA_MIRRORS=("launchpad.proxy.ustclug.org" "ppa.launchpadcontent.net" "mirrors.tuna.tsinghua.edu.cn")
+PPA_MIRRORS=("launchpad.proxy.ustclug.org" "ppa.launchpadcontent.net")
 SELECTED_MIRROR=""
 SYSTEM_CODENAME=""
 
@@ -157,31 +157,13 @@ add_gpg_key() {
     log_error "所有 GPG 密钥添加方法均失败"
 }
 
-# 配置 PPA 源文件
+# 配置 PPA 源（仅 ustclug 镜像 xtradeb，其余用官方 Launchpad）
 configure_ppa_source() {
     log_step "配置 PPA 源"
     local list_file="/etc/apt/sources.list.d/xtradeb-apps.list"
-    local ppa_url
-    
-    if [ "$USE_MIRROR" = true ] && [ "$SELECTED_MIRROR" != "ppa.launchpadcontent.net" ]; then
-        # 使用镜像
-        case "$SELECTED_MIRROR" in
-            launchpad.proxy.ustclug.org)
-                ppa_url="https://$SELECTED_MIRROR/xtradeb/apps/ubuntu"
-                ;;
-            mirrors.tuna.tsinghua.edu.cn)
-                ppa_url="https://$SELECTED_MIRROR/ubuntu-ports/xtradeb/apps/ubuntu"
-                ;;
-            *)
-                ppa_url="https://$SELECTED_MIRROR/xtradeb/apps/ubuntu"
-                ;;
-        esac
-        log_info "使用镜像: $SELECTED_MIRROR"
-    else
-        ppa_url="https://ppa.launchpadcontent.net/xtradeb/apps/ubuntu"
-        log_info "使用官方源"
-    fi
-    
+    local ppa_url="https://ppa.launchpadcontent.net/xtradeb/apps/ubuntu"
+    [ "$USE_MIRROR" = true ] && [ "$SELECTED_MIRROR" = "launchpad.proxy.ustclug.org" ] && ppa_url="https://$SELECTED_MIRROR/xtradeb/apps/ubuntu"
+    log_info "使用源: $ppa_url"
     echo "deb $ppa_url $SYSTEM_CODENAME main" > "$list_file"
     log_success "PPA 源配置完成"
 }
@@ -194,6 +176,15 @@ add_ppa_repository() {
     log_step "更新软件包列表"
     apt update 2>&1 | tee /tmp/apt_update.log >/dev/null
     
+    # 若 xtradeb 源 404 或无 Release 文件，改用官方 PPA 再试
+    if grep -qE "404 Not Found|does not have a Release file" /tmp/apt_update.log 2>/dev/null; then
+        if [ -f /etc/apt/sources.list.d/xtradeb-apps.list ]; then
+            log_warn "xtradeb 源不可用，改用官方 Launchpad"
+            echo "deb https://ppa.launchpadcontent.net/xtradeb/apps/ubuntu $SYSTEM_CODENAME main" > /etc/apt/sources.list.d/xtradeb-apps.list
+            apt update -y -qq 2>/dev/null || true
+        fi
+    fi
+    
     # 处理密钥问题
     if grep -q "NO_PUBKEY" /tmp/apt_update.log; then
         log_warn "检测到密钥问题，正在修复..."
@@ -204,19 +195,14 @@ add_ppa_repository() {
         apt update -y -qq 2>/dev/null
     fi
     
-    # 验证 PPA（改进的验证逻辑）
     log_step "验证 PPA 源"
     local retry=0 max_retries=3
     while [ $retry -lt $max_retries ]; do
-        if apt-cache policy chromium 2>/dev/null | grep -q "xtradeb\|$SELECTED_MIRROR"; then
+        if apt-cache policy chromium 2>/dev/null | grep -q "xtradeb"; then
             log_success "PPA 源验证成功"
             return 0
         fi
-        [ $retry -eq 0 ] && {
-            log_info "等待 PPA 源同步..."
-            sleep 2
-            apt update -y -qq 2>/dev/null
-        }
+        [ $retry -eq 0 ] && { sleep 2; apt update -y -qq 2>/dev/null; }
         retry=$((retry + 1))
     done
     
