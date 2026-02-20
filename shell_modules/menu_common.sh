@@ -160,8 +160,8 @@ menu_show() {
         shift
     fi
     
-    # 分离选项和提示语（如果最后一个参数是提示语）
-    if [ $# -gt 0 ] && [[ "${@: -1}" =~ ^(输入|按|选择|请|q|Q|退出) ]]; then
+    # 分离选项和提示语（仅当最后一项像完整提示句时才剥离，单字「退出」视为菜单项）
+    if [ $# -gt 0 ] && [[ "${@: -1}" =~ ^(输入|按|选择|请).+ ]]; then
         opts=("${@:1:$(($#-1))}")
         hint="${@: -1}"
     else
@@ -187,14 +187,20 @@ menu_show() {
     MENU_OPT_COUNT=${#opts[@]}
 }
 
+# 判断是否为退出选择（0、q 或最后一项序号），调用前需已执行 menu_show 设置 MENU_OPT_COUNT
+menu_is_exit_choice() {
+    local ch="$1"
+    [ "$ch" = "0" ] || [ "$ch" = "q" ] || [ "$ch" = "${MENU_OPT_COUNT}" ]
+}
+
 # 双色边框菜单显示函数（用于errorbg等特殊样式）
 # 用法：menu_show_double "标题" "选项1" "选项2" ... [hint]
 menu_show_double() {
     local title="$1" hint width opts=()
     shift
     
-    # 分离选项和提示语
-    if [ $# -gt 0 ] && [[ "${@: -1}" =~ ^(输入|按|选择|请|q|Q|退出) ]]; then
+    # 分离选项和提示语（与 menu_show 一致：仅完整提示句剥离，单字「退出」视为菜单项）
+    if [ $# -gt 0 ] && [[ "${@: -1}" =~ ^(输入|按|选择|请).+ ]]; then
         opts=("${@:1:$(($#-1))}")
         hint="${@: -1}"
     else

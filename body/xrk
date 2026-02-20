@@ -81,8 +81,10 @@ function show_menu
 MENU_OPT_COUNT=7
 while true; do
     show_menu
-    read -p "请选择 [1-${MENU_OPT_COUNT}]，r 更新脚本: " CHOICE
+    read -p "请选择 [1-${MENU_OPT_COUNT}]，r 更新脚本: " raw_choice
+    CHOICE=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     forin=28 clear_menu
+    [ -z "$CHOICE" ] && continue
     case "$CHOICE" in
         1 )
         bash /xrk/linuxinstall.sh
@@ -116,9 +118,8 @@ while true; do
             echo "更新完成，正在退出"
             exit 0
             ;;
-        * )
-             echo -e "${red}退啦${bg}"
-             exit 1
-        ;;
+        *)
+            echo -e "${red}无效选择${bg}"
+            ;;
     esac
 done

@@ -10,9 +10,9 @@ while true; do
     echo ""
     menu_show "环境与模块" "  " "安装/配置 tmux" "安装 ffmpeg" "配置 .profile" "升级 xrkk 到 bin" "Python + uv" "返回"
     echo ""
-    read -rp "请选择 [0-${MENU_OPT_COUNT:-6}]: " c
+    read -rp "请选择 [0-${MENU_OPT_COUNT}]: " c
     c=$(echo "$c" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-    [ "$c" = "0" ] || [ "$c" = "q" ] || [ "$c" = "${MENU_OPT_COUNT:-6}" ] && exit 0
+    [ "$c" = "0" ] || [ "$c" = "q" ] || [ "$c" = "${MENU_OPT_COUNT}" ] && exit 0
     case "$c" in
         1) bash /xrk/body/modules/tmux ;;
         2) bash /xrk/body/modules/ffmpeg ;;

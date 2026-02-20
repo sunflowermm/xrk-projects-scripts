@@ -36,6 +36,25 @@ require_xrk() {
     [ -d /xrk ] || { echo "请先执行 3 安装脚本仓库"; return 1; }
 }
 
+# xm 自更新：重拉 body/xm 到当前 xm 所在路径，若有 /xrk 则 git pull 脚本仓库
+update_xm() {
+    local xm_path
+    xm_path=$(type -p xm 2>/dev/null || command -v xm)
+    [ -z "$xm_path" ] && xm_path="/usr/local/bin/xm"
+    [ -z "$SCRIPT_RAW_BASE" ] && init_repo_source
+    echo "[xm] 正在更新…"
+    if curl -sL "${SCRIPT_RAW_BASE}/body/xm" -o "$xm_path" 2>/dev/null && chmod +x "$xm_path"; then
+        echo "[xm] 已更新: $xm_path"
+    else
+        echo "[xm] 更新失败，请检查网络或 SCRIPT_RAW_BASE"
+        return 1
+    fi
+    if [ -d /xrk ]; then
+        (cd /xrk && git pull --no-rebase) && echo "[xm] 脚本仓库 /xrk 已更新" || echo "[xm] /xrk 更新失败或非 git 目录"
+    fi
+    echo "[xm] 更新完成"
+}
+
 # 优先本地，否则远程拉取（不依赖 /xrk）
 run_software() {
     local path="$1"
@@ -53,9 +72,9 @@ env_install_menu() {
         echo ""
         menu_show "环境安装(yq/chromium等)" "  " "yq" "Chromium" "Node.js" "pnpm" "ffmpeg" "Python + uv" "返回"
         echo ""
-        read -rp "请选择 [0-${MENU_OPT_COUNT:-7}]: " c
+        read -rp "请选择 [0-${MENU_OPT_COUNT}]: " c
         c=$(echo "$c" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-        [ "$c" = "0" ] || [ "$c" = "q" ] || [ "$c" = "${MENU_OPT_COUNT:-7}" ] && return 0
+        [ "$c" = "0" ] || [ "$c" = "q" ] || [ "$c" = "${MENU_OPT_COUNT}" ] && return 0
         case "$c" in
             1) run_software "project-install/software/yq" ;;
             2) run_software "project-install/software/chromium" ;;
@@ -73,20 +92,21 @@ show_menu() {
     [ -d /xrk ] && opts+=("进入主菜单(xrk)" "环境与模块(tmux等)")
     opts+=("退出")
     echo ""
-    menu_show "xm 主菜单" "  " "${opts[@]}"
+    menu_show "xm 主菜单" "  " "${opts[@]}" "输入 0/q 或最后一档退出，r 更新 xm"
     echo ""
 }
 
 while true; do
     show_menu
     # 读取用户输入；若遇到 EOF（例如管道/非交互环境），则优雅退出
-    if ! read -rp "请选择 [0-${MENU_OPT_COUNT:-5}]: " raw_choice; then
+    if ! read -rp "请选择 [0-${MENU_OPT_COUNT:-8}]: " raw_choice; then
         echo "再见"; exit 0
     fi
     choice=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     if [ -z "$choice" ]; then
         continue
     fi
+    [ "$choice" = "r" ] && { update_xm; continue; }
     [ "$choice" = "0" ] || [ "$choice" = "q" ] || [ "$choice" = "${MENU_OPT_COUNT}" ] && { echo "再见"; exit 0; }
     case "$choice" in
         1)
