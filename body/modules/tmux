@@ -18,11 +18,19 @@ install_tmux_pkg() {
     command -v tmux &>/dev/null || { [ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh && ensure_cmd tmux tmux; }
 }
 
+# 克隆 GitHub 仓库（若存在 github.sh 则走其代理/直连逻辑）
+git_clone_gh() {
+    local url="$1" dest="$2"
+    [ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh
+    type git &>/dev/null || { echo "[tmux] 未找到 git"; return 1; }
+    git clone --depth=1 "$url" "$dest"
+}
+
 # oh-my-tmux
 setup_oh_my_tmux() {
     if [ ! -d "$HOME/.tmux" ]; then
         echo "[tmux] 克隆 oh-my-tmux..."
-        git clone --depth=1 https://github.com/gpakosz/.tmux.git "$HOME/.tmux"
+        git_clone_gh "https://github.com/gpakosz/.tmux.git" "$HOME/.tmux"
     fi
 }
 
@@ -31,8 +39,9 @@ setup_tpm() {
     mkdir -p "$HOME/.tmux/plugins"
     if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
         echo "[tmux] 安装 tpm..."
-        git clone --depth=1 https://github.com/tmux-plugins/tpm.git "$HOME/.tmux/plugins/tpm"
+        git_clone_gh "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm"
     else
+        [ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh
         (cd "$HOME/.tmux/plugins/tpm" && git pull --rebase --autostash)
     fi
     chmod -R 755 "$HOME/.tmux/plugins" 2>/dev/null || true
