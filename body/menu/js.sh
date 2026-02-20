@@ -80,7 +80,7 @@ show_menu() {
 }
 
 while true; do
-    forin=10 clear_menu
+    clear_menu
     show_menu
     read -rp "请选择 [0-${MENU_OPT_COUNT}]: " raw_menu
     mainmenu=$(echo "$raw_menu" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')

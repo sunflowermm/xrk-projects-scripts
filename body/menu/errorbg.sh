@@ -66,7 +66,7 @@ while true; do
     show_menu
     read -rp "请选择 [1-${MENU_OPT_COUNT}]，q 退出: " raw_choice
     CHOICE=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-    forin=13 clear_menu
+    clear_menu
     [ "$CHOICE" = "0" ] || [ "$CHOICE" = "q" ] && { echo "退出"; exit 0; }
     case "$CHOICE" in
         1) read -rp "确认删除并重装浏览器？[y/N]: " confirm

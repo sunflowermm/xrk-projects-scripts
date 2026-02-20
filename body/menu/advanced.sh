@@ -12,7 +12,7 @@ while true; do
     echo
     read -rp "请选择 [1-${MENU_OPT_COUNT}]，q 退出: " raw_patch
     patch=$(echo "$raw_patch" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-    forin=8 clear_menu
+    clear_menu
     [ "$patch" = "0" ] || [ "$patch" = "q" ] && exit 0
     case "$patch" in
         1)
@@ -21,7 +21,7 @@ while true; do
             read -rp "选择主题 [1-13]，q 返回: " color
             color=$(echo "$color" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
             [ "$color" = "q" ] && continue
-            forin=19 clear_menu
+            clear_menu
             if [[ "$color" =~ ^[0-9]+$ ]] && [ "$color" -ge 1 ] && [ "$color" -le 13 ]; then
                 yq -i '.color = "'"${THEMES[$((color-1))]}"'"' "$root/system.yaml" 2>/dev/null
                 [ -f "$root/.init" ] && . "$root/.init"

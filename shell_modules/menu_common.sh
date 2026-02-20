@@ -130,6 +130,7 @@ menu_show() {
     done
     echo -e "${prefix}$MENU_BOT"
     MENU_OPT_COUNT=${#opts[@]}
+    MENU_LINES=$((MENU_OPT_COUNT + 5))
 }
 
 menu_is_exit_choice() {
@@ -158,10 +159,17 @@ menu_show_double() {
     echo -e "${caidan1}${border_bot}${bg}"
     echo
     MENU_OPT_COUNT=${#opts[@]}
+    MENU_LINES=$((MENU_OPT_COUNT + 6))
 }
 
 clear_menu() {
-    local n=${forin:-0}
+    local n="${1:-${MENU_LINES:-0}}"
+    # 没有可用的行数时，直接清屏，保证菜单/GUI 关闭后不残留
+    if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -le 0 ]; then
+        command -v clear &>/dev/null && clear || printf "\033[2J\033[H"
+        return 0
+    fi
+    local i
     for ((i=0; i<n; i++)); do
         printf "\e[1A\e[K"
     done

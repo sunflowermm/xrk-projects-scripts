@@ -156,10 +156,10 @@ function manage_plugins() {
         if menu_validate_input "$input" 1 ${#plugin_names[@]} "序号 $input 超出范围"; then
             index=$((input - 1))
             change_proxy "${filtered_dirs[index]}" "${plugin_names[index]}"
-            forin=$((${#plugin_names[@]} + 7)) clear_menu
+            clear_menu
         else
             read -rp "按回车键继续..." _
-            forin=$((${#plugin_names[@]} + 7)) clear_menu
+            clear_menu
         fi
     done
 }

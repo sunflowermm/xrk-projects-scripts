@@ -84,7 +84,6 @@ while true; do
     show_menu
     read -rp "请选择 [1-${MENU_OPT_COUNT}]，r 更新脚本: " raw_choice
     CHOICE=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-    forin=20
     clear_menu
     [ -z "$CHOICE" ] && continue
     case "$CHOICE" in

@@ -71,11 +71,10 @@ function manage_files() {
                 file_opts+=("📄 $file")
             fi
         done
-        echo -e "${caidan3}$folder_name：${bg}"
         menu_show "$folder_name" "${file_opts[@]}"
         
         read -rp "输入序号 [1-${MENU_OPT_COUNT}] 多选用空格，回车返回 q 退出: " raw_input
-        [ -z "$raw_input" ] && { forin=$((${#file_list[@]} + 7)) clear_menu; return; }
+        [ -z "$raw_input" ] && { clear_menu; return; }
         first=$(echo "$raw_input" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
         [ "$first" = "q" ] && { echo "程序已退出"; exit 0; }
         IFS=' ' read -ra inputs <<< "$raw_input"
@@ -94,7 +93,7 @@ function manage_files() {
         if [ ${#files_to_delete[@]} -gt 0 ] && [ "$invalid_input" = false ]; then
             delete_files "$want_path" "${files_to_delete[@]}"
             read -rp "按回车键继续..." _
-            forin=$((${#file_list[@]} + 7)) clear_menu
+            clear_menu
         fi
     done
 }
@@ -117,7 +116,7 @@ function main() {
                ;;
             *) echo -e "${red}无效选择 [1-${MENU_OPT_COUNT}]${bg}" ;;
         esac
-        forin=9 clear_menu
+        clear_menu
     done
 }
 
