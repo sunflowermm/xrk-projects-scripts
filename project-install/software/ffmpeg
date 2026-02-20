@@ -67,11 +67,12 @@ get_download_url() {
 install_ffmpeg() {
     local url
     url=$(get_download_url)
-    getgh "url" 2>/dev/null || true
     local temp_dir
     temp_dir=$(mktemp -d)
     echo -e "${BLUE}安装 FFmpeg ($os-$ffmpeg_arch)${NC}"
-    (cd "$temp_dir" && wget --tries=3 --timeout=60 -O ffmpeg.tar.xz "$url" || wget --tries=3 --timeout=60 -O ffmpeg.tar.xz "$(get_download_url)") &
+    (cd "$temp_dir" && {
+        xrk_download_quiet "$url" "ffmpeg.tar.xz" 3 || xrk_download_quiet "$(get_download_url)" "ffmpeg.tar.xz" 3
+    }) &
     show_progress "下载 FFmpeg"
     [ ! -s "$temp_dir/ffmpeg.tar.xz" ] && { echo -e "${RED}下载失败${NC}"; rm -rf "$temp_dir"; exit 1; }
     (cd "$temp_dir" && tar -Jxf ffmpeg.tar.xz && \

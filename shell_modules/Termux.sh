@@ -11,6 +11,13 @@ else
 fi
 Termux_URL="$SCRIPT_RAW_BASE/Termux-container"
 
+# 复用统一下载输出/重试（Termux 入口未必有 /xrk，本模块独立加载 common）
+if [ -f "${XRK_ROOT:-/xrk}/shell_modules/common.sh" ]; then
+    source "${XRK_ROOT:-/xrk}/shell_modules/common.sh"
+else
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh" 2>/dev/null) 2>/dev/null || true
+fi
+
 字体键盘魔法() {
     local font_dir="$HOME/.termux"
     local font_file="$font_dir/font.ttf"
@@ -27,7 +34,7 @@ Termux_URL="$SCRIPT_RAW_BASE/Termux-container"
 
     # 处理字体文件
     echo "检查字体文件..."
-    if curl -L -o "$temp_font" "${FONT_URL}/font.ttf"; then
+    if xrk_download "${FONT_URL}/font.ttf" "$temp_font" 3; then
         if [ -f "$font_file" ] && cmp -s "$temp_font" "$font_file"; then
             echo "字体文件无需更新"
             rm -f "$temp_font"
@@ -43,7 +50,7 @@ Termux_URL="$SCRIPT_RAW_BASE/Termux-container"
 
     # 处理键盘布局文件
     echo "检查键盘布局..."
-    if curl -L -o "$temp_prop" "${Termux_URL}/termux.properties"; then
+    if xrk_download "${Termux_URL}/termux.properties" "$temp_prop" 3; then
         if [ -f "$prop_file" ] && cmp -s "$temp_prop" "$prop_file"; then
             echo "键盘布局无需更新"
             rm -f "$temp_prop"

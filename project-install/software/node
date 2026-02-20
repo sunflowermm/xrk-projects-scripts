@@ -56,7 +56,7 @@ install_nodejs() {
     local temp_dir
     temp_dir=$(mktemp -d)
     echo -e "${BLUE}开始安装 Node.js $LATEST_VERSION (LTS) [$arch]${NC}"
-    (cd "$temp_dir" && { command -v wget &>/dev/null && wget -q --show-progress "$url" || curl -L -# "$url" -o "node-$LATEST_VERSION-linux-$arch.tar.xz"; }) &
+    (cd "$temp_dir" && xrk_download_quiet "$url" "node-$LATEST_VERSION-linux-$arch.tar.xz" 3) &
     show_progress "下载 Node.js $LATEST_VERSION"
     (cd "$temp_dir" && tar -xf "node-$LATEST_VERSION-linux-$arch.tar.xz" && \
         sudo mkdir -p /opt/node && sudo rm -rf /opt/node/* && \
@@ -70,8 +70,8 @@ install_nodejs() {
 }
 
 setup_and_verify() {
-    npm config set registry https://registry.npmmirror.com 2>/dev/null &
-    show_progress "配置 npm 镜像"
+    type xrk_setup_js_mirrors &>/dev/null && { xrk_setup_js_mirrors & }; 
+    show_progress "配置 JS 镜像源"
     command -v node &>/dev/null && command -v npm &>/dev/null && \
         echo -e "${GREEN}✅ Node.js: $(node -v)  npm: $(npm -v)${NC}" || { echo -e "${RED}❌ 安装失败${NC}"; exit 1; }
 }
@@ -82,6 +82,6 @@ if check_nodejs_version; then
     setup_and_verify
     echo -e "${GREEN}🎉 Node.js LTS 安装完成${NC}"
 else
-    command -v npm &>/dev/null && npm config set registry https://registry.npmmirror.com 2>/dev/null
+    type xrk_setup_js_mirrors &>/dev/null && xrk_setup_js_mirrors
     echo -e "${GREEN}🎉 Node.js 环境已就绪${NC}"
 fi

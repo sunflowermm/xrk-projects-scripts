@@ -67,14 +67,36 @@ _xrk_pick_github_proxy() {
 }
 
 # GitHub URL 处理：cn 自动加速（proxy/原URL），overseas 保持原样
+# 用法：
+#   getgh url_var     # 变量名，函数内部原地修改（老用法，向下兼容）
+#   getgh "https://github.com/..."  # 直接传 URL，stdout 返回处理后的 URL（供 git() 等使用）
 getgh() {
-    local var_name="$1" original_url="${!var_name}" proxy=""
+    local arg="$1" var_name="" original_url proxy="" new_url
 
-    # 仅处理 GitHub 相关 URL；其他 URL 保持原样
-    case "$original_url" in
-        https://github.com/*|https://raw.githubusercontent.com/*) ;;
-        *) return 0 ;;
+    # 1) 直接传入 URL：用于数组元素等场景（避免 `${!var_name}` 非法间接展开）
+    case "$arg" in
+        https://github.com/*|https://raw.githubusercontent.com/*)
+            original_url="$arg"
+            ;;
+        *)
+            # 2) 传入变量名：保持兼容旧接口
+            var_name="$arg"
+            # 非法变量名（比如 "args[$i]"）直接返回，避免 invalid indirect expansion
+            case "$var_name" in
+                ''|*'['*|*']'*|*' '*|*'$'*|*'*'*|*'?'*|*'!'*)
+                    return 0
+                    ;;
+            esac
+            # 间接展开获取变量值
+            original_url="${!var_name}"
+            case "$original_url" in
+                https://github.com/*|https://raw.githubusercontent.com/*) ;;
+                *) return 0 ;;
+            esac
+            ;;
     esac
+
+    new_url="$original_url"
 
     if _is_cn_region; then
         # 手动指定 proxy_num 优先；否则随机挑一个可用的
@@ -83,16 +105,20 @@ getgh() {
         else
             proxy="$(_xrk_pick_github_proxy)"
         fi
-        [ -z "$proxy" ] && return 0
-        printf -v "$var_name" '%s/%s' "$proxy" "$original_url"
-        return 0
+        [ -n "$proxy" ] && new_url="${proxy}/${original_url}"
+    else
+        # overseas：不加代理；如果用户强制 proxy_num（非0），也按其指定加代理
+        if [ -n "${proxy_num:-}" ] && [ "${proxy_num}" != "0" ]; then
+            proxy="${PROXIES[$((proxy_num-1))]:-}"
+            [ -n "$proxy" ] && new_url="${proxy}/${original_url}"
+        fi
     fi
 
-    # overseas：不加代理；如果用户强制 proxy_num（非0），也按其指定加代理
-    if [ -n "${proxy_num:-}" ] && [ "${proxy_num}" != "0" ]; then
-        proxy="${PROXIES[$((proxy_num-1))]:-}"
-        [ -z "$proxy" ] && return 0
-        printf -v "$var_name" '%s/%s' "$proxy" "$original_url"
+    # 按调用方式返回结果：有变量名则原地修改，否则 echo
+    if [ -n "$var_name" ]; then
+        printf -v "$var_name" '%s' "$new_url"
+    else
+        printf '%s\n' "$new_url"
     fi
 }
 
@@ -102,7 +128,12 @@ git() {
     # 国内时区：自动将 GitHub URL 换为镜像
     # 国外时区：保持原样，仅在手动指定 proxy_num 时加代理
     for ((i=0; i<${#args[@]}; i++)); do
-        [[ "${args[i]}" == https://github.com/* || "${args[i]}" == https://raw.githubusercontent.com/* ]] && getgh "args[$i]"
+        if [[ "${args[i]}" == https://github.com/* || "${args[i]}" == https://raw.githubusercontent.com/* ]]; then
+            # 通过 URL 形式调用 getgh，避免数组元素的非法间接展开
+            local __new
+            __new=$(getgh "${args[i]}") || __new="${args[i]}"
+            args[i]="$__new"
+        fi
     done
     command git "${args[@]}"
 }

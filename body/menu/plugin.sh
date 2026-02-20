@@ -4,7 +4,16 @@ root="${XRK_ROOT:-/xrk}"
 [ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
 menu_init 1 0  # 初始化：需要common（install_pkg），不需要check_changes
 YZ_DIR="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}"
-MENU_DIR="$YZ_DIR/plugins/XRK/resources/plugins"
+MENU_DIR="$YZ_DIR/plugins/XRK-plugin/resources/plugins"
+
+# 确保 github.sh 可用：统一 GitHub 加速（git 包装 + getgh），避免各处重复判断
+_PLUGIN_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
+type getgh &>/dev/null || {
+    [ -f "$root/shell_modules/github.sh" ] && source "$root/shell_modules/github.sh" \
+        || source <(curl -sL "${_PLUGIN_RAW_BASE}/shell_modules/github.sh" 2>/dev/null) 2>/dev/null \
+        || true
+}
+
 CATEGORIES=(
     "推荐插件:recommended_plugins.json"
     "文娱插件:entertainment_plugins.json"
@@ -60,9 +69,6 @@ install_normal_plugin() {
     local git_url="$2"
     local cn_name="$3"
     local target_dir="$YZ_DIR/plugins/$name"
-    
-    # CN：getgh 会把 GitHub URL 转为可用代理 URL；非 CN 保持原样
-    [[ "$git_url" == *"github.com"* ]] && getgh "git_url"
 
     if [ -d "$target_dir" ]; then
         echo -e "${yellow}! $cn_name 已安装${bg}"
@@ -86,9 +92,6 @@ install_js_plugin() {
     local target_dir="$YZ_DIR/plugins/other"
     local target_file="$target_dir/${cn_name}.js"
 
-    # CN：getgh 会把 GitHub URL 转为可用代理 URL；非 CN 保持原样
-    [[ "$git_url" == *"github.com"* ]] && getgh "git_url"
-
     mkdir -p "$target_dir"
     
     if [ -f "$target_file" ]; then
@@ -97,7 +100,7 @@ install_js_plugin() {
     fi
     
     echo -e "${caidan2}正在安装 $cn_name...${bg}"
-    if curl -s "$git_url" -o "$target_file"; then
+    if xrk_download "$git_url" "$target_file" 3; then
         echo -e "${green}✓ $cn_name 安装成功!${bg}"
         return 0
     else

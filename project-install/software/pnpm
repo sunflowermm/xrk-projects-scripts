@@ -16,11 +16,16 @@ case "$arch" in
 esac
 
 url="https://github.com/pnpm/pnpm/releases/download/$PNPM_VERSION/$pnpm_bin"
-# getgh 会自动处理：国内时区换源，国外保持原样
-getgh "url" 2>/dev/null || true
 cd "$HOME" || exit 1
 echo "开始安装 pnpm $PNPM_VERSION..."
-wget --tries=3 --timeout=30 -O "$pnpm_bin" "$url" || { echo "下载失败"; exit 1; }
+xrk_download "$url" "$pnpm_bin" 3 || { echo "下载失败"; exit 1; }
 sudo mv "$pnpm_bin" /usr/local/bin/pnpm && sudo chmod 755 /usr/local/bin/pnpm
 rm -f "$pnpm_bin" 2>/dev/null
-pnpm -v &>/dev/null && echo -e "\033[0;32mpnpm $(pnpm -v) 安装成功\033[0m" || { echo -e "\033[0;31mpnpm 安装失败\033[0m"; exit 1; }
+if pnpm -v &>/dev/null; then
+    echo -e "\033[0;32mpnpm $(pnpm -v) 安装成功\033[0m"
+    # 安装完成后统一走 JS 换源逻辑（npm/pnpm 都照顾到）
+    type xrk_setup_js_mirrors &>/dev/null && xrk_setup_js_mirrors
+else
+    echo -e "\033[0;31mpnpm 安装失败\033[0m"
+    exit 1
+fi

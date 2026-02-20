@@ -45,7 +45,7 @@ update_xm() {
     [ -z "$xm_path" ] && xm_path="/usr/local/bin/xm"
     [ -z "$SCRIPT_RAW_BASE" ] && init_repo_source
     echo "[xm] 正在更新…"
-    if curl -sL "${SCRIPT_RAW_BASE}/body/xm" -o "$xm_path" 2>/dev/null && chmod +x "$xm_path"; then
+    if xrk_download "${SCRIPT_RAW_BASE}/body/xm" "$xm_path" 3 && chmod +x "$xm_path"; then
         echo "[xm] 已更新: $xm_path"
     else
         echo "[xm] 更新失败，请检查网络或 SCRIPT_RAW_BASE"

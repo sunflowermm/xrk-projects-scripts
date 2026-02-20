@@ -55,7 +55,7 @@ else
 fi
 
 echo "[xm] 正在安装 xm 到 $XM_DEST ..."
-curl -sL "$SCRIPT_RAW_BASE/body/xm" -o "$XM_DEST" && chmod +x "$XM_DEST" || {
+xrk_download "$SCRIPT_RAW_BASE/body/xm" "$XM_DEST" 3 && chmod +x "$XM_DEST" || {
     echo "xm 下载失败"
     exit 1
 }

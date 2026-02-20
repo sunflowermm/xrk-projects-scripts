@@ -123,9 +123,7 @@ function download_napcat() {
     else
         log "开始下载NapCat安装包,请稍等..."
         napcat_download_url="https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCat.Shell.zip"
-        # getgh 会自动处理：国内时区换源，国外保持原样
-        command -v getgh &>/dev/null && getgh napcat_download_url
-        curl -L -# "${napcat_download_url}" -o "${default_file}" || { log "文件下载失败"; clean; exit 1; }
+        xrk_download "${napcat_download_url}" "${default_file}" 3 || { log "文件下载失败"; clean; exit 1; }
         log "${default_file} 成功下载"
     fi
 
@@ -280,13 +278,8 @@ function install_linuxqq() {
 
     if [ "${package_manager}" = "dnf" ]; then
         if ! [ -f "QQ.rpm" ]; then
-            curl -L -# "${qq_download_url}" -o QQ.rpm
-            if [ $? -ne 0 ]; then
-                log "文件下载失败, 请检查错误。"
-                exit 1
-            else
-                log "文件下载成功"
-            fi
+            xrk_download "${qq_download_url}" "QQ.rpm" 3 || { log "文件下载失败, 请检查错误。"; exit 1; }
+            log "文件下载成功"
         else
             log "检测到当前目录下存在QQ安装包, 将使用本地安装包进行安装。"
         fi
@@ -295,13 +288,8 @@ function install_linuxqq() {
         rm -f QQ.rpm
     elif [ "${package_manager}" = "apt-get" ]; then
         if ! [ -f "QQ.deb" ]; then
-            curl -L -# "${qq_download_url}" -o QQ.deb
-            if [ $? -ne 0 ]; then
-                log "文件下载失败, 请检查错误。"
-                exit 1
-            else
-                log "文件下载成功"
-            fi
+            xrk_download "${qq_download_url}" "QQ.deb" 3 || { log "文件下载失败, 请检查错误。"; exit 1; }
+            log "文件下载成功"
         else
             log "检测到当前目录下存在QQ安装包, 将使用本地安装包进行安装。"
         fi
@@ -477,11 +465,9 @@ function check_napcat_cli() {
 function install_napcat_cli() {
     log "安装NapCatQQ CLI..."   
     napcat_cli_download_url="https://raw.githubusercontent.com/NapNeko/NapCat-Installer/refs/heads/main/script/napcat"
-    # getgh 会自动处理：国内时区换源，国外保持原样
-    command -v getgh &>/dev/null && getgh napcat_cli_download_url
     default_file="napcatcli"
     log "NapCatQQ CLI 下载链接: ${napcat_cli_download_url}"
-    curl -L -# "${napcat_cli_download_url}" -o "./${default_file}" || { log "文件下载失败"; clean; exit 1; }
+    xrk_download "${napcat_cli_download_url}" "./${default_file}" 3 || { log "文件下载失败"; clean; exit 1; }
     cp -f "./${default_file}" /usr/local/bin/napcat && chmod +x /usr/local/bin/napcat || { log "文件移动失败，请以root身份运行"; clean; exit 1; }
     rm -f "./${default_file}"
 }

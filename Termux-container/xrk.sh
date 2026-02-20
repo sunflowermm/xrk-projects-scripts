@@ -13,6 +13,26 @@ case "$1" in
     ;;
 esac
 
+# Termux 依赖保障：本脚本会用到 curl/wget/proot/tar/xz/sha256sum/shuf 等
+_termux_ensure() {
+  local pkg="$1" cmd="${2:-$1}"
+  command -v "$cmd" >/dev/null 2>&1 && return 0
+  pkg install -y "$pkg" >/dev/null 2>&1 || pkg install -y "$cmd" >/dev/null 2>&1 || return 1
+}
+_termux_ensure_deps() {
+  # curl：首跳拉取 bootstrap 依赖
+  _termux_ensure curl curl || { echo "缺少 curl，且安装失败"; exit 1; }
+  # wget：rootfs 下载依赖
+  _termux_ensure wget wget || { echo "缺少 wget，且安装失败"; exit 1; }
+  # proot：容器解压/运行依赖
+  _termux_ensure proot proot || { echo "缺少 proot，且安装失败"; exit 1; }
+  # tar/xz/sha256sum/shuf 等常用工具
+  _termux_ensure tar tar || true
+  _termux_ensure xz xz || true
+  _termux_ensure coreutils sha256sum || true
+}
+_termux_ensure_deps
+
 # 首次引导
 case "${XRK_SOURCE#-}" in
     1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
@@ -225,7 +245,10 @@ EOM
 
     termux-fix-shebang "$START_SCRIPT"
     chmod +x "$START_SCRIPT"
-    curl -o "$INSTALL_DIR/root/.xrk" "$INITIAL_SCRIPT_URL"
+    info "下载初始化脚本 .xrk ..."
+    (curl -fL --connect-timeout 10 --max-time 120 --progress-bar -o "$INSTALL_DIR/root/.xrk" "$INITIAL_SCRIPT_URL" 2>/dev/null \
+        || wget --tries=3 --timeout=30 --show-progress -O "$INSTALL_DIR/root/.xrk" "$INITIAL_SCRIPT_URL" 2>/dev/null) \
+        || warn ".xrk 下载失败（可进入容器后手动重试）"
     info "配置一次性启动脚本..."
     printf 'XRK_SOURCE="%s"\n' "$XRK_SOURCE" > "$INSTALL_DIR/root/.xrk_env"
     # 生成一次性 profile 脚本（使用 POSIX 兼容写法，避免 Alpine /bin/sh 报 bad substitution）
