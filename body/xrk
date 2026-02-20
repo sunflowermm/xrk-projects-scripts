@@ -78,9 +78,10 @@ function show_menu
     echo
 }
 
+MENU_OPT_COUNT=7
 while true; do
     show_menu
-    read -p "请从选项中选一个: " CHOICE
+    read -p "请选择 [1-${MENU_OPT_COUNT}]，r 更新脚本: " CHOICE
     forin=28 clear_menu
     case "$CHOICE" in
         1 )
@@ -107,17 +108,14 @@ while true; do
         7 )
         bash /xrk/body/modules/env
         ;;
-        r )
-    echo -e "开始更新至最新脚本"
-    cd /xrk
-    git pull --no-rebase
-    if [ -n "$xyz" ]; then
-       葵崽升级
-    fi
-    双崽linux脚本升级
-    echo "更新完成，正在退出"
-    exit 1
-        ;;
+        r)
+            echo -e "开始更新至最新脚本"
+            cd /xrk && git pull --no-rebase
+            葵崽升级
+            双崽linux脚本升级
+            echo "更新完成，正在退出"
+            exit 0
+            ;;
         * )
              echo -e "${red}退啦${bg}"
              exit 1

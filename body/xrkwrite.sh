@@ -18,14 +18,14 @@ function install_and_configure_scripts() {
     葵崽升级
 }
 
-# 主执行函数（仅核心：安装器、git/jq、脚本仓库、葵崽升级、xrkk；tmux/ffmpeg/profile 为独立模块，从菜单安装）
+# 主执行：脚本侧（安装器、git/jq、脚本仓库、bin）；环境与云崽由 xm 选项 4 后续调用 linuxinstall 完成
 function main() {
     确定系统安装器魔法
     install_package "git"
     install_package "jq"
     install_and_configure_scripts
     双崽linux脚本升级
-    echo "主流程安装完成。tmux/ffmpeg/profile 可从主菜单「环境与模块」或 xm 中单独安装。"
+    echo "[主流程] 脚本与命令已就绪。"
     [ -f "$HOME/.profile" ] && source "$HOME/.profile"
 }
 

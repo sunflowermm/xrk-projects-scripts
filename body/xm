@@ -1,5 +1,11 @@
 #!/bin/bash
 # xm：脚本仓库统一入口（换源 / 安装仓库 / 主流程 / 主菜单 / 环境安装）
+#
+# 正常安装 Yunzai（从 xm 开始）：
+#   1. 输入 xm → 国内建议先选 1 换源、2 安装 Git
+#   2. 选 3 安装脚本仓库（克隆到 /xrk，必做）
+#   3. 选 4 安装主流程（脚本+环境+云崽一条龙，含 Node/pnpm/Redis/Chromium 与 XRK-Yunzai）
+#   4. 完成后按提示用 xyz 或 xyzlogin 启动；选 6 可进主菜单做插件/报错/换签等
 
 cd "$HOME" || exit
 
@@ -104,8 +110,8 @@ while true; do
             ;;
         4)
             require_xrk || continue
-            echo "[xm] 开始安装主流程（脚本与机器人）..."
-            exec bash /xrk/body/xrkwrite.sh
+            echo "[xm] 主流程：脚本与命令 → 环境与云崽"
+            bash /xrk/body/xrkwrite.sh && echo "[xm] 正在安装环境与云崽…" && bash /xrk/linuxinstall.sh || continue
             ;;
         5)
             env_install_menu
