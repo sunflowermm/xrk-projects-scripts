@@ -10,4 +10,3 @@ check_changes
 search_directories
 [ -d /xrk ] && [ ! -f /xrk/system.yaml ] && echo 'color: .theme' > /xrk/system.yaml
 source /xrk/.color
-# tmux 不在此自动启动，避免子菜单 source .init 时误触；需 tmux 请从主菜单「环境与模块」或执行 xrk-tmux
