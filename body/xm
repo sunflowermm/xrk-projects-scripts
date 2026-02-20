@@ -17,10 +17,13 @@ else
 fi
 init_repo_source
 load_module "shell_modules/common.sh"
-# 有 /xrk 时加载菜单公共（终端列宽、居中），保证中文与框线对齐
+# 菜单公共（自动宽度、选项数）：优先 /xrk，否则远程拉取
 if [ -d /xrk ] && [ -f /xrk/shell_modules/menu_common.sh ]; then
     [ -f /xrk/.init ] && source /xrk/.init
     source /xrk/shell_modules/menu_common.sh
+elif ! type menu_show &>/dev/null && [ -n "${SCRIPT_RAW_BASE:-}" ]; then
+    [ -f /xrk/.init ] && source /xrk/.init
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/menu_common.sh" 2>/dev/null) 2>/dev/null || true
 fi
 
 require_xrk() {
@@ -41,27 +44,12 @@ run_software() {
 env_install_menu() {
     local c
     while true; do
-        if type menu_show &>/dev/null; then
-            # 使用统一菜单显示函数（带前缀"  "）
-            echo ""
-            menu_show "环境安装(yq/chromium等)" "  " "yq" "Chromium" "Node.js" "pnpm" "ffmpeg" "Python + uv" "返回"
-        else
-            echo ""
-            echo "  ╭────────────────────────────╮"
-            echo "  │   环境安装(yq/chromium等)  │"
-            echo "  ├────────────────────────────┤"
-            echo "  │  1  yq                     │"
-            echo "  │  2  Chromium              │"
-            echo "  │  3  Node.js               │"
-            echo "  │  4  pnpm                  │"
-            echo "  │  5  ffmpeg                │"
-            echo "  │  6  Python + uv           │"
-            echo "  │  0  返回                  │"
-            echo "  ╰────────────────────────────╯"
-        fi
         echo ""
-        read -rp "请选择 [0-6]: " c
-        c=$(echo "$c" | tr -d '[:space:]')
+        menu_show "环境安装(yq/chromium等)" "  " "yq" "Chromium" "Node.js" "pnpm" "ffmpeg" "Python + uv" "返回"
+        echo ""
+        read -rp "请选择 [0-${MENU_OPT_COUNT:-7}]: " c
+        c=$(echo "$c" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+        [ "$c" = "0" ] || [ "$c" = "q" ] || [ "$c" = "${MENU_OPT_COUNT:-7}" ] && return 0
         case "$c" in
             1) run_software "project-install/software/yq" ;;
             2) run_software "project-install/software/chromium" ;;
@@ -69,49 +57,31 @@ env_install_menu() {
             4) run_software "project-install/software/pnpm" ;;
             5) run_software "project-install/software/ffmpeg" ;;
             6) run_software "body/modules/python_uv" ;;
-            0) return 0 ;;
             *) echo "无效选择" ;;
         esac
     done
 }
 
 show_menu() {
-    if type menu_show &>/dev/null; then
-        # 使用统一菜单显示函数（带前缀"  "）
-        local opts=("换源(apt 镜像)" "安装 Git" "安装脚本仓库" "安装主流程(机器人等)" "环境安装(yq/chromium)")
-        [ -d /xrk ] && opts+=("进入主菜单(xrk)" "环境与模块(tmux等)")
-        opts+=("退出")
-        echo ""
-        menu_show "xm 主菜单" "  " "${opts[@]}"
-    else
-        echo ""
-        echo "  ╭────────────────────────────╮"
-        echo "  │          xm 主菜单         │"
-        echo "  ├────────────────────────────┤"
-        echo "  │  1  换源（apt 镜像）       │"
-        echo "  │  2  安装 Git               │"
-        echo "  │  3  安装脚本仓库           │"
-        echo "  │  4  安装主流程(机器人等)   │"
-        echo "  │  5  环境安装(yq/chromium)  │"
-        [ -d /xrk ] && echo "  │  6  进入主菜单(xrk)        │"
-        [ -d /xrk ] && echo "  │  7  环境与模块(tmux等)     │"
-        echo "  │  0  退出                   │"
-        echo "  ╰────────────────────────────╯"
-    fi
+    local opts=("换源(apt 镜像)" "安装 Git" "安装脚本仓库" "安装主流程(机器人等)" "环境安装(yq/chromium)")
+    [ -d /xrk ] && opts+=("进入主菜单(xrk)" "环境与模块(tmux等)")
+    opts+=("退出")
+    echo ""
+    menu_show "xm 主菜单" "  " "${opts[@]}"
     echo ""
 }
 
 while true; do
     show_menu
     # 读取用户输入；若遇到 EOF（例如管道/非交互环境），则优雅退出
-    if ! read -rp "请选择: " raw_choice; then
+    if ! read -rp "请选择 [0-${MENU_OPT_COUNT:-5}]: " raw_choice; then
         echo "再见"; exit 0
     fi
     choice=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-    # 空输入直接重绘菜单，不再刷“无效选择”
     if [ -z "$choice" ]; then
         continue
     fi
+    [ "$choice" = "0" ] || [ "$choice" = "q" ] || [ "$choice" = "${MENU_OPT_COUNT}" ] && { echo "再见"; exit 0; }
     case "$choice" in
         1)
             change_source_linux
@@ -147,9 +117,6 @@ while true; do
         7)
             require_xrk || continue
             bash /xrk/body/modules/env
-            ;;
-        0|q)
-            echo "再见"; exit 0
             ;;
         *)
             echo "无效选择"

@@ -6,33 +6,18 @@ source /xrk/.init 2>/dev/null || true
 [ -f /xrk/shell_modules/menu_common.sh ] && source /xrk/shell_modules/menu_common.sh
 
 while true; do
-    if type menu_show &>/dev/null; then
-        # 使用统一菜单显示函数（带前缀"  "）
-        echo ""
-        menu_show "环境与模块" "  " "安装/配置 tmux" "安装 ffmpeg" "配置 .profile" "升级 xrkk 到 bin" "Python + uv" "返回"
-    else
-        echo ""
-        echo "  ╭─────────────────────────────╮"
-        echo "  │       环境与模块              │"
-        echo "  ├─────────────────────────────┤"
-        echo "  │  1  安装/配置 tmux           │"
-        echo "  │  2  安装 ffmpeg              │"
-        echo "  │  3  配置 .profile            │"
-        echo "  │  4  升级 xrkk 到 bin         │"
-        echo "  │  5  Python + uv              │"
-        echo "  │  0  返回                     │"
-        echo "  ╰─────────────────────────────╯"
-    fi
     echo ""
-    read -rp "请选择 [0-5]: " c
-    c=$(echo "$c" | tr -d '[:space:]')
+    menu_show "环境与模块" "  " "安装/配置 tmux" "安装 ffmpeg" "配置 .profile" "升级 xrkk 到 bin" "Python + uv" "返回"
+    echo ""
+    read -rp "请选择 [0-${MENU_OPT_COUNT:-6}]: " c
+    c=$(echo "$c" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    [ "$c" = "0" ] || [ "$c" = "q" ] || [ "$c" = "${MENU_OPT_COUNT:-6}" ] && exit 0
     case "$c" in
         1) bash /xrk/body/modules/tmux ;;
         2) bash /xrk/body/modules/ffmpeg ;;
         3) bash /xrk/body/modules/profile ;;
         4) cat /xrk/body/Linux > /usr/local/bin/xrkk && chmod 755 /usr/local/bin/xrkk && echo "xrkk 已更新" ;;
         5) bash /xrk/body/modules/python_uv ;;
-        0) exit 0 ;;
         *) echo "无效选择" ;;
     esac
 done

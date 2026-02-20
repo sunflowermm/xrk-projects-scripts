@@ -176,14 +176,15 @@ menu_show() {
     # 显示菜单（统一格式，支持prefix）
     echo -e "$hint"
     echo -e "${prefix}$MENU_TOP"
-    echo -e "${prefix}│${caidan2}$(menu_center_title "$title" "$width")${caidan1}│${bg}"
+    echo -e "${prefix}${caidan1}│${caidan2}$(menu_center_title "$title" "$width")${caidan1}│${bg}"
     echo -e "${prefix}$MENU_MID"
     local num=1
     for opt in "${opts[@]}"; do
-        echo -e "${prefix}│${caidan2}$(menu_line_option "$num" "$opt" "$width")${caidan1}│${bg}"
+        echo -e "${prefix}${caidan1}│${caidan2}$(menu_line_option "$num" "$opt" "$width")${caidan1}│${bg}"
         ((num++))
     done
     echo -e "${prefix}$MENU_BOT"
+    MENU_OPT_COUNT=${#opts[@]}
 }
 
 # 双色边框菜单显示函数（用于errorbg等特殊样式）
@@ -220,6 +221,7 @@ menu_show_double() {
     echo -e "${caidan1}${border_bot}${bg}"
     echo -e "${caidan3}${border_bot}${bg}"
     echo
+    MENU_OPT_COUNT=${#opts[@]}
 }
 
 
