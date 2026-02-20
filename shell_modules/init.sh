@@ -44,5 +44,4 @@ search_all_directories() {
 
 search_directories() {
     search_common_paths || search_all_directories
-    [ -n "${xyz:-}" ] && echo "找到葵崽目录: $xyz"
 }

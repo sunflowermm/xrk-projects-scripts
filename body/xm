@@ -1,7 +1,8 @@
 #!/bin/bash
-# xm：脚本仓库统一入口（换源 / 安装仓库 / 主流程 / 主菜单 / 环境安装）
-#
-# 正常安装 Yunzai：进 xm 自动检查/安装 Git → 选 2 安装脚本仓库 → 选 3 安装主流程（环境+云崽一条龙）→ 用 xyz 启动；国内可先选 1 换源
+# xm：脚本入口（换源 / 安装脚本仓库 / 环境安装 / 进入 xrk）
+# 职责边界：
+# - xm 负责脚本本身与运行环境（apt 换源、克隆 xrk 仓库、安装 node/pnpm/yq 等）
+# - xrk 负责具体项目（葵崽 XRK-Yunzai 等）的安装与管理
 
 cd "$HOME" || exit
 
@@ -79,7 +80,7 @@ env_install_menu() {
 }
 
 show_menu() {
-    local opts=("换源(apt 镜像)" "安装脚本仓库" "安装主流程(机器人等)" "环境安装(yq/chromium)")
+    local opts=("换源(apt 镜像)" "安装脚本仓库" "环境安装(yq/chromium)")
     [ -d "$XRK_ROOT" ] && opts+=("进入主菜单(xrk)" "环境与模块(tmux等)")
     opts+=("退出")
     echo ""
@@ -116,18 +117,14 @@ while true; do
             fi
             ;;
         3)
-            require_xrk || continue
-            echo "[xm] 主流程：脚本与命令 → 环境与云崽"
-            bash "$XRK_ROOT/body/xrkwrite.sh" && echo "[xm] 正在安装环境与云崽…" && bash "$XRK_ROOT/linuxinstall.sh" || continue
-            ;;
-        4)
             env_install_menu
             ;;
-        5)
+        4)
+            # 仅在菜单已包含该项时才可能进入此分支；进一步校验 XRK_ROOT 是否就绪
             require_xrk || continue
             exec bash "$XRK_ROOT/body/xrk"
             ;;
-        6)
+        5)
             require_xrk || continue
             bash "$XRK_ROOT/body/modules/env_module.sh"
             ;;

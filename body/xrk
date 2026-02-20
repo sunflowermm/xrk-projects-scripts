@@ -47,13 +47,12 @@ show_menu() {
     local prefix="        "
 
     echo -e "${caidan2}现在的时间是 : $current_time${bg}"
-    echo -e "${caidan1}任意键退出脚本，当前主管葵崽(XRK-Yunzai)目录: $yz${bg}"
     echo -e "${caidan2}更新请输入 r${bg}"
-    echo -e "${caidan3}                  __ _                        
- ___ _   _ _ __  / _| | _____      _____ _ __ 
-/ __| | | | '_ \| |_| |/ _ \ \ /\ / / _ \ '__|
-\__ \ |_| | | | |  _| | (_) \ V  V /  __/ |   
-|___/\__,_|_| |_|_| |_|\___/ \_/\_/ \___|_|   ${bg}"
+    echo -e "${caidan3}                   __ _                        
+  ___ _   _ _ __  / _| | _____      _____ _ __ 
+ / __| | | | '_ \| |_| |/ _ \ \ /\ / / _ \ '__|
+ \__ \ |_| | | | |  _| | (_) \ V  V /  __/ |   
+ |___/\__,_|_| |_|_| |_|\___/ \_/\_/ \___|_|   ${bg}"
     
     # 动态生成边框
     local border_top=$(menu_build_border "$menu_width" top)
@@ -66,7 +65,7 @@ show_menu() {
     echo -e "${caidan1}${prefix}${border_top}${bg}"
     echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "向日葵脚本" "$menu_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_mid}${bg}"
-    echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "集中营 1013495491" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "集中营 1075364017" "$menu_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_mid}${bg}   ${caidan1}${status_top}${bg}"
     echo -e "${caidan1}${prefix}│${caidan2}$(menu_line_option 1 "葵崽相关" "$menu_width")${caidan1}│${bg}   ${caidan1}│${caidan3}$(menu_center_title "脚本状态" "$status_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_mid}${bg}   ${caidan1}│${caidan2}$(menu_center_title "最新: $ver1" "$status_width")${caidan1}│${bg}"
