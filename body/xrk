@@ -106,7 +106,7 @@ while true; do
         break
         ;;
         7 )
-        bash /xrk/body/modules/env
+        bash /xrk/body/modules/env_module
         ;;
         r)
             echo -e "开始更新至最新脚本"

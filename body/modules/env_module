@@ -1,5 +1,6 @@
 #!/bin/bash
 # 环境与模块子菜单：tmux / ffmpeg / profile / xrkk 升级，可单独执行
+# 文件名用 env_module 避免与系统 env 或 gitignore 常用规则冲突
 [ -d /xrk ] || { echo "请先安装脚本仓库到 /xrk"; exit 1; }
 source /xrk/shell_modules/color.sh 2>/dev/null || true
 source /xrk/.init 2>/dev/null || true

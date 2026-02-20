@@ -122,7 +122,7 @@ while true; do
             ;;
         7)
             require_xrk || continue
-            bash /xrk/body/modules/env
+            bash /xrk/body/modules/env_module
             ;;
         *)
             echo "无效选择"
