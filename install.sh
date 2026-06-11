@@ -1,39 +1,27 @@
 #!/bin/bash
-# Copyright (c) 2026 Xrkseek
-# Licensed under MIT License
 # 统一入口：Termux→容器安装 | Linux→xm 安装
 # 参数：1=GitCode 2=GitHub 3=Gitee（默认 3）
 
 XRK_SOURCE="${1:-3}"
-# 加载 bootstrap 获取 get_base_from_arg（无 /xrk 时用默认 URL，首跳按 XRK_SOURCE 选源）
-if [ -f /xrk/shell_modules/bootstrap.sh ]; then
-    source /xrk/shell_modules/bootstrap.sh
+XRK_ROOT="${XRK_ROOT:-/xrk}"
+# shellcheck source=/dev/null
+if [ -f "$XRK_ROOT/shell_modules/xrk_base.sh" ]; then
+    source "$XRK_ROOT/shell_modules/xrk_base.sh"
 else
-    case "${XRK_SOURCE#-}" in
-        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
-        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
-        3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
-    esac
-    source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")
+    source <(curl -sL "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh")
 fi
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg "$XRK_SOURCE")}"
-SCRIPT_CLONE_URL="${SCRIPT_CLONE_URL:-$(get_clone_from_raw "$SCRIPT_RAW_BASE")}"
-export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_SOURCE
+xrk_bootstrap "$XRK_SOURCE" 1
 
 if [ -n "${TERMUX_VERSION:-}" ]; then
+    _termux_dists=(ubuntu debian alpine arch fedora centos)
     echo "检测到 Termux，安装 Linux 容器..."
     echo "  1=Ubuntu  2=Debian  3=Alpine  4=Arch  5=Fedora  6=CentOS"
     while true; do
         read -rp "请选择 [1-6]: " choice
-        case "$choice" in
-            1) exec bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/xrk.sh") --ubuntu "$XRK_SOURCE" ;;
-            2) exec bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/xrk.sh") --debian "$XRK_SOURCE" ;;
-            3) exec bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/xrk.sh") --alpine "$XRK_SOURCE" ;;
-            4) exec bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/xrk.sh") --arch "$XRK_SOURCE" ;;
-            5) exec bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/xrk.sh") --fedora "$XRK_SOURCE" ;;
-            6) exec bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/xrk.sh") --centos "$XRK_SOURCE" ;;
-            *) echo "请输入 1-6" ;;
-        esac
+        if [[ "$choice" =~ ^[1-6]$ ]]; then
+            exec bash <(curl -sL "$SCRIPT_RAW_BASE/Termux-container/xrk.sh") "--${_termux_dists[$((choice-1))]}" "$XRK_SOURCE"
+        fi
+        echo "请输入 1-6"
     done
 else
     echo "安装 xm，输入 xm 启动..."

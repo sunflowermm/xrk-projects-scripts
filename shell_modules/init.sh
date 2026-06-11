@@ -6,17 +6,26 @@
 XRK_MARKER_DIRS="plugins/XRK plugins/other"
 
 check_changes() {
-    export xyz=""
-    export yz=""
     search_root="${search_root:-$HOME}"
+    if [ -n "${xyz:-}" ] && [ -f "${xyz}/package.json" ] && check_directory "$xyz" 2>/dev/null; then
+        export yz="$xyz" xyz="$xyz"
+        return 0
+    fi
+    export xyz="" yz=""
 }
 
 check_directory() {
     local dir="$1" name
     [ ! -f "$dir/package.json" ] && return 1
     name=$(jq -r '.name // empty' "$dir/package.json" 2>/dev/null)
-    [ -z "$name" ] || [ "$name" != "xrk-yunzai" ] && return 1
-    [ -z "${xyz:-}" ] && export xyz="$dir" yz="$dir"
+    if [ -z "$name" ]; then
+        name=$(grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]+"' "$dir/package.json" 2>/dev/null \
+            | head -1 | sed -n 's/.*"\([^"]*\)"$/\1/p')
+    fi
+    [[ "$name" == "xrk-yunzai" ]] || return 1
+    if [ -z "${xyz:-}" ]; then
+        export xyz="$dir" yz="$dir"
+    fi
     return 0
 }
 
@@ -45,3 +54,6 @@ search_all_directories() {
 search_directories() {
     search_common_paths || search_all_directories
 }
+
+检测葵崽路径() { search_directories; }
+刷新葵崽路径() { check_changes; search_directories; }

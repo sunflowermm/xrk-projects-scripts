@@ -1,14 +1,16 @@
 #!/bin/bash
 # NapCat QQ 多开启动器（可复制到 /usr/local/bin/nt）
 root="${XRK_ROOT:-/xrk}"
-[ -f "$root/shell_modules/common.sh" ] && source "$root/shell_modules/common.sh"
+# shellcheck source=/dev/null
+source "${root}/shell_modules/xrk_base.sh"
+xrk_加载底层 install
 
 BASE_DIR="$root/body"
 CONFIG_DIR="/opt/QQ/resources/app/app_launcher/napcat/config"
 
 check_dependencies() {
     for pkg in jq dialog xvfb-run; do
-        if ! command -v $pkg &>/dev/null; then
+        if ! command -v "$pkg" &>/dev/null; then
             if type install_pkg &>/dev/null; then
                 install_pkg "$pkg" || { echo "安装 $pkg 失败"; exit 1; }
             else

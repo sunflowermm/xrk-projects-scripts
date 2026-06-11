@@ -1,45 +1,17 @@
 #!/bin/bash
-# xrkk：包管理(i/f/mk/list) + 菜单快捷(plugin/js/error/nc 等)。依赖：common → install → init → menu_common → update
+# xrkk：包管理 + 菜单快捷
 XRK_ROOT="${XRK_ROOT:-/xrk}"
-[ -f "$XRK_ROOT/shell_modules/common.sh" ] && source "$XRK_ROOT/shell_modules/common.sh"
-[ -f "$XRK_ROOT/shell_modules/install.sh" ] && source "$XRK_ROOT/shell_modules/install.sh"
-[ -f "$XRK_ROOT/shell_modules/init.sh" ] && source "$XRK_ROOT/shell_modules/init.sh"
-[ -f "$XRK_ROOT/shell_modules/menu_common.sh" ] && source "$XRK_ROOT/shell_modules/menu_common.sh"
-[ -f "$XRK_ROOT/shell_modules/update.sh" ] && source "$XRK_ROOT/shell_modules/update.sh"
+# shellcheck source=/dev/null
+source "$XRK_ROOT/shell_modules/xrk_base.sh" || { echo "请先安装脚本仓库到 $XRK_ROOT"; exit 1; }
+xrk_加载底层 full
 menu_init 1 1
 
 SCRIPT_NAME="xrkk"
 SCRIPT_VERSION="2.2"
 
-# 包安装：优先 install_package，否则按 detect_os 调用系统包管理器
-_do_install() {
-    if type install_package &>/dev/null; then
-        install_package "$@"
-        return
-    fi
-    type detect_os &>/dev/null || { echo "请先安装脚本仓库到 $XRK_ROOT 或手动安装: $*"; return 1; }
-    local os; os=$(detect_os)
-    case "$os" in
-        debian|ubuntu) apt update -qq; apt install -y "$@" ;;
-        arch) pacman -Sy --noconfirm "$@" ;;
-        centos) command -v dnf &>/dev/null && dnf install -y "$@" || yum install -y "$@" ;;
-        *) echo "请手动安装: $*"; return 1 ;;
-    esac
-}
+_do_install() { install_pkgs "$@"; }
+_do_remove() { remove_pkgs "$@"; }
 
-# 包卸载
-_do_remove() {
-    type detect_os &>/dev/null || { echo "请先安装脚本仓库到 $XRK_ROOT 或手动卸载: $*"; return 1; }
-    local os; os=$(detect_os)
-    case "$os" in
-        debian|ubuntu) apt remove -y "$@" ;;
-        arch) pacman -R --noconfirm "$@" ;;
-        centos) command -v dnf &>/dev/null && dnf remove -y "$@" || yum remove -y "$@" ;;
-        *) echo "请手动卸载: $*"; return 1 ;;
-    esac
-}
-
-# 列出底层常用工具状态（是否已安装及版本）
 _do_list() {
     local os; os=$(detect_os 2>/dev/null || echo "unknown")
     echo "系统: $os"
@@ -81,9 +53,7 @@ show_help() {
 [ $# -lt 1 ] && { show_help; exit 1; }
 
 case "$1" in
-    -h|--help)
-        show_help
-        ;;
+    -h|--help) show_help ;;
     i)
         shift
         [ $# -lt 1 ] && { echo "错误: 请指定要安装的包名"; exit 1; }
@@ -99,34 +69,15 @@ case "$1" in
         [ $# -lt 1 ] && { echo "错误: 请指定目录"; exit 1; }
         mkdir -p "$@"
         ;;
-    list|l)
-        _do_list
-        ;;
-    plugin)
-        bash "$XRK_ROOT/body/menu/plugin.sh"
-        ;;
-    other)
-        bash "$XRK_ROOT/body/menu/advanced.sh"
-        ;;
-    js)
-        bash "$XRK_ROOT/body/menu/js.sh"
-        ;;
-    dele)
-        bash "$XRK_ROOT/body/menu/deletion.sh"
-        ;;
-    diadele)
-        bash "$XRK_ROOT/body/menu/deletiondialog.sh"
-        ;;
-    up)
-        check_changes
-        search_directories
-        ;;
-    error)
-        bash "$XRK_ROOT/body/menu/errorbg.sh"
-        ;;
-    nc|ncqq)
-        type run_software &>/dev/null && run_software "project-install/NapCat.sh" || { echo "请先安装脚本仓库到 $XRK_ROOT"; exit 1; }
-        ;;
+    list|l) _do_list ;;
+    plugin)  bash "$XRK_ROOT/body/menu/plugin.sh" ;;
+    other)   bash "$XRK_ROOT/body/menu/advanced.sh" ;;
+    js)      bash "$XRK_ROOT/body/menu/js.sh" ;;
+    dele)    bash "$XRK_ROOT/body/menu/deletion.sh" ;;
+    diadele) bash "$XRK_ROOT/body/menu/deletiondialog.sh" ;;
+    up)      check_changes; search_directories ;;
+    error)   bash "$XRK_ROOT/body/menu/errorbg.sh" ;;
+    nc|ncqq) run_software "project-install/NapCat.sh" ;;
     *)
         echo "未知子命令: $1"
         show_help

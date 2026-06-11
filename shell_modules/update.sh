@@ -10,7 +10,8 @@ XRK_BIN="${XRK_BIN:-/usr/local/bin}"
         ["$XRK_BIN/xyz"]="$XRK_ROOT/body/writeto/xrk/xyz"
         ["$XRK_BIN/xyzlogin"]="$XRK_ROOT/body/writeto/xrk/xyzlogin"
         ["$XRK_BIN/xrk"]="$XRK_ROOT/body/xrk"
-        ["$XRK_BIN/xrk-tmux"]="$XRK_ROOT/body/modules/tmux.sh"
+        ["$XRK_BIN/xrk-tmux"]="$XRK_ROOT/body/tmux.sh"
+        ["$XRK_BIN/xrk-tmux-setup"]="$XRK_ROOT/body/modules/tmux.sh"
     )
     for dest in "${!files[@]}"; do
         [ -f "${files[$dest]}" ] && cat "${files[$dest]}" > "$dest" && chmod 755 "$dest"
@@ -31,8 +32,14 @@ tmux配置检查() {
 }
 
 ffmpeg配置检查() {
-    type run_software &>/dev/null && { run_software "body/modules/ffmpeg.sh" || run_software "project-install/software/ffmpeg"; return; }
-    _run_module "body/modules/ffmpeg.sh" || _run_module "project-install/software/ffmpeg"
+    if ! type xrk_run_script &>/dev/null; then
+        type xrk_source_common &>/dev/null && xrk_source_common || {
+            # shellcheck source=/dev/null
+            [ -f "$XRK_ROOT/shell_modules/common.sh" ] && source "$XRK_ROOT/shell_modules/common.sh"
+        }
+    fi
+    type xrk_run_script &>/dev/null && xrk_run_script "project-install/software/ffmpeg" \
+        || _run_module "project-install/software/ffmpeg"
 }
 
 profile配置检查() {

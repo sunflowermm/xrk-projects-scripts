@@ -7,3 +7,4 @@ root="${XRK_ROOT:-/xrk}"
 }
 
 install_package() { install_pkg "$1"; }
+安装系统包() { install_package "$@"; }

@@ -1,5 +1,6 @@
 #!/bin/bash
 # GitHub 访问优化：
+# 插件菜单专用探测见 shell_modules/plugin_proxy.sh（含速度阈值）
 # - 中国大陆（detect_region=cn）：随机测试代理，命中一个可用就用（proxy/原URL）
 # - 海外（detect_region=overseas）：默认保持原样（如需强制可手动 proxy_num）
 
@@ -136,4 +137,12 @@ git() {
         fi
     done
     command git "${args[@]}"
+}
+
+# 浅克隆 GitHub 仓库（自动走 git() 加速包装）
+xrk_git_clone() {
+    local url="$1" dest="$2" depth="${3:-1}"
+    [ -z "$url" ] || [ -z "$dest" ] && return 1
+    command -v git &>/dev/null || return 1
+    git clone --depth="$depth" "$url" "$dest"
 }

@@ -5,7 +5,7 @@
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 XRK_BIN="${XRK_BIN:-/usr/local/bin}"
 _XRK_DEFAULT_RAW_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master"
-_XRK_DEFAULT_CLONE="https://gitcode.com/Xrkseek/xrk-projects-scripts.git"
+_XRK_DEFAULT_CLONE="https://gitee.com/xrkseek/xrk-projects-scripts.git"
 YZ_DEFAULT_NAME="XRK-Yunzai"
 YZ_DEFAULT_DIR="${HOME}/${YZ_DEFAULT_NAME}"
 

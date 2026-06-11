@@ -1,16 +1,11 @@
 #!/bin/bash
 
-# 切换到用户目录
 cd ~ || exit
 
-# 导入函数与变量（已克隆到 XRK_ROOT，直接使用本地）
 XRK_ROOT="${XRK_ROOT:-/xrk}"
-source "$XRK_ROOT/shell_modules/install.sh"
-source "$XRK_ROOT/shell_modules/Yunzai_pieces.sh"
-source "$XRK_ROOT/shell_modules/github.sh"
-source "$XRK_ROOT/shell_modules/init.sh"
-source "$XRK_ROOT/shell_modules/update.sh"
-
+# shellcheck source=/dev/null
+source "$XRK_ROOT/shell_modules/xrk_base.sh"
+xrk_加载底层 deploy
 
 install_and_configure_scripts() {
     安装xrk脚本
@@ -19,8 +14,8 @@ install_and_configure_scripts() {
 }
 
 main() {
-    install_package "git"
-    install_package "jq"
+    安装系统包 git
+    安装系统包 jq
     install_and_configure_scripts
     type xrkk同步 &>/dev/null && xrkk同步
     echo "[主流程] 脚本与命令已就绪。"

@@ -53,18 +53,10 @@ if ! command -v curl &>/dev/null; then
 fi
 
 # 3. bootstrap + common
-if [ -f /xrk/shell_modules/bootstrap.sh ]; then
-    source /xrk/shell_modules/bootstrap.sh
-else
-    case "${XRK_SOURCE#-}" in
-        1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
-        2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
-        3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
-    esac
-    source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")
-fi
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg "$XRK_SOURCE")}"
-export SCRIPT_RAW_BASE
+# shellcheck source=/dev/null
+[ -f /xrk/shell_modules/bootstrap.sh ] && source /xrk/shell_modules/bootstrap.sh \
+    || source <(curl -sL "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh")
+xrk_bootstrap "${XRK_SOURCE:-}"
 # shellcheck source=/dev/null
 source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
 ensure_cmd bash bash

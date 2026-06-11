@@ -2,15 +2,15 @@
 # Node.js 安装：使用最新 LTS，支持 x64/arm64/armv7l/ppc64le/s390x
 
 set -e
+XRK_ROOT="${XRK_ROOT:-/xrk}"
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
-[ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh")
-
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+if [ -f "${XRK_ROOT}/shell_modules/software_head.sh" ]; then
+    # shellcheck source=/dev/null
+    source "${XRK_ROOT}/shell_modules/software_head.sh"
+else
+    # shellcheck source=/dev/null
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/software_head.sh")
+fi
 
 # Node 官方支持：x64 arm64 armv7l ppc64le s390x
 arch=$(detect_arch)
@@ -21,13 +21,6 @@ esac
 
 LATEST_VERSION="$NODE_LTS_VERSION"
 MIN_MAJOR_VERSION=$(echo "$LATEST_VERSION" | sed 's/^v//' | cut -d'.' -f1)
-
-show_progress() {
-    local text="$1"
-    echo -ne "${BLUE}$text...${NC}"
-    while kill -0 $! 2>/dev/null; do echo -n "."; sleep 0.5; done
-    echo -e " ${GREEN}✓${NC}"
-}
 
 check_permission() {
     if [ ! -w "/usr/local/bin" ] && [ "$EUID" -ne 0 ]; then

@@ -2,17 +2,16 @@
 # FFmpeg 完整版安装：BtbN 构建，支持 Linux(x64/arm64) / macOS(x64/arm64)
 
 set -e
+XRK_ROOT="${XRK_ROOT:-/xrk}"
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
-[ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh")
-[ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/github.sh")
-
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'
+if [ -f "${XRK_ROOT}/shell_modules/software_head.sh" ]; then
+    # shellcheck source=/dev/null
+    source "${XRK_ROOT}/shell_modules/software_head.sh"
+else
+    # shellcheck source=/dev/null
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/software_head.sh")
+fi
 CYAN='\033[0;36m'
-NC='\033[0m'
 
 BUILD_TYPE="gpl"
 # BtbN 架构：64(x86_64) | arm64
@@ -27,13 +26,6 @@ case "$os" in
     linux|macos) ;;
     *) echo -e "${RED}不支持的系统: $(uname -s)${NC}"; exit 1 ;;
 esac
-
-show_progress() {
-    local text="$1"
-    echo -ne "${BLUE}$text...${NC}"
-    while kill -0 $! 2>/dev/null; do echo -n "."; sleep 0.5; done
-    echo -e " ${GREEN}✓${NC}"
-}
 
 check_permission() {
     if [ ! -w "/usr/local/bin" ] && [ "$EUID" -ne 0 ]; then

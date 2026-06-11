@@ -4,20 +4,11 @@
 # 主菜单：葵崽相关、脚本、NapCat、环境
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 cd "$HOME" || true
-source "$XRK_ROOT/shell_modules/repo_source.sh"
-source "$XRK_ROOT/shell_modules/update.sh"
-source "$XRK_ROOT/.init"
-source "$XRK_ROOT/shell_modules/menu_common.sh"
-red="${color_red:-\033[31m}"
-yz="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}"
+# shellcheck source=/dev/null
+source "$XRK_ROOT/shell_modules/xrk_main_head.sh"
 
-# 启动时自动写入 .profile（xrk 环境 + PUPPETEER_SKIP_DOWNLOAD），已有则跳过
-_profile="$HOME/.profile"
-[ -f "$_profile" ] || touch "$_profile"
-_init_line="[[ -f $XRK_ROOT/.init ]] && source $XRK_ROOT/.init"
-grep -Fxq "$_init_line" "$_profile" || echo "$_init_line" >> "$_profile"
-grep -Fxq "export PUPPETEER_SKIP_DOWNLOAD='true'" "$_profile" || echo "export PUPPETEER_SKIP_DOWNLOAD='true'" >> "$_profile"
-unset _profile _init_line
+# 启动时写入 .profile（委托 body/modules/profile.sh）
+XRK_PROFILE_QUIET=1 bash "$XRK_ROOT/body/modules/profile.sh" 2>/dev/null || true
 
 # 非 root 时以 root 重新执行本脚本，保证后续菜单与安装有权限
 if [ "$(whoami)" != "root" ]; then
@@ -81,11 +72,10 @@ show_menu() {
 MENU_OPT_COUNT=4
 while true; do
     show_menu
-    read -rp "请选择 [1-${MENU_OPT_COUNT}]，0/q 退出，r 更新脚本: " raw_choice
-    CHOICE=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    CHOICE=$(menu_read_choice "请选择 [1-${MENU_OPT_COUNT}]，0/q 退出，r 更新脚本: ") || exit 0
     clear_menu
     [ -z "$CHOICE" ] && continue
-    [ "$CHOICE" = "0" ] || [ "$CHOICE" = "q" ] && exit 0
+    menu_should_exit "$CHOICE" quit && exit 0
     case "$CHOICE" in
         1) bash "$XRK_ROOT/body/menu/kuizai.sh" ;;
         2) bash "$XRK_ROOT/body/menu/advanced.sh" ;;
@@ -100,7 +90,7 @@ while true; do
             exit 0
             ;;
         *)
-            echo -e "${red}无效选择${bg}"
+            menu_msg_err
             ;;
     esac
 done

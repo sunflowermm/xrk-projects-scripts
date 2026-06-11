@@ -1,84 +1,61 @@
 #!/bin/bash
 # js 插件（dialog 触屏版），目录 plugins/other
 root="${XRK_ROOT:-/xrk}"
-[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
-menu_init 1 0
-
-xrk="$HOME/xrk"
-YZ_PLUGINS_JS="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}/plugins/other"
+# shellcheck source=/dev/null
+source "$root/shell_modules/menu_head.sh" 1 1 js_plugins.sh
+xrk_js_init_paths
 jh="$YZ_PLUGINS_JS"
+xrk="$XRK_JS_REPO"
 
 menu_check_deps dialog 1
 
-move_vocal(){
-    local woaini=$1
-    local wogeng=$2
-    sleep 1
-    mkdir -p "$jh"
-
-    dialog --backtitle "$XRK_DIALOG_BACKTITLE" --infobox "正在检查 $woaini 安装状态..." 3 40
-    if [ -d "$yz/resources/$woaini" ]; then
-        dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "已经安装过 ${woaini} 了，正在跳过" 6 40
-    else
-        mv -f $xrk/shell-js/$woaini $yz/resources/
-    fi
-    
-    dialog --backtitle "$XRK_DIALOG_BACKTITLE" --infobox "正在检查 $wogeng 安装状态..." 3 40
-    if [ -d "$jh/$wogeng" ]; then
-        dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "已经安装过 ${wogeng} 了，正在跳过" 6 40
-    else
-        mv -f $xrk/shell-js/$wogeng $jh/
-    fi
-}
-
 select_js_plugins() {
-    local js_files=($(find "$xrk/shell-js/" -maxdepth 1 -type f -name "*.js" 2>/dev/null))
-    local options=""
-    local i=0
-    
+    mapfile -t js_files < <(xrk_js_list_files)
+    local options="" i=0 file basename selected_plugins selection selected_file
+
     for file in "${js_files[@]}"; do
         basename="${file##*/}"
         options="$options $i $basename off"
         ((i++))
     done
-    
-    local selected_plugins=$(dialog --separate-output \
-        --backtitle "$XRK_DIALOG_BACKTITLE" \
+
+    selected_plugins=$(xrk_dialog --separate-output \
         --checklist "选择要安装的插件:" \
         "$XRK_DIALOG_HEIGHT" "$XRK_DIALOG_WIDTH" 10 \
         $options \
         2>&1 >/dev/tty)
-    
+
     local selected_name_reply_js=false
-    
+
     for selection in $selected_plugins; do
-        if [[ $selection =~ ^[0-9]+$ ]] && [ $selection -ge 0 ] && [ $selection -lt ${#js_files[@]} ]; then
+        if [[ $selection =~ ^[0-9]+$ ]] && [ "$selection" -ge 0 ] && [ "$selection" -lt ${#js_files[@]} ]; then
             selected_file=${js_files[$selection]}
-            if [ "${selected_file##*/}" == "名称回复.js" ]; then
+            if [ "${selected_file##*/}" = "名称回复.js" ]; then
                 selected_name_reply_js=true
             fi
-            mv -n "$selected_file" $jh/
-            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --infobox "已安装 $(basename "$selected_file")" 3 40
+            mv -n "$selected_file" "$jh/"
+            xrk_dialog_infobox "已安装 $(basename "$selected_file")" 3 40
             sleep 1
         fi
     done
-    
+
     if [ "$selected_name_reply_js" = true ]; then
-        local bot_name=$(dialog --backtitle "$XRK_DIALOG_BACKTITLE" --inputbox "输入你想要的机器人名字:" \
+        local bot_name
+        bot_name=$(xrk_dialog --inputbox "输入你想要的机器人名字:" \
             8 40 \
             2>&1 >/dev/tty)
-            
+
         if [ $? -eq 0 ]; then
-            [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${bot_name}'/" "$jh/名称回复.js"
-            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "机器人名字已更新为: $bot_name" 6 40
+            xrk_js_set_name_reply "$bot_name" "$jh/名称回复.js" \
+                && xrk_dialog_msgbox "机器人名字已更新为: $bot_name" 6 40 \
+                || xrk_dialog_msgbox "名称无效或更新失败" 6 40
         fi
     fi
 }
 
 while true; do
     exec 3>&1
-    selection=$(dialog \
-        --backtitle "$XRK_DIALOG_BACKTITLE" \
+    selection=$(xrk_dialog \
         --title "js插件" \
         --clear \
         --cancel-label "退出" \
@@ -90,7 +67,7 @@ while true; do
         2>&1 1>&3)
     exit_status=$?
     exec 3>&-
-    
+
     case $exit_status in
         1|255)
             clear
@@ -98,26 +75,28 @@ while true; do
             exit 0
             ;;
     esac
-    
+
     case $selection in
         1)
-            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --infobox "正在克隆插件仓库..." 3 40
-            git clone --depth=1 https://gitcode.com/Xrkseek/collection-of-jses.git $xrk
-            select_js_plugins
-            chmod 755 $xrk
-            rm -rf $xrk
+            xrk_dialog_infobox "正在克隆插件仓库..." 3 40
+            if xrk_js_clone_repo "$xrk"; then
+                select_js_plugins
+            fi
+            chmod 755 "$xrk" 2>/dev/null || true
+            rm -rf "$xrk"
             ;;
         2)
-            dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "去下载xrk-plugin吧，见鬼吧你，还在这安装" 6 40
+            xrk_dialog_msgbox "去下载xrk-plugin吧，见鬼吧你，还在这安装" 6 40
             ;;
         3)
-            bot_name=$(dialog --backtitle "$XRK_DIALOG_BACKTITLE" --inputbox "输入你想要的机器人名字:" \
+            bot_name=$(xrk_dialog --inputbox "输入你想要的机器人名字:" \
                 8 40 \
                 2>&1 >/dev/tty)
-            
+
             if [ $? -eq 0 ]; then
-                [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${bot_name}'/" "$jh/名称回复.js"
-                dialog --backtitle "$XRK_DIALOG_BACKTITLE" --msgbox "机器人名字已更新为: $bot_name" 6 40
+                xrk_js_set_name_reply "$bot_name" "$jh/名称回复.js" \
+                    && xrk_dialog_msgbox "机器人名字已更新为: $bot_name" 6 40 \
+                    || xrk_dialog_msgbox "名称无效或更新失败" 6 40
             fi
             ;;
     esac

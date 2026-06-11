@@ -44,3 +44,10 @@ export bold_white="\033[1;37m"
 # 重置颜色
 export reset_color="\033[0m"
 export reset_all="\033[0m"
+
+# 简写别名（菜单/安装脚本复用，避免各处重复定义 RED/GREEN）
+export RED="${color_red}"
+export GREEN="${bold_green}"
+export YELLOW="${color_yellow}"
+export BLUE="${color_light_blue}"
+export NC="${reset_color}"

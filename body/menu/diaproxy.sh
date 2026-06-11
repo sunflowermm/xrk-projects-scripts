@@ -1,16 +1,14 @@
 #!/bin/bash
-# GitHub 代理切换（whiptail 触屏版），共用 github.sh 的 PROXIES
+# GitHub 代理切换（whiptail 触屏版）
 root="${XRK_ROOT:-/xrk}"
-[ -f "$root/.init" ] && source "$root/.init"
-[ -f "$root/shell_modules/github.sh" ] && source "$root/shell_modules/github.sh"
-[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
-menu_init 0 0
+# shellcheck source=/dev/null
+source "$root/shell_modules/menu_head.sh" 0 1 github.sh plugin_proxy.sh
 
-RED="$RED"
-GREEN="$GREEN"
-YELLOW="$YELLOW"
+RED="${RED:-\033[31m}"
+GREEN="${GREEN:-\033[1;32m}"
+YELLOW="${YELLOW:-\033[33m}"
 BLUE='\033[38;2;30;144;255m'
-NC="$NC"
+NC="${NC:-\033[0m}"
 
 export NEWT_COLORS='
 root=,black
@@ -22,21 +20,12 @@ actbutton=white,red
 title=blue,black
 '
 
-FILTER_DIRS=('example' 'other' 'system' 'adapter')
-
 show_loading() {
-    local message=$1
-    local frames=("◐" "◓" "◑" "◒")
-    local colors=("$BLUE" "$GREEN" "$YELLOW" "$BLUE")
-    local i=0
-    
-    (
-        while true; do
-            printf "\r${colors[i]}%s ${frames[i]} ${NC}" "$message"
-            i=$(( (i + 1) % 4 ))
-            sleep 0.12
-        done
-    ) &
+    local message=$1 frames=("◐" "◓" "◑" "◒") colors=("$BLUE" "$GREEN" "$YELLOW" "$BLUE") i=0
+    ( while true; do
+        printf "\r${colors[i]}%s ${frames[i]} ${NC}" "$message"
+        i=$(( (i + 1) % 4 )); sleep 0.12
+    done ) &
     SPIN_PID=$!
 }
 
@@ -45,207 +34,84 @@ stop_loading() {
     printf "\r%*s\r" $(($(tput cols))) ""
 }
 
-clean_url() {
-    local url=$1
-    url=$(echo "$url" | sed -E '
-        s|^https?://[^/]+/https://github\.com|https://github.com|;
-        s|^https?://[^/]+/github\.com|https://github.com|;
-        s|^https?://gh(proxy)?[.][^/]+/|https://|;
-        s|/$||
-    ')
-    echo "$url"
-}
-
 get_proxy() {
-    local var_name="$1"
-    local original_url="${!var_name}"
-    local clean_url=$(clean_url "$original_url")
-    local check_path="NapNeko/NapCatQQ/main/package.json"
-    local speed_threshold=2
-    local curl_timeout=3
-
-    local shuffled_proxies=($(printf "%s\n" "${PROXIES[@]}" | shuf))
-
-    echo -e "${BLUE}🔍 正在检测原始URL: ${clean_url}${NC}"
-
-    for proxy in "${shuffled_proxies[@]}"; do
-        [ -z "$proxy" ] && continue
-
-        local proxied_check_url="${proxy}/https://raw.githubusercontent.com/${check_path}"
-        local result
-        result=$(curl --silent --fail --max-time $curl_timeout -w "%{http_code} %{time_total}" -o /dev/null "$proxied_check_url")
-        local http_code=$(echo "$result" | awk '{print $1}')
-        local time_total=$(echo "$result" | awk '{print $2}')
-
-        if [ "$http_code" = "200" ]; then
-            if awk "BEGIN{exit($time_total<$speed_threshold?0:1)}"; then
-                echo -e "${GREEN}✨ 已找到最佳代理: ${proxy} (响应时间: ${time_total}s)${NC}"
-                echo "$proxy"
-                return 0
-            else
-                echo -e "${YELLOW}⚠️ 代理响应较慢(${time_total}s): ${proxy}${NC}"
-            fi
-        else
-            echo -e "${YELLOW}⚠️ 代理不可用: ${proxy}${NC}"
-        fi
-    done
+    local proxy
+    proxy=$(xrk_pick_best_proxy)
+    if [ -n "$proxy" ]; then
+        echo -e "${GREEN}✨ 已找到最佳代理: ${proxy}${NC}" >&2
+        echo "$proxy"
+        return 0
+    fi
     return 1
 }
 
 manage_plugins() {
-    local plugins_path="$yz/plugins"
-    
+    local plugins_path="$(xrk_yz_dir)/plugins" filtered_dirs=() menu_items=() selected_plugin selected_dir proxy
+
     while true; do
         if [ ! -d "$plugins_path" ]; then
-            whiptail --title "错误提示" \
-                    --msgbox "❌ 插件目录不存在，请检查路径" \
-                    8 40
+            whiptail --title "错误提示" --msgbox "❌ 插件目录不存在，请检查路径" 8 40
             exit 1
         fi
-        
-        local all_dirs=($(find "$plugins_path" -mindepth 1 -maxdepth 1 -type d 2>/dev/null))
-        local filtered_dirs=()
-        local menu_items=()
-        
-        for dir in "${all_dirs[@]}"; do
-            local base_name=$(basename "$dir")
-            local should_filter=false
-            
-            for filter in "${FILTER_DIRS[@]}"; do
-                if [ "$base_name" = "$filter" ]; then
-                    should_filter=true
-                    break
-                fi
-            done
-            
-            if [ "$should_filter" = false ]; then
-                filtered_dirs+=("$dir")
-                if [ -d "$dir/.git" ]; then
-                    menu_items+=("$base_name" "📦 Git仓库")
-                else
-                    menu_items+=("$base_name" "📁 普通目录")
-                fi
-            fi
-        done
-        
-        if [ ${#filtered_dirs[@]} -eq 0 ]; then
-            whiptail --title "提示信息" \
-                    --msgbox "📝 未找到可管理的插件" \
-                    8 40
-            exit 1
-        fi
-        
-        local selected_plugin
-        selected_plugin=$(whiptail --title "插件管理" \
-                                 --menu "请选择要操作的插件:" \
-                                 --ok-button "确定" \
-                                 --cancel-button "返回" \
-                                 15 60 8 \
-                                 "${menu_items[@]}" \
-                                 3>&1 1>&2 2>&3)
-        
-        [ $? -ne 0 ] && break
-        
-        local selected_dir
+
+        mapfile -t filtered_dirs < <(xrk_list_plugin_dirs "$plugins_path")
+        menu_items=()
         for dir in "${filtered_dirs[@]}"; do
-            if [ "$(basename "$dir")" = "$selected_plugin" ]; then
-                selected_dir="$dir"
-                break
+            if [ -d "$dir/.git" ]; then
+                menu_items+=("$(basename "$dir")" "📦 Git仓库")
+            else
+                menu_items+=("$(basename "$dir")" "📁 普通目录")
             fi
         done
-        
+
+        if [ ${#filtered_dirs[@]} -eq 0 ]; then
+            whiptail --title "提示信息" --msgbox "📝 未找到可管理的插件" 8 40
+            exit 1
+        fi
+
+        selected_plugin=$(whiptail --title "插件管理" --menu "请选择要操作的插件:" \
+            --ok-button "确定" --cancel-button "返回" 15 60 8 "${menu_items[@]}" 3>&1 1>&2 2>&3)
+        [ $? -ne 0 ] && break
+
+        selected_dir=""
+        for dir in "${filtered_dirs[@]}"; do
+            [ "$(basename "$dir")" = "$selected_plugin" ] && { selected_dir="$dir"; break; }
+        done
+
         if [ ! -d "$selected_dir/.git" ]; then
-            whiptail --title "错误提示" \
-                    --msgbox "❌ ${selected_plugin} 不是Git仓库，无法管理" \
-                    8 45
+            whiptail --title "错误提示" --msgbox "❌ ${selected_plugin} 不是Git仓库，无法管理" 8 45
             continue
         fi
-        
-        local current_url=$(cd "$selected_dir" && git config --get remote.origin.url)
-        if [ -z "$current_url" ]; then
-            whiptail --title "错误提示" \
-                    --msgbox "❌ 无法获取远程URL，请检查仓库配置" \
-                    8 45
-            continue
-        fi
-        current_url=$(clean_url "$current_url")
-        
+
         show_loading "🔄 正在扫描可用代理..."
-        local proxy=$(get_proxy "current_url")
+        proxy=$(get_proxy)
         stop_loading
-        
-        if [ $? -eq 0 ] && [ -n "$proxy" ]; then
-            if [[ "$current_url" == https://github.com/* ]]; then
-                local new_url="${proxy}/${current_url}"
-                if (cd "$selected_dir" && git config remote.origin.url "$new_url"); then
-                    show_loading "⬇️ 正在使用代理 ${proxy} 更新插件..."
-                    if (cd "$selected_dir" && git pull); then
-                        stop_loading
-                        whiptail --title "操作成功" \
-                                --msgbox "✅ 已成功使用代理 ${proxy} 更新插件！" \
-                                8 60
-                    else
-                        stop_loading
-                        whiptail --title "错误提示" \
-                                --msgbox "❌ 使用代理 ${proxy} 更新失败，请重试" \
-                                8 60
-                    fi
-                fi
+
+        if [ -n "$proxy" ]; then
+            show_loading "⬇️ 正在使用代理 ${proxy} 更新插件..."
+            if xrk_apply_github_proxy "$selected_dir" "$proxy"; then
+                stop_loading
+                whiptail --title "操作成功" --msgbox "✅ 已成功使用代理 ${proxy} 更新插件！" 8 60
             else
-                whiptail --title "提示信息" \
-                        --msgbox "ℹ️ 当前URL不是GitHub链接，无法应用代理" \
-                        8 45
+                stop_loading
+                whiptail --title "错误提示" --msgbox "❌ 使用代理 ${proxy} 更新失败，请重试" 8 60
             fi
         else
-            whiptail --title "错误提示" \
-                    --msgbox "❌ 未能找到可用的代理服务器" \
-                    8 40
+            whiptail --title "错误提示" --msgbox "❌ 未能找到可用的代理服务器" 8 40
         fi
     done
-}
-
-function git() {
-    local args=("$@")
-    local proxied=false
-    
-    for ((i=0; i<${#args[@]}; i++)); do
-        if [[ "${args[i]}" == https://github.com/* || "${args[i]}" == https://raw.githubusercontent.com/* ]]; then
-            args[i]=$(clean_url "${args[i]}")
-            
-            show_loading "🔄 正在获取最快代理..."
-            local proxy=$(get_proxy "args[$i]")
-            stop_loading
-            
-            if [ $? -eq 0 ] && [ -n "$proxy" ]; then
-                args[$i]="${proxy}/${args[i]}"
-                proxied=true
-                echo -e "${GREEN}✅ 已启用代理: ${proxy}${NC}"
-            fi
-            break
-        fi
-    done
-    
-    if [ "$proxied" = true ]; then
-        command git "${args[@]}"
-    else
-        command git "$@"
-    fi
 }
 
 clear
-if whiptail --title "GitHub 代理优化工具" \
-            --yes-button "启动" \
-            --no-button "关闭" \
-            --yesno "
+if whiptail --title "GitHub 代理优化工具" --yes-button "启动" --no-button "关闭" --yesno "
         🚀 GitHub 代理切换工具
-            
+
 ✨ 主要功能:
  • 智能检测最快代理
  • 一键切换代理设置
  • 优化访问速度
- 
-🔄 开始优化之旅?" \
-            15 48; then
+
+🔄 开始优化之旅?" 15 48; then
     manage_plugins
 fi
 clear

@@ -6,7 +6,7 @@
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}}"
 [ -z "$SCRIPT_CLONE_URL" ] && type get_clone_from_raw &>/dev/null && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"
-[ -z "$SCRIPT_CLONE_URL" ] && SCRIPT_CLONE_URL="${_XRK_DEFAULT_CLONE:-https://gitcode.com/Xrkseek/xrk-projects-scripts.git}"
+[ -z "$SCRIPT_CLONE_URL" ] && SCRIPT_CLONE_URL="${_XRK_DEFAULT_CLONE:-https://gitee.com/xrkseek/xrk-projects-scripts.git}"
 export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_ROOT
 
 克隆脚本() {
@@ -35,51 +35,44 @@ export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_ROOT
     fi
 }
 
-# 检测已安装葵崽(XRK-Yunzai)，若存在则询问是否删除后继续
+# 检测已安装葵崽，若存在则询问是否删除后继续
 检测葵崽存在魔法() {
     source "$XRK_ROOT/shell_modules/init.sh"
     check_changes
     search_directories
-    if [ -n "${xyz:-}" ] || [ -n "${yz:-}" ]; then
-        read -rp "检测到已安装葵崽(XRK-Yunzai)，是否删除并继续脚本 (是/否)： " user_input
-        case "$user_input" in
-            "是")
-                to_del="${yz:-$xyz}"
-                [ -z "$to_del" ] && to_del="${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}"
-                if [ -z "$to_del" ] || [ ! -d "$to_del" ]; then
-                    echo -e "${color_red}未找到葵崽路径，无法删除${reset_color}"
-                    exit 1
-                fi
-                echo -e "${color_light_blue}正在删除葵崽...${reset_color}"
-                if rm -rf "$to_del"; then
-                    echo -e "${color_light_green}葵崽已成功删除${reset_color}"
-                else
-                    echo -e "${color_red}删除葵崽失败${reset_color}"
-                    exit 1
-                fi
-                ;;
-            *)
-                echo -e "${color_red}操作取消，退出脚本${reset_color}"
-                exit 1
-                ;;
-        esac
+    [ -z "${xyz:-}" ] && [ -z "${yz:-}" ] && return 0
+    if ! xrk_confirm "检测到已安装葵崽(XRK-Yunzai)，是否删除并继续脚本 (是/否)" '^(是|[Yy])$'; then
+        echo -e "${color_red}操作取消，退出脚本${reset_color}"
+        exit 1
     fi
+    local to_del="${yz:-$xyz}"
+    [ -z "$to_del" ] && to_del="${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}"
+    if [ ! -d "$to_del" ]; then
+        echo -e "${color_red}未找到葵崽路径，无法删除${reset_color}"
+        exit 1
+    fi
+    echo -e "${color_light_blue}正在删除葵崽...${reset_color}"
+    rm -rf "$to_del" && echo -e "${color_light_green}葵崽已成功删除${reset_color}" \
+        || { echo -e "${color_red}删除葵崽失败${reset_color}"; exit 1; }
 }
 
 检测npm-node-pnpm安装() {
-    if type run_software &>/dev/null && [ -f "$XRK_ROOT/project-install/software/node" ]; then
-        run_software "project-install/software/node"
-        run_software "project-install/software/pnpm"
-    elif [ -f "$XRK_ROOT/project-install/software/node" ]; then
-        bash "$XRK_ROOT/project-install/software/node"
-        bash "$XRK_ROOT/project-install/software/pnpm"
-    else
-        bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/node")
-        bash <(curl -sL "$SCRIPT_RAW_BASE/project-install/software/pnpm")
-    fi
+    type xrk_run_script &>/dev/null || type run_software &>/dev/null || true
+    local _run=run_software
+    type xrk_run_script &>/dev/null && _run=xrk_run_script
+    "$_run" "project-install/software/node"
+    "$_run" "project-install/software/pnpm"
 }
 
 检测redis安装() {
+    if ! command -v redis-server &>/dev/null; then
+        echo -e "${color_light_yellow:-${color_yellow:-\033[33m}}未检测到 redis-server，尝试安装...${reset_color}"
+        type install_package &>/dev/null && install_package redis || 安装包 redis || true
+    fi
+    if ! command -v redis-server &>/dev/null; then
+        echo -e "${color_red}Redis 未安装，请手动安装 redis${reset_color}"
+        return 1
+    fi
     echo -e "${color_light_blue}正在启动 Redis 服务...${reset_color}"
     redis-server --daemonize yes --save 900 1 --save 300 10
 }
@@ -98,7 +91,7 @@ export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_ROOT
     if [[ -d "$yz_dir" ]]; then
         echo -e "${color_light_blue}正在安装 $name 依赖...${reset_color}"
         cd "$yz_dir" || exit
-        git clone --depth=1 https://github.com/yoimiya-kokomi/miao-plugin.git ./plugins/miao-plugin/
+        xrk_git_clone "https://github.com/yoimiya-kokomi/miao-plugin.git" "./plugins/miao-plugin/"
         git clone https://gitee.com/TimeRainStarSky/Yunzai-genshin.git ./plugins/genshin/
         export PUPPETEER_SKIP_DOWNLOAD='true'
         pnpm update puppeteer@19.8.3 -w

@@ -1,7 +1,7 @@
 #!/bin/bash
 root="${XRK_ROOT:-/xrk}"
-[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
-menu_init 0 1  # 初始化：不需要common，需要check_changes（检测xyz路径，.init会加载init.sh）
+# shellcheck source=/dev/null
+source "$root/shell_modules/menu_head.sh" 0 1
 
 # 显示帮助信息
 show_help() {
@@ -17,14 +17,15 @@ show_help() {
 if [[ "$1" == "--h" || "$1" == "-h" ]]; then
   show_help
 fi
-echo "正在启动葵崽"
-redis-server --daemonize yes --save 900 1 --save 300 10
 
-# 根据是否有参数决定执行方式
+_yz="$(xrk_yz_dir)"
+[ -d "$_yz" ] || { echo "未找到葵崽目录: $_yz"; exit 1; }
+
+echo "正在启动葵崽"
+redis-server --daemonize yes --save 900 1 --save 300 10 2>/dev/null || true
+
 if [ -z "$1" ]; then
-  # 无参数时，按原来方式执行
-  cd $xyz && node --expose-gc app
+  cd "$_yz" && node --expose-gc app
 else
-  # 有参数时，将参数传递给node app
-  cd $xyz && node --expose-gc app "$1"
+  cd "$_yz" && node --expose-gc app "$1"
 fi

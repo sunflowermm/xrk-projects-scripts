@@ -105,6 +105,104 @@ ensure_cmd() {
     install_pkg "$pkg"
 }
 
+# 卸载系统包（供 errorbg、xrkk 等复用）
+remove_pkg() {
+    local pkg="$1" os
+    [ -z "$pkg" ] && return 1
+    os=$(detect_os)
+    case "$os" in
+        termux)   pkg uninstall -y "$pkg" 2>/dev/null ;;
+        debian|ubuntu) apt-get remove --purge -y "${pkg}"* 2>/dev/null; apt-get autoremove -y 2>/dev/null ;;
+        centos|opensuse) command -v dnf &>/dev/null && dnf remove -y "${pkg}"* 2>/dev/null || yum remove -y "${pkg}"* 2>/dev/null ;;
+        arch) pacman -Rns --noconfirm "$pkg" 2>/dev/null ;;
+        alpine) apk del "$pkg" 2>/dev/null ;;
+        *) return 1 ;;
+    esac
+}
+
+remove_pkgs() {
+    local pkg
+    for pkg in "$@"; do remove_pkg "$pkg"; done
+}
+
+install_pkgs() {
+    local pkg
+    for pkg in "$@"; do install_pkg "$pkg" || return 1; done
+}
+
+# 系统更新（葵崽发行版安装等复用）
+# 用法：system_update [ubuntu|debian|arch|centos|opensuse|alpine|generic]
+system_update() {
+    local os="${1:-$(detect_os)}"
+    case "$os" in
+        ubuntu)   apt update -qq && apt upgrade -y ;;
+        debian)   apt-get update -qq && apt-get upgrade -y ;;
+        arch)     pacman -Syu --noconfirm ;;
+        centos)   command -v dnf &>/dev/null && dnf update -y || yum update -y ;;
+        opensuse) zypper -n refresh && zypper -n update -y ;;
+        alpine)   apk update && apk upgrade -y ;;
+        generic)  return 0 ;;
+        *)        return 1 ;;
+    esac
+}
+
+# NapCat 等仅支持 apt/dnf 的场景（无 dnf 时回退 yum）
+detect_apt_dnf_pm() {
+    local os
+    os=$(detect_os)
+    case "$os" in
+        debian|ubuntu) echo "apt-get"; return 0 ;;
+        centos|rhel|fedora|rocky|almalinux)
+            command -v dnf &>/dev/null && echo "dnf" && return 0
+            command -v yum &>/dev/null && echo "yum" && return 0
+            return 1
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# 首跳安装 curl（install_xm 等）
+ensure_curl() {
+    command -v curl &>/dev/null && return 0
+    if command -v apt-get &>/dev/null; then
+        apt-get update -qq && apt-get install -y curl
+    elif command -v yum &>/dev/null; then
+        yum install -y curl
+    elif command -v dnf &>/dev/null; then
+        dnf install -y curl
+    elif command -v pacman &>/dev/null; then
+        pacman --disable-sandbox -Sy --noconfirm curl
+    else
+        return 1
+    fi
+    command -v curl &>/dev/null
+}
+
+# 标准加载 common（本地 /xrk 优先，否则远程；可重复调用）
+xrk_source_common() {
+    type detect_os &>/dev/null && return 0
+    local root="${XRK_ROOT:-/xrk}"
+    SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}}"
+    export SCRIPT_RAW_BASE
+    if type load_module &>/dev/null; then
+        load_module "shell_modules/common.sh" && return 0
+    fi
+    if [ -f "$root/shell_modules/common.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$root/shell_modules/common.sh"
+        return 0
+    fi
+    # shellcheck source=/dev/null
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
+}
+
+# 软件/模块安装脚本标准入口：common + versions + github + 颜色
+xrk_init_software() {
+    xrk_source_common
+    load_install_deps
+    xrk_colors 2>/dev/null || true
+}
+
 _xrk_is_tty() { [ -t 1 ] && [ -n "${TERM:-}" ]; }
 _xrk_has() { command -v "$1" >/dev/null 2>&1; }
 
@@ -232,4 +330,128 @@ change_source_linux_auto() {
     . /etc/os-release
     [ "$ID" = "ubuntu" ] && [ -f /etc/apt/sources.list ] && sed -i 's/ports.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list 2>/dev/null
     [ "$ID" = "debian" ] && [ -f /etc/apt/sources.list ] && sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list 2>/dev/null
+}
+
+# 加载软件安装脚本常用依赖（common 已由调用方 source，此处补 versions + github）
+load_install_deps() {
+    local root="${XRK_ROOT:-/xrk}"
+    if type load_module &>/dev/null; then
+        load_module "shell_modules/versions.sh"
+        load_module "shell_modules/github.sh"
+        return 0
+    fi
+    local base="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}}"
+    [ -f "$root/shell_modules/versions.sh" ] && source "$root/shell_modules/versions.sh" \
+        || source <(curl -sL "$base/shell_modules/versions.sh")
+    [ -f "$root/shell_modules/github.sh" ] && source "$root/shell_modules/github.sh" \
+        || source <(curl -sL "$base/shell_modules/github.sh")
+}
+
+# 从调用栈向上查找脚本仓库根目录（含 shell_modules/common.sh）
+_xrk_script_repo_root() {
+    local root="${XRK_ROOT:-/xrk}" dir script depth=0
+    [ -f "$root/shell_modules/common.sh" ] && { echo "$root"; return 0; }
+    for script in "${BASH_SOURCE[@]}"; do
+        [[ "$script" == /dev/fd/* ]] && continue
+        dir="$(cd "$(dirname "$script")" 2>/dev/null && pwd)" || continue
+        depth=0
+        while [ "$dir" != "/" ] && [ "$depth" -lt 10 ]; do
+            [ -f "$dir/shell_modules/common.sh" ] && { echo "$dir"; return 0; }
+            dir="$(dirname "$dir")"
+            depth=$((depth + 1))
+        done
+    done
+    return 1
+}
+
+# 统一脚本执行：本地优先，远程 curl 兜底，带重试
+# 用法：xrk_run_script <repo内路径> [参数...]
+xrk_run_script() {
+    local path="$1"
+    shift
+    local args=("$@") base="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}}"
+    local retry=0 max_retries=3 repo_root
+
+    repo_root=$(_xrk_script_repo_root 2>/dev/null) || repo_root=""
+    [ -n "$repo_root" ] && [ -f "${repo_root}/${path}" ] && { bash "${repo_root}/${path}" "${args[@]}"; return $?; }
+
+    while [ "$retry" -lt "$max_retries" ]; do
+        if bash <(curl -sL --connect-timeout 10 --max-time 60 "$base/$path" 2>/dev/null) "${args[@]}"; then
+            return 0
+        fi
+        retry=$((retry + 1))
+        [ "$retry" -lt "$max_retries" ] && sleep 2
+    done
+    echo -e "\033[31m[错误] 远程执行失败: $base/$path\033[0m" >&2
+    return 1
+}
+
+# 交互确认（deploy 等未加载 menu_common 时使用）
+xrk_confirm() {
+    local msg="$1" re="${2:-^[Yy]$}" ans
+    read -rp "$msg " ans
+    [[ "$ans" =~ $re ]]
+}
+
+# 下载 GitHub release 二进制到 /usr/local/bin
+# 用法：xrk_install_github_binary <owner/repo> <version> <binary_name> <dest_cmd>
+xrk_install_github_binary() {
+    local repo="$1" version="$2" binary_name="$3" dest_name="${4:-}"
+    local url dest_path tmp_ver
+
+    [ -z "$repo" ] || [ -z "$version" ] || [ -z "$binary_name" ] && return 1
+    if [ -z "$dest_name" ]; then
+        case "$binary_name" in
+            pnpm-linux-*) dest_name="pnpm" ;;
+            yq_linux_*) dest_name="yq" ;;
+            *) dest_name="${binary_name%%_linux*}"; dest_name="${dest_name#pnpm-}" ;;
+        esac
+    fi
+    dest_path="/usr/local/bin/$dest_name"
+
+    if command -v "$dest_name" &>/dev/null; then
+        tmp_ver=$("$dest_name" --version 2>/dev/null || "$dest_name" -v 2>/dev/null || true)
+        echo -e "\033[0;32m${dest_name} 已安装: ${tmp_ver}\033[0m"
+        return 0
+    fi
+
+    url="https://github.com/${repo}/releases/download/${version}/${binary_name}"
+    cd "$HOME" || return 1
+    echo "开始安装 ${dest_name} ${version}..."
+    xrk_download "$url" "$binary_name" 3 || { echo "下载失败"; return 1; }
+    sudo mv "$binary_name" "$dest_path" && sudo chmod 755 "$dest_path"
+    rm -f "$binary_name" 2>/dev/null
+
+    if command -v "$dest_name" &>/dev/null; then
+        tmp_ver=$("$dest_name" --version 2>/dev/null || "$dest_name" -v 2>/dev/null || true)
+        echo -e "\033[0;32m${dest_name} ${tmp_ver} 安装成功\033[0m"
+        return 0
+    fi
+    echo -e "\033[0;31m${dest_name} 安装失败\033[0m"
+    return 1
+}
+
+# 后台任务进度指示（node/ffmpeg 等安装脚本复用）
+show_progress() {
+    local text="$1"
+    local blue='\033[0;34m' green='\033[0;32m' nc='\033[0m'
+    echo -ne "${blue}${text}...${nc}"
+    while kill -0 "${2:-$!}" 2>/dev/null; do echo -n "."; sleep 0.5; done
+    echo -e " ${green}✓${nc}"
+}
+
+# 导出简写颜色变量（供菜单/安装脚本复用 color.sh）
+xrk_colors() {
+    [ -n "${RED:-}" ] && return 0
+    if [ -f "${XRK_ROOT:-/xrk}/shell_modules/color.sh" ]; then
+        # shellcheck source=/dev/null
+        source "${XRK_ROOT:-/xrk}/shell_modules/color.sh"
+        return 0
+    fi
+    RED="${RED:-\033[31m}"
+    GREEN="${GREEN:-\033[1;32m}"
+    YELLOW="${YELLOW:-\033[33m}"
+    BLUE="${BLUE:-\033[1;36m}"
+    NC="${NC:-\033[0m}"
+    export RED GREEN YELLOW BLUE NC
 }

@@ -1,12 +1,14 @@
 #!/bin/bash
 # pnpm 安装：使用 versions.sh 版本，支持 x64/arm64
-
-command -v pnpm &>/dev/null && { echo -e "\033[0;32mpnpm 已安装: $(pnpm -v)\033[0m"; exit 0; }
-
+XRK_ROOT="${XRK_ROOT:-/xrk}"
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
-[ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh")
-[ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/github.sh")
+if [ -f "${XRK_ROOT}/shell_modules/software_head.sh" ]; then
+    # shellcheck source=/dev/null
+    source "${XRK_ROOT}/shell_modules/software_head.sh"
+else
+    # shellcheck source=/dev/null
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/software_head.sh")
+fi
 
 arch=$(detect_arch_raw)
 case "$arch" in
@@ -15,17 +17,5 @@ case "$arch" in
     *) echo -e "\033[0;31m不支持的架构: $arch（pnpm 仅支持 x64/arm64）\033[0m"; exit 1 ;;
 esac
 
-url="https://github.com/pnpm/pnpm/releases/download/$PNPM_VERSION/$pnpm_bin"
-cd "$HOME" || exit 1
-echo "开始安装 pnpm $PNPM_VERSION..."
-xrk_download "$url" "$pnpm_bin" 3 || { echo "下载失败"; exit 1; }
-sudo mv "$pnpm_bin" /usr/local/bin/pnpm && sudo chmod 755 /usr/local/bin/pnpm
-rm -f "$pnpm_bin" 2>/dev/null
-if pnpm -v &>/dev/null; then
-    echo -e "\033[0;32mpnpm $(pnpm -v) 安装成功\033[0m"
-    # 安装完成后统一走 JS 换源逻辑（npm/pnpm 都照顾到）
-    type xrk_setup_js_mirrors &>/dev/null && xrk_setup_js_mirrors
-else
-    echo -e "\033[0;31mpnpm 安装失败\033[0m"
-    exit 1
-fi
+xrk_install_github_binary "pnpm/pnpm" "$PNPM_VERSION" "$pnpm_bin" "pnpm" \
+    && type xrk_setup_js_mirrors &>/dev/null && xrk_setup_js_mirrors

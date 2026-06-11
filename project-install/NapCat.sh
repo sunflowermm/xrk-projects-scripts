@@ -22,10 +22,13 @@ fi
 # 初始化安装环境（如果 install_script_common.sh 加载成功，默认 3=Gitee，与全局一致）
 type init_install_env &>/dev/null && init_install_env "${XRK_SOURCE:-3}" || true
 
-# 颜色（github.sh 已有 RED/GREEN/YELLOW/NC，此处补足）
+type xrk_colors &>/dev/null && xrk_colors 2>/dev/null || true
 CYAN='\033[0;1;36;96m'
 BLUE='\033[0;1;34;94m'
 NC="${NC:-\033[0m}"
+RED="${RED:-\033[31m}"
+GREEN="${GREEN:-\033[1;32m}"
+YELLOW="${YELLOW:-\033[33m}"
 
 TARGET_FOLDER="/opt/QQ/resources/app/app_launcher"
 
@@ -60,19 +63,19 @@ function get_system_arch() {
     log "当前系统架构: ${system_arch}"
 }
 
-# 包管理器检测：优先用 common.detect_os，否则按命令存在判断
+# 包管理器检测：委托 common.detect_apt_dnf_pm
 function set_package_tool() {
-    if type detect_os &>/dev/null; then
-        case "$(detect_os)" in
-            debian|ubuntu) package_manager="apt-get"; package_installer="dpkg" ;;
-            centos|rhel|fedora|rocky|almalinux) package_manager="dnf"; package_installer="rpm" ;;
-            *) log "目前仅支持 apt-get/dnf"; exit 1 ;;
-        esac
+    if type detect_apt_dnf_pm &>/dev/null; then
+        package_manager=$(detect_apt_dnf_pm) || { log "目前仅支持 apt-get/dnf"; exit 1; }
     else
-        command -v apt-get &>/dev/null && { package_manager="apt-get"; package_installer="dpkg"; return; }
-        command -v dnf &>/dev/null && { package_manager="dnf"; package_installer="rpm"; return; }
-        log "未找到 apt-get/dnf"; exit 1
+        command -v apt-get &>/dev/null && package_manager="apt-get" \
+            || command -v dnf &>/dev/null && package_manager="dnf" \
+            || { log "未找到 apt-get/dnf"; exit 1; }
     fi
+    case "$package_manager" in
+        apt-get) package_installer="dpkg" ;;
+        dnf) package_installer="rpm" ;;
+    esac
     log "当前包管理器: ${package_manager}"
 }
 

@@ -3,10 +3,17 @@
 
 cd "$HOME" || exit
 
-# 支持远程执行：bash <(curl -sL https://raw.gitcode.com/.../chromium)
+XRK_ROOT="${XRK_ROOT:-/xrk}"
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
+if [ -f "${XRK_ROOT}/shell_modules/software_head.sh" ]; then
+    # shellcheck source=/dev/null
+    source "${XRK_ROOT}/shell_modules/software_head.sh"
+else
+    # shellcheck source=/dev/null
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/software_head.sh")
+fi
 
-# 颜色定义
+# 颜色定义（保留本脚本专用格式，与 xrk_colors 并存）
 RED="\033[31m"
 GREEN="\033[32m"
 YELLOW="\033[33m"

@@ -1,18 +1,10 @@
 #!/bin/bash
 # 插件菜单：安装/管理插件、Python 环境、代理
 root="${XRK_ROOT:-/xrk}"
-[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
-menu_init 1 0  # 初始化：需要common（install_pkg），不需要check_changes
-YZ_DIR="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}"
+# shellcheck source=/dev/null
+source "$root/shell_modules/menu_head.sh" 1 1 github.sh
+YZ_DIR="$(xrk_yz_dir)"
 MENU_DIR="$YZ_DIR/plugins/XRK-plugin/resources/plugins"
-
-# 确保 github.sh 可用：统一 GitHub 加速（git 包装 + getgh），避免各处重复判断
-_PLUGIN_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-type getgh &>/dev/null || {
-    [ -f "$root/shell_modules/github.sh" ] && source "$root/shell_modules/github.sh" \
-        || source <(curl -sL "${_PLUGIN_RAW_BASE}/shell_modules/github.sh" 2>/dev/null) 2>/dev/null \
-        || true
-}
 
 CATEGORIES=(
     "推荐插件:recommended_plugins.json"
@@ -40,7 +32,7 @@ install_python_env() {
     else
         echo -e "${red}未找到 python_uv 模块${bg}"
     fi
-    read -rp "按Enter继续..." _
+    menu_pause "按Enter继续..."
 }
 
 # 加载插件数据（使用统一文件检查）
@@ -124,8 +116,7 @@ show_dialog_plugins() {
         fi
     done < <(load_plugins "$category_file")
     
-    dialog --title "向日葵插件安装 - $category_name" \
-           --backtitle "$XRK_DIALOG_BACKTITLE" \
+    xrk_dialog --title "向日葵插件安装 - $category_name" \
            --checklist "请选择要安装的插件 [空格选择，回车确认]：" 20 70 15 \
            "${options[@]}" 2>/tmp/plugin_selections
            
@@ -164,11 +155,13 @@ show_text_plugins() {
             fi
         done < <(load_plugins "$category_file")
         menu_show "${category_name} 插件" "${plugin_names[@]}"
-        read -rp "请选择 [1-${MENU_OPT_COUNT}] 多选用空格，0 返回: " raw_sel
-        selections=$(echo "$raw_sel" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-        [ "$selections" = "0" ] || [ "$selections" = "q" ] && break
+        raw_sel=$(menu_read_choice "请选择 [1-${MENU_OPT_COUNT}] 多选用空格，0 返回: ") || break
+        [ -z "$raw_sel" ] && break
+        first=$(echo "$raw_sel" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+        [ "$first" = "0" ] || [ "$first" = "q" ] && break
         
-        for selection in $selections; do
+        for selection in $raw_sel; do
+            selection=$(echo "$selection" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
             if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${MENU_OPT_COUNT}" ]; then
                 IFS="|" read -r cn_name name description git <<< "${plugins_data[$selection-1]}"
                 
@@ -180,11 +173,7 @@ show_text_plugins() {
             fi
         done
         
-        echo -e "${caidan2}是否继续安装此类别的其他插件? (y/n)${bg}"
-        read -r continue_install
-        if [[ "$continue_install" != "y" ]]; then
-            break
-        fi
+        menu_confirm "是否继续安装此类别的其他插件? (y/n)" || break
     done
 }
 
@@ -198,17 +187,17 @@ main() {
     while true; do
         clear
         show_main_menu
-        read -rp "请选择 [0-${MENU_OPT_COUNT}]: " raw_choice
-        choice=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-        [ "$choice" = "0" ] || [ "$choice" = "q" ] && { echo -e "${caidan2}感谢使用，再见！${bg}"; run_pnpm_install; exit 0; }
+        choice=$(menu_read_choice "请选择 [0-${MENU_OPT_COUNT}]，0/q 退出: ") || exit 0
+        menu_should_exit "$choice" quit && { echo -e "${caidan2}感谢使用，再见！${bg}"; run_pnpm_install; exit 0; }
         case "$choice" in
             1|2)
                 clear
                 show_plugin_selection
-                read -rp "请选择类别 [0-${MENU_OPT_COUNT}]: " raw_cat
-                category_choice=$(echo "$raw_cat" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-                if [ -z "$category_choice" ] || [ "$category_choice" = "0" ] || [ "$category_choice" = "q" ]; then
-                    echo -e "${red}已取消${bg}"; sleep 2
+                raw_cat=$(menu_read_choice "请选择类别 [0-${MENU_OPT_COUNT}]，0 返回: ") || continue
+                category_choice=$(menu_normalize_choice "$raw_cat")
+                if menu_should_exit "$category_choice" quit; then
+                    menu_msg_warn "已取消"
+                    sleep 2
                 elif [[ "$category_choice" =~ ^[0-9]+$ ]] && [ "$category_choice" -ge 1 ] && [ "$category_choice" -le "${MENU_OPT_COUNT}" ]; then
                     IFS=":" read -r category_name category_file <<< "${CATEGORIES[$category_choice-1]}"
                     if [ "$choice" = "1" ]; then
@@ -219,7 +208,8 @@ main() {
                     clear
                     run_pnpm_install
                 else
-                    echo -e "${red}无效选择${bg}"; sleep 2
+                    menu_msg_err "无效选择"
+                    sleep 2
                 fi
                 ;;
             3)
@@ -261,7 +251,7 @@ main() {
                 clear
                 ;;
             *)
-                echo -e "${red}无效选择 [0-${MENU_OPT_COUNT}]${bg}"
+                menu_msg_err "无效选择 [0-${MENU_OPT_COUNT}]"
                 sleep 1
                 ;;
         esac

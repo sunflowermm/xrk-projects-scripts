@@ -34,14 +34,8 @@ _termux_ensure_deps() {
 _termux_ensure_deps
 
 # 首次引导
-case "${XRK_SOURCE#-}" in
-    1) _BOOT_BASE="https://raw.gitcode.com/Xrkseek/xrk-projects-scripts/raw/main" ;;
-    2) _BOOT_BASE="https://raw.githubusercontent.com/sunflowermm/xrk-projects-scripts/main" ;;
-    3|*) _BOOT_BASE="https://gitee.com/xrkseek/xrk-projects-scripts/raw/master" ;;
-esac
-source <(curl -sL "${_BOOT_BASE}/shell_modules/bootstrap.sh")
-SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$(get_base_from_arg "$XRK_SOURCE")}"
-export SCRIPT_RAW_BASE XRK_SOURCE
+source <(curl -sL "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh")
+xrk_bootstrap "$XRK_SOURCE" 1
 source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/Termux.sh")
 
 case "$1" in

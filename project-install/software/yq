@@ -1,12 +1,14 @@
 #!/bin/bash
 # yq 安装：使用 versions.sh 版本，支持 amd64/arm64
-
-command -v yq &>/dev/null && { echo -e "\033[0;32myq 已安装: $(yq --version)\033[0m"; exit 0; }
-
+XRK_ROOT="${XRK_ROOT:-/xrk}"
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-[ -f /xrk/shell_modules/common.sh ] && source /xrk/shell_modules/common.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
-[ -f /xrk/shell_modules/versions.sh ] && source /xrk/shell_modules/versions.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/versions.sh")
-[ -f /xrk/shell_modules/github.sh ] && source /xrk/shell_modules/github.sh || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/github.sh")
+if [ -f "${XRK_ROOT}/shell_modules/software_head.sh" ]; then
+    # shellcheck source=/dev/null
+    source "${XRK_ROOT}/shell_modules/software_head.sh"
+else
+    # shellcheck source=/dev/null
+    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/software_head.sh")
+fi
 
 arch=$(detect_arch_raw)
 case "$arch" in
@@ -15,10 +17,4 @@ case "$arch" in
     *) echo -e "\033[0;31m不支持的架构: $arch\033[0m"; exit 1 ;;
 esac
 
-url="https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/$binary_name"
-cd "$HOME" || exit 1
-echo "开始安装 yq $YQ_VERSION..."
-xrk_download "$url" "$binary_name" 3 || { echo "下载失败"; exit 1; }
-sudo mv "$binary_name" /usr/local/bin/yq && sudo chmod 755 /usr/local/bin/yq
-rm -f "$binary_name" 2>/dev/null
-yq --version &>/dev/null && echo -e "\033[0;32myq $(yq --version) 安装成功\033[0m" || { echo -e "\033[0;31myq 安装失败\033[0m"; exit 1; }
+xrk_install_github_binary "mikefarah/yq" "$YQ_VERSION" "$binary_name" "yq"

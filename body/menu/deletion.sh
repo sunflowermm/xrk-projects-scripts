@@ -1,8 +1,9 @@
 #!/bin/bash
 # 文件/目录管理：插件、js、Bot、自定义目录删除
 root="${XRK_ROOT:-/xrk}"
-[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
-menu_init 0 0  # 初始化：不需要common，不需要check_changes
+# shellcheck source=/dev/null
+source "$root/shell_modules/menu_head.sh" 0 1 deletion_common.sh
+xrk_deletion_paths
 
 function show_menu() {
     local title="${1:-文件管理}"
@@ -22,24 +23,13 @@ function delete_files() {
         echo "- $type_str: $file"
     done
     echo
-    read -rp "确定要删除这些文件吗? (y/n): " confirm
-    case $confirm in
-        [Yy]*)
-            for file in "${files[@]}"; do
-                if rm -rf "$want_path/$file"; then
-                    ((deleted++))
-                else
-                    echo -e "${red}删除失败: $file${bg}"
-                    ((failed++))
-                fi
-            done
-            echo -e "${green}成功删除 $deleted 个文件/文件夹${bg}"
-            [ $failed -gt 0 ] && echo -e "${red}删除失败 $failed 个文件/文件夹${bg}"
-            ;;
-        *)
-            echo -e "${yellow}已取消删除操作${bg}"
-            ;;
-    esac
+    if menu_confirm "确定要删除这些文件吗? (y/n)"; then
+        xrk_delete_items "$want_path" deleted failed "${files[@]}"
+        menu_msg_ok "成功删除 $deleted 个文件/文件夹"
+        [ "$failed" -gt 0 ] && menu_msg_err "删除失败 $failed 个文件/文件夹"
+    else
+        menu_msg_warn "已取消删除操作"
+    fi
     echo
 }
 
@@ -51,17 +41,13 @@ function manage_files() {
         menu_check_dir "$want_path" "目录 $want_path 不存在" || return
         
         IFS=$'\n'
-        file_list=($(find "$want_path" -mindepth 1 -maxdepth 1 2>/dev/null))
+        file_list=($(xrk_list_dir_entries "$want_path"))
         
         if [ ${#file_list[@]} -eq 0 ]; then
-            echo -e "${yellow}当前目录为空${bg}"
-            read -rp "按回车键返回主菜单..." _
+            menu_msg_warn "当前目录为空"
+            menu_pause "按回车键返回主菜单..."
             return
         fi
-
-        for i in "${!file_list[@]}"; do
-            file_list[$i]=$(basename "${file_list[$i]}")
-        done
         
         local file_opts=()
         for file in "${file_list[@]}"; do
@@ -73,7 +59,7 @@ function manage_files() {
         done
         menu_show "$folder_name" "${file_opts[@]}"
         
-        read -rp "输入序号 [1-${MENU_OPT_COUNT}] 多选用空格，回车返回 q 退出: " raw_input
+        raw_input=$(menu_read_choice "输入序号 [1-${MENU_OPT_COUNT}] 多选用空格，回车返回 q 退出: ") || return
         [ -z "$raw_input" ] && { clear_menu; return; }
         first=$(echo "$raw_input" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
         [ "$first" = "q" ] && { echo "程序已退出"; exit 0; }
@@ -92,7 +78,7 @@ function manage_files() {
         
         if [ ${#files_to_delete[@]} -gt 0 ] && [ "$invalid_input" = false ]; then
             delete_files "$want_path" "${files_to_delete[@]}"
-            read -rp "按回车键继续..." _
+            menu_pause
             clear_menu
         fi
     done
@@ -103,18 +89,18 @@ function main() {
     
     while true; do
         show_menu "选择目录" "${options[@]}"
-        read -rp "请选择 [1-${MENU_OPT_COUNT}]，q 退出: " raw_choice
-        choice=$(echo "$raw_choice" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-        [ "$choice" = "0" ] || [ "$choice" = "q" ] && { echo "程序已退出"; exit 0; }
+        choice=$(menu_read_choice "请选择 [1-${MENU_OPT_COUNT}]，q 退出: ") || exit 0
+        menu_should_exit "$choice" quit && { echo "程序已退出"; exit 0; }
         case "$choice" in
-            1) want_path="$yz/plugins"; manage_files "$want_path" "${options[0]}" ;;
-            2) want_path="$yz/plugins/other"; manage_files "$want_path" "${options[1]}" ;;
-            3) want_path="$yz"; manage_files "$want_path" "${options[2]}" ;;
-            4) read -rp "输入要管理的目录: " want_path
+            1) manage_files "$XRK_DEL_PLUGINS" "${options[0]}" ;;
+            2) manage_files "$XRK_DEL_JS" "${options[1]}" ;;
+            3) manage_files "$XRK_DEL_BOT" "${options[2]}" ;;
+            4)
+               want_path=$(menu_read_text "输入要管理的目录: ")
                menu_check_dir "$want_path" "目录不存在" || continue
                manage_files "$want_path" "自定义目录"
                ;;
-            *) echo -e "${red}无效选择 [1-${MENU_OPT_COUNT}]${bg}" ;;
+            *) menu_msg_err "无效选择 [1-${MENU_OPT_COUNT}]" ;;
         esac
         clear_menu
     done

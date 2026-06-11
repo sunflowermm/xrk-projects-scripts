@@ -1,63 +1,40 @@
 #!/bin/bash
 # js 插件：克隆仓库、选择安装、名称回复（目录 plugins/other）
 root="${XRK_ROOT:-/xrk}"
-[ -f "$root/shell_modules/menu_common.sh" ] && source "$root/shell_modules/menu_common.sh"
-menu_init 0 0
-
-xrk="$HOME/xrk"
-YZ_PLUGINS_JS="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}/plugins/other"
+# shellcheck source=/dev/null
+source "$root/shell_modules/menu_head.sh" 0 1 js_plugins.sh
+xrk_js_init_paths
 jh="$YZ_PLUGINS_JS"
-
-move_vocal(){
-    local woaini=$1
-    local wogeng=$2
-    sleep 1
-    if [ -d "$yz/resources/$woaini" ]; then
-        echo -e "${caidan1}已经安装过${woaini}了，正在跳过${bg}"
-    else
-        mv -f $xrk/shell-js/$woaini $yz/resources/
-        echo -e "${caidan3}已安装 ${woaini}${bg}"
-    fi
-    
-    sleep 1
-    mkdir -p "$jh"
-    if [ -d "$jh/$wogeng" ]; then
-        echo -e "${caidan2}已经安装过${wogeng}了，正在跳过${bg}"
-    else
-        mv -f "$xrk/shell-js/$wogeng" "$jh/"
-        echo -e "${caidan3}已安装 ${wogeng}${bg}"
-    fi
-}
+xrk="$XRK_JS_REPO"
 
 select_js_plugins() {
     echo -e "${caidan3}获取 JS 插件列表...${bg}"
     mkdir -p "$jh"
-    local js_files=($(find "$xrk/shell-js/" -maxdepth 1 -type f -name "*.js" 2>/dev/null))
-    
+    mapfile -t js_files < <(xrk_js_list_files)
+
     if [ ${#js_files[@]} -eq 0 ]; then
         echo -e "${caidan1}未找到任何 JS 插件${bg}"
         return
     fi
-    
+
     echo -e "${caidan2}可用的 JS 插件:${bg}"
     for i in "${!js_files[@]}"; do
-        basename="${js_files[$i]##*/}"
-        echo -e "${caidan1}$i: $basename${bg}"
+        echo -e "${caidan1}$i: ${js_files[$i]##*/}${bg}"
     done
-    
+
     echo -e "${caidan2}输入你想要安装的插件编号(空格分隔，直接回车安装全部):${bg}"
     read -a selections
-    
+
     if [ ${#selections[@]} -eq 0 ]; then
-        selections=($(seq 0 $((${#js_files[@]}-1))))
+        mapfile -t selections < <(seq 0 $((${#js_files[@]}-1)))
     fi
-    
-    local selected_name_reply_js=false
-    
+
+    local selected_name_reply_js=false i selected_file
+
     for i in "${selections[@]}"; do
-        if [[ $i =~ ^[0-9]+$ ]] && [ $i -ge 0 ] && [ $i -lt ${#js_files[@]} ]; then
+        if [[ $i =~ ^[0-9]+$ ]] && [ "$i" -ge 0 ] && [ "$i" -lt ${#js_files[@]} ]; then
             selected_file=${js_files[$i]}
-            if [ "${selected_file##*/}" == "名称回复.js" ]; then
+            if [ "${selected_file##*/}" = "名称回复.js" ]; then
                 selected_name_reply_js=true
             fi
             mv -n "$selected_file" "$jh/"
@@ -66,12 +43,13 @@ select_js_plugins() {
             echo -e "${caidan1}无效的选择: $i${bg}"
         fi
     done
-    
+
     if [ "$selected_name_reply_js" = true ]; then
         echo -e "${caidan3}检测到名称回复插件，请配置机器人名字${bg}"
-        read -rp "输入你想要的机器人名字: " add_text
-        [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${add_text}'/" "$jh/名称回复.js"
-        echo -e "${caidan2}机器人名字已更新为: ${add_text}${bg}"
+        add_text=$(menu_read_text "输入你想要的机器人名字: ")
+        xrk_js_set_name_reply "$add_text" "$jh/名称回复.js" \
+            && echo -e "${caidan2}机器人名字已更新为: ${add_text}${bg}" \
+            || echo -e "${caidan1}名称无效或文件不存在${bg}"
     fi
 }
 
@@ -82,29 +60,28 @@ show_menu() {
 while true; do
     clear_menu
     show_menu
-    read -rp "请选择 [0-${MENU_OPT_COUNT}]: " raw_menu
-    mainmenu=$(echo "$raw_menu" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    mainmenu=$(menu_read_choice "请选择 [0-${MENU_OPT_COUNT}]，0/q 退出: ") || exit 0
     echo
-    [ "$mainmenu" = "0" ] || [ "$mainmenu" = "q" ] && { echo -e "${caidan2}感谢使用！${bg}"; exit 0; }
+    menu_should_exit "$mainmenu" quit && { echo -e "${caidan2}感谢使用！${bg}"; exit 0; }
     case "$mainmenu" in
         1)
             echo -e "${caidan3}正在克隆插件仓库...${bg}"
-            git clone --depth=1 https://gitcode.com/Xrkseek/collection-of-jses.git $xrk
-            select_js_plugins
-            chmod 755 $xrk
-            rm -rf $xrk
+            xrk_js_clone_repo "$xrk" && select_js_plugins
+            chmod 755 "$xrk" 2>/dev/null || true
+            rm -rf "$xrk"
             echo -e "${caidan2}操作完成${bg}"
             ;;
         2)
             echo -e "${caidan2}去下载xrk-plugin吧，见鬼吧你，还在这安装${bg}"
             ;;
         3)
-            read -rp "输入你想要的机器人名字: " add_text
-            [ -f "$jh/名称回复.js" ] && sed -i "11 s/'[^']*'/'${add_text}'/" "$jh/名称回复.js"
-            echo -e "${caidan2}机器人名字已更新为: ${add_text}${bg}"
+            add_text=$(menu_read_text "输入你想要的机器人名字: ")
+            xrk_js_set_name_reply "$add_text" "$jh/名称回复.js" \
+                && echo -e "${caidan2}机器人名字已更新为: ${add_text}${bg}" \
+                || echo -e "${caidan1}名称无效或文件不存在${bg}"
             ;;
         *)
-            echo -e "${caidan1}无效选择 [0-${MENU_OPT_COUNT}]${bg}"
+            menu_msg_err "无效选择 [0-${MENU_OPT_COUNT}]"
             ;;
     esac
     echo

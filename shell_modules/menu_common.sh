@@ -137,10 +137,97 @@ menu_show() {
     MENU_OPT_COUNT=${#opts[@]}
 }
 
-menu_is_exit_choice() {
-    local ch="$1"
-    [ "$ch" = "0" ] || [ "$ch" = "q" ] || [ "$ch" = "${MENU_OPT_COUNT}" ]
+# --- 统一交互 API（各菜单脚本复用，减少重复 read/echo）---
+
+menu_normalize_choice() {
+    echo "$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]'
 }
+
+menu_should_exit() {
+    local choice="$1" mode="${2:-back}"
+    [ -z "$choice" ] && return 1
+    [ "$choice" = "0" ] || [ "$choice" = "q" ] && return 0
+    [ "$mode" = "back" ] && [ "$choice" = "${MENU_OPT_COUNT}" ] && return 0
+    return 1
+}
+
+menu_is_exit_choice() {
+    menu_should_exit "$1" "${2:-back}"
+}
+
+menu_read_choice() {
+    local prompt="${1:-请选择 [1-${MENU_OPT_COUNT}]: }"
+    local raw
+    if ! read -rp "$prompt" raw; then
+        echo ""
+        return 1
+    fi
+    menu_normalize_choice "$raw"
+}
+
+menu_msg_err()  { echo -e "${red}${1:-无效选择}${bg}"; }
+menu_msg_ok()   { echo -e "${green}${1:-完成}${bg}"; }
+menu_msg_warn() { echo -e "${yellow}${1}${bg}"; }
+
+menu_read_text() {
+    local prompt="$1" val
+    IFS= read -rp "$prompt" val || return 1
+    printf '%s' "$val"
+}
+
+menu_confirm() {
+    local prompt="$1" pattern="${2:-^[Yy]$}" answer
+    read -rp "$prompt " answer
+    [[ "$answer" =~ $pattern ]]
+}
+
+menu_pause() {
+    read -rp "${1:-按回车继续...}" _ </dev/tty 2>/dev/null || read -rp "${1:-按回车继续...}" _
+}
+
+# 标准文字菜单循环：menu_run_loop "标题" opt1 opt2 ... -- handler
+# handler 接收选项编号 1..N；返回非 0 时结束循环
+menu_run_loop() {
+    local title="$1" choice
+    shift
+    local -a _mrun_opts=()
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do
+        _mrun_opts+=("$1")
+        shift
+    done
+    local _mrun_handler="${1:-}"
+    [ -z "$_mrun_handler" ] && return 1
+    while true; do
+        menu_show "$title" "${_mrun_opts[@]}"
+        choice=$(menu_read_choice "请选择 [1-${#_mrun_opts[@]}]，0/q 返回: ") || exit 0
+        menu_should_exit "$choice" back && return 0
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#_mrun_opts[@]}" ]; then
+            "$_mrun_handler" "$choice" || return $?
+        else
+            menu_msg_err
+        fi
+        echo
+    done
+}
+
+# dialog 统一主题（jsdialog / 插件触屏菜单）
+xrk_dialog() {
+    dialog --backtitle "${XRK_DIALOG_BACKTITLE}" "$@"
+}
+
+xrk_dialog_msgbox() {
+    xrk_dialog --msgbox "$1" "${2:-6}" "${3:-44}"
+}
+
+xrk_dialog_infobox() {
+    xrk_dialog --infobox "$1" "${2:-3}" "${3:-44}"
+}
+
+# 葵崽根目录（menu_init 探测后使用）
+xrk_yz_dir() {
+    echo "${yz:-${xyz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}}"
+}
+葵崽路径() { xrk_yz_dir; }
 
 menu_show_double() {
     local title="$1" hint width opts=()
@@ -182,11 +269,30 @@ clear_menu() {
 
 menu_init() {
     local need_common="${1:-0}" need_check="${2:-0}" root="${XRK_ROOT:-/xrk}"
-    [ -z "${bg:-}" ] && [ -z "${color_red:-}" ] && [ -f "$root/.init" ] && source "$root/.init"
-    [ "$need_common" = "1" ] && [ -f "$root/shell_modules/common.sh" ] && source "$root/shell_modules/common.sh"
-    if [ "$need_check" = "1" ] && [ -z "${xyz:-}" ] && [ -z "${yz:-}" ]; then
+    if [ "$need_common" = "1" ] && ! type detect_os &>/dev/null; then
+        if [ -f "$root/shell_modules/xrk_base.sh" ]; then
+            # shellcheck source=/dev/null
+            source "$root/shell_modules/xrk_base.sh"
+            xrk_加载底层 common
+        elif [ -f "$root/shell_modules/common.sh" ]; then
+            # shellcheck source=/dev/null
+            source "$root/shell_modules/common.sh"
+        fi
+    fi
+    if [ -z "${caidan1:-}" ] && [ -f "$root/.init" ]; then
+        # shellcheck source=/dev/null
+        source "$root/.init"
+    elif [ -z "${color_red:-}" ] && [ -f "$root/shell_modules/color.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$root/shell_modules/color.sh"
+        [ -f "$root/.color" ] && source "$root/.color" 2>/dev/null || true
+    fi
+    ensure_menu_colors
+    if [ "$need_check" = "1" ]; then
         type check_changes &>/dev/null && check_changes
-        type search_directories &>/dev/null && search_directories
+        if [ -z "${xyz:-}" ] && [ -z "${yz:-}" ]; then
+            type search_directories &>/dev/null && search_directories
+        fi
     fi
     yz="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}"
     xyz="${xyz:-$yz}"
@@ -194,6 +300,10 @@ menu_init() {
     green="${bold_green:-\033[1;32m}"
     yellow="${color_yellow:-\033[33m}"
     bg="${bg:-\033[0m}"
+    RED="${RED:-$red}"
+    GREEN="${GREEN:-$green}"
+    YELLOW="${YELLOW:-$yellow}"
+    NC="${NC:-$bg}"
 }
 
 menu_check_deps() {
@@ -210,27 +320,30 @@ menu_check_deps() {
 }
 
 menu_check_dir() {
-    [ -d "$1" ] || { echo -e "${red}错误: ${2:-目录 $1 不存在}${bg}"; return 1; }
+    [ -d "$1" ] || { menu_msg_err "${2:-目录 $1 不存在}"; return 1; }
 }
 
 menu_check_file() {
-    [ -f "$1" ] || { echo -e "${red}错误: ${2:-文件 $1 不存在}${bg}"; return 1; }
+    [ -f "$1" ] || { menu_msg_err "${2:-文件 $1 不存在}"; return 1; }
 }
 
 menu_validate_input() {
-    [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge "$2" ] && [ "$1" -le "$3" ] || { echo -e "${red}错误: ${4:-无效的输入}${bg}"; return 1; }
+    [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge "$2" ] && [ "$1" -le "$3" ] \
+        || { menu_msg_err "${4:-无效的输入}"; return 1; }
 }
 
 run_software() {
-    local path="$1"; shift; local args=("$@") root="${XRK_ROOT:-/xrk}" base="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}}" retry=0 max_retries=3
-    [ -f "$root/$path" ] && { bash "$root/$path" "${args[@]}"; return $?; }
-    while [ $retry -lt $max_retries ]; do
-        if bash <(curl -sL --connect-timeout 10 --max-time 60 "$base/$path" 2>/dev/null) "${args[@]}"; then
-            return 0
+    if ! type xrk_run_script &>/dev/null; then
+        if type _xrk_ensure_common &>/dev/null; then
+            _xrk_ensure_common
+        elif type xrk_source_common &>/dev/null; then
+            xrk_source_common
+        else
+            # shellcheck source=/dev/null
+            [ -f "${XRK_ROOT:-/xrk}/shell_modules/common.sh" ] && source "${XRK_ROOT:-/xrk}/shell_modules/common.sh" \
+                || source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/common.sh")
         fi
-        retry=$((retry + 1))
-        [ $retry -lt $max_retries ] && sleep 2
-    done
-    echo -e "\033[31m[错误] 远程执行失败: $base/$path\033[0m" >&2
-    return 1
+    fi
+    xrk_run_script "$@"
 }
+执行软件安装() { run_software "$@"; }
