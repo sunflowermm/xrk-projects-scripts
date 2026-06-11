@@ -5,12 +5,17 @@ if [ -f "$root/shell_modules/menu_boot.sh" ]; then
     # shellcheck source=/dev/null
     source "$root/shell_modules/menu_boot.sh"
 else
-    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
     # shellcheck source=/dev/null
-    if [ -f "$root/shell_modules/bootstrap.sh" ]; then
+    if [ -f "$root/shell_modules/xrk_boot.sh" ]; then
+        source "$root/shell_modules/xrk_boot.sh"
+    elif [ -f "$root/shell_modules/bootstrap.sh" ]; then
         source "$root/shell_modules/bootstrap.sh"
     else
-        source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
+        tmp=$(mktemp "${TMPDIR:-/tmp}/xrk-bootstrap.XXXXXX") || exit 1
+        curl -fsSL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh" \
+            -o "$tmp" || exit 1
+        source "$tmp"
+        rm -f "$tmp"
     fi
     xrk_ensure_bootstrap
 fi

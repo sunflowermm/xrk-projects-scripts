@@ -34,7 +34,6 @@ PROXIES=(
     "https://git.z23.cc"
     "https://gitcdn.uiisc.org"
     "https://github.aci1.com"
-    "https://github.bef841ca.cn"
     "https://github.blogonly.cn"
     "https://github.codecho.cc"
     "https://github.jianrry.plus"
@@ -139,10 +138,20 @@ git() {
     command git "${args[@]}"
 }
 
-# 浅克隆 GitHub 仓库（自动走 git() 加速包装）
+# 浅克隆 GitHub 仓库（国内走加速；失败则直连重试）
 xrk_git_clone() {
     local url="$1" dest="$2" depth="${3:-1}"
     [ -z "$url" ] || [ -z "$dest" ] && return 1
     command -v git &>/dev/null || return 1
-    git clone --depth="$depth" "$url" "$dest"
+    if git clone --depth="$depth" "$url" "$dest" 2>/dev/null; then
+        return 0
+    fi
+    case "$url" in
+        https://github.com/*|https://raw.githubusercontent.com/*)
+            echo "[git] 加速源失败，尝试直连: $url" >&2
+            command git clone --depth="$depth" "$url" "$dest"
+            return $?
+            ;;
+    esac
+    return 1
 }

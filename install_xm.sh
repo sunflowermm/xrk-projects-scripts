@@ -5,10 +5,17 @@
 XRK_SOURCE="${1:-3}"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
-if [ -f "$XRK_ROOT/shell_modules/xrk_base.sh" ]; then
-    source "$XRK_ROOT/shell_modules/xrk_base.sh"
+if [ -f "$XRK_ROOT/shell_modules/xrk_boot.sh" ]; then
+    source "$XRK_ROOT/shell_modules/xrk_boot.sh"
+elif [ -f "$XRK_ROOT/shell_modules/bootstrap.sh" ]; then
+    source "$XRK_ROOT/shell_modules/bootstrap.sh"
 else
-    source <(curl -sL "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh")
+    tmp=$(mktemp "${TMPDIR:-/tmp}/xrk-bootstrap.XXXXXX") || exit 1
+    curl -fsSL --connect-timeout 10 --max-time 30 \
+        "https://gitee.com/xrkseek/xrk-projects-scripts/raw/master/shell_modules/bootstrap.sh" \
+        -o "$tmp" || { rm -f "$tmp"; echo "bootstrap 下载失败"; exit 1; }
+    source "$tmp"
+    rm -f "$tmp"
 fi
 xrk_bootstrap "$XRK_SOURCE" 1
 
@@ -25,9 +32,9 @@ if [ -f "$XRK_ROOT/shell_modules/xrk_base.sh" ]; then
     source "$XRK_ROOT/shell_modules/xrk_base.sh"
     xrk_加载底层 common
 else
-    # shellcheck source=/dev/null
-    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/xrk_base.sh") 2>/dev/null \
-        && xrk_加载底层 common 2>/dev/null || source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/common.sh")
+    load_module "shell_modules/xrk_base.sh" 2>/dev/null \
+        && xrk_加载底层 common 2>/dev/null \
+        || load_module "shell_modules/common.sh"
 fi
 ensure_curl || { echo "请先安装 curl"; exit 1; }
 ensure_cmd git git
