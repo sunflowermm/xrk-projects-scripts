@@ -11,9 +11,9 @@ _xm_init() {
         # shellcheck source=/dev/null
         source "$root/shell_modules/xm_head.sh"
     else
+        [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
         # shellcheck source=/dev/null
-        [ -f "$root/shell_modules/xrk_boot.sh" ] && source "$root/shell_modules/xrk_boot.sh" \
-            || source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
+        source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
         xrk_ensure_bootstrap
         xrk_load_xm
     fi
@@ -21,7 +21,10 @@ _xm_init() {
 _xm_init
 
 require_xrk() {
-    [ -d "$XRK_ROOT" ] || { menu_msg_err "请先执行 2 安装脚本仓库"; return 1; }
+    type xrk_is_script_repo &>/dev/null && xrk_is_script_repo || {
+        menu_msg_err "请先 xm→2 安装本仓库（${XRK_ROOT:-/xrk} 不是 xrk-projects-scripts）"
+        return 1
+    }
 }
 
 update_xm() {
@@ -36,7 +39,7 @@ update_xm() {
         echo "[xm] 更新失败，请检查网络或 SCRIPT_RAW_BASE"
         return 1
     fi
-    if [ -d "$XRK_ROOT" ]; then
+    if type xrk_is_script_repo &>/dev/null && xrk_is_script_repo; then
         (cd "$XRK_ROOT" && git pull --no-rebase) && echo "[xm] 脚本仓库 $XRK_ROOT 已更新" || echo "[xm] $XRK_ROOT 更新失败或非 git 目录"
     fi
     echo "[xm] 更新完成"
@@ -44,7 +47,7 @@ update_xm() {
 
 show_menu() {
     local opts=("换源(apt 镜像)" "安装脚本仓库" "环境与工具安装")
-    [ -d "$XRK_ROOT" ] && opts+=("进入主菜单(xrk)")
+    type xrk_is_script_repo &>/dev/null && xrk_is_script_repo && opts+=("进入主菜单(xrk)")
     opts+=("退出")
     echo ""
     menu_show "xm 主菜单" "  " "${opts[@]}" "输入 0/q 或最后一档退出，r 更新 xm"

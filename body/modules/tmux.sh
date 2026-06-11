@@ -1,13 +1,14 @@
 #!/bin/bash
 # 安装并配置 tmux（oh-my-tmux + tpm + .tmux.conf 链接）
 set -e
-root="${XRK_ROOT:-/xrk}"
+XRK_ROOT="${XRK_ROOT:-/xrk}"
+[ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
 # shellcheck source=/dev/null
-[ -f "$root/shell_modules/xrk_boot.sh" ] && source "$root/shell_modules/xrk_boot.sh"
+[ -f "$XRK_ROOT/shell_modules/bootstrap.sh" ] && source "$XRK_ROOT/shell_modules/bootstrap.sh"
 xrk_ensure_bootstrap
-xrk_prepare_root
-load_module "shell_modules/common.sh"
-load_module "shell_modules/install.sh"
+# shellcheck source=/dev/null
+source "$XRK_ROOT/shell_modules/xrk_base.sh"
+xrk_加载底层 install
 safe_source "shell_modules/github.sh"
 
 install_tmux_pkg() {
@@ -38,7 +39,7 @@ setup_tpm() {
 }
 
 link_conf() {
-    xrk_ensure_repo_file "body/.tmux.conf" || { echo "[tmux] 无法获取 body/.tmux.conf"; return 1; }
+    [ -f "$XRK_ROOT/body/.tmux.conf" ] || { echo "[tmux] 未找到 $XRK_ROOT/body/.tmux.conf"; return 1; }
     ln -sf "$XRK_ROOT/body/.tmux.conf" "$HOME/.tmux.conf"
     echo "[tmux] 已链接 ~/.tmux.conf -> $XRK_ROOT/body/.tmux.conf"
 }

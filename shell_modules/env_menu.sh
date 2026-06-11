@@ -1,21 +1,17 @@
 #!/bin/bash
 # 统一环境与工具安装菜单
 root="${XRK_ROOT:-/xrk}"
-[ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
 if [ -f "$root/shell_modules/menu_boot.sh" ]; then
     # shellcheck source=/dev/null
     source "$root/shell_modules/menu_boot.sh"
-elif [ -f "$root/shell_modules/xrk_boot.sh" ]; then
-    # shellcheck source=/dev/null
-    source "$root/shell_modules/xrk_boot.sh"
-    xrk_ensure_bootstrap
 else
-    base="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-    tmp=$(mktemp "${TMPDIR:-/tmp}/xrk-boot.XXXXXX") || exit 1
-    curl -fsSL "${base}/shell_modules/xrk_boot.sh" -o "$tmp" || exit 1
+    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
     # shellcheck source=/dev/null
-    source "$tmp"
-    rm -f "$tmp"
+    if [ -f "$root/shell_modules/bootstrap.sh" ]; then
+        source "$root/shell_modules/bootstrap.sh"
+    else
+        source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
+    fi
     xrk_ensure_bootstrap
 fi
 xrk_source_menu_head 0 0
@@ -30,16 +26,18 @@ _env_run_action() {
         ffmpeg)   run_software "project-install/software/ffmpeg" ;;
         python)   run_software "body/modules/python_uv.sh" ;;
         tmux)
+            menu_require_repo || return 1
             if [ ! -d "$HOME/.tmux/plugins/tpm" ] || { [ ! -f "$HOME/.tmux.conf" ] && [ ! -L "$HOME/.tmux.conf" ]; }; then
                 xrk_exec_script "body/modules/tmux.sh" || return 1
             fi
             xrk_exec_script "body/tmux.sh" || return 1
             ;;
         profile)
-            xrk_exec_script "body/modules/profile.sh" || return 1
+            menu_require_repo || return 1
+            XRK_PROFILE_QUIET=0 xrk_exec_script "body/modules/profile.sh" || return 1
             ;;
         xrkk)
-            menu_check_xrk_repo || return 1
+            menu_require_repo || return 1
             xrkk同步 || return 1
             menu_msg_ok "xrkk 已更新"
             ;;

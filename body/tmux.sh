@@ -54,12 +54,6 @@ attach_or_create() {
         return
     fi
 
-    if ! _has_desktop_layout; then
-        _tmux new-session -s "$SESSION_NAME" || handle_error "无法创建 tmux 会话"
-        attach_existing_session "$SESSION_NAME"
-        return
-    fi
-
     create_desktop_layout
     _tmux source-file "$TMUX_CONF" 2>/dev/null || true
     attach_existing_session "$SESSION_NAME"
@@ -73,43 +67,20 @@ handle_error() {
 
 # 检查依赖
 check_dependencies() {
-    root="${XRK_ROOT:-/xrk}"
-    if ! type xrk_ensure_bootstrap &>/dev/null; then
-        # shellcheck source=/dev/null
-        [ -f "$root/shell_modules/xrk_boot.sh" ] && source "$root/shell_modules/xrk_boot.sh"
-    fi
-    type xrk_ensure_bootstrap &>/dev/null && xrk_ensure_bootstrap && xrk_prepare_root
-
     if ! command -v tmux &>/dev/null; then
-        if type xrk_exec_script &>/dev/null; then
-            XRK_TMUX_PKG_ONLY=1 xrk_exec_script "body/modules/tmux.sh" || handle_error "未安装 tmux"
-        elif [ -f "$XRK_ROOT/body/modules/tmux.sh" ]; then
-            XRK_TMUX_PKG_ONLY=1 bash "$XRK_ROOT/body/modules/tmux.sh" || handle_error "未安装 tmux"
-        else
-            handle_error "未找到 tmux 安装模块"
-        fi
+        [ -f "$XRK_ROOT/body/modules/tmux.sh" ] || handle_error "未找到 tmux 安装模块"
+        XRK_TMUX_PKG_ONLY=1 bash "$XRK_ROOT/body/modules/tmux.sh" || handle_error "未安装 tmux"
     fi
-    if [ ! -f "$TMUX_CONF" ]; then
-        if type xrk_ensure_repo_file &>/dev/null; then
-            xrk_ensure_repo_file "body/.tmux.conf" && ln -sf "$XRK_ROOT/body/.tmux.conf" "$HOME/.tmux.conf" 2>/dev/null
-        elif [ -f "$XRK_ROOT/body/.tmux.conf" ]; then
+    [ -f "$TMUX_CONF" ] || {
+        if [ -f "$XRK_ROOT/body/.tmux.conf" ]; then
             ln -sf "$XRK_ROOT/body/.tmux.conf" "$HOME/.tmux.conf" 2>/dev/null || true
+            TMUX_CONF="$HOME/.tmux.conf"
         fi
-        TMUX_CONF="${HOME}/.tmux.conf"
-    fi
+    }
     [ -f "$TMUX_CONF" ] || handle_error "配置文件不存在: $TMUX_CONF（可先 xm→3→7 配置 tmux）"
-}
-
-_has_desktop_layout() {
-    local w
-    for w in window_a.sh window_b.sh window_c.sh; do
-        if type xrk_ensure_repo_file &>/dev/null; then
-            xrk_ensure_repo_file "body/$w" 2>/dev/null || return 1
-        elif [ ! -f "$XRK_ROOT/body/$w" ]; then
-            return 1
-        fi
-    done
-    return 0
+    [ -f "$XRK_ROOT/body/window_a.sh" ] || handle_error "window_a.sh 不存在"
+    [ -f "$XRK_ROOT/body/window_b.sh" ] || handle_error "window_b.sh 不存在"
+    [ -f "$XRK_ROOT/body/window_c.sh" ] || handle_error "window_c.sh 不存在"
 }
 
 # 主函数

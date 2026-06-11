@@ -208,15 +208,11 @@ menu_run_loop() {
         _mrun_opts=("${_mrun_opts[@]:1}")
     fi
     if [ -z "$_mrun_handler" ]; then
-        menu_msg_err "menu_run_loop: 缺少 handler（请在选项后写 -- 函数名）"
-        return 1
-    fi
-    if [[ "$_mrun_handler" == -* ]]; then
-        menu_msg_err "menu_run_loop: 非法 handler「$_mrun_handler」（是否把 -- 写成了 ---？）"
+        menu_msg_err "menu_run_loop: 缺少 handler"
         return 1
     fi
     if ! type "$_mrun_handler" &>/dev/null; then
-        menu_msg_err "menu_run_loop: 未找到函数 $_mrun_handler（请 git pull 更新脚本仓库）"
+        menu_msg_err "menu_run_loop: 未找到函数 $_mrun_handler"
         return 1
     fi
     while true; do
@@ -345,14 +341,13 @@ menu_check_dir() {
     [ -d "$1" ] || { menu_msg_err "${2:-目录 $1 不存在}"; return 1; }
 }
 
-# 脚本仓库须含 bootstrap（避免空目录 / 半拉子 clone 误判为已安装）
-menu_check_xrk_repo() {
-    local root="${1:-${XRK_ROOT:-/xrk}}" msg="${2:-请先 xm→2 安装脚本仓库，或 cd $root && git pull}"
-    menu_check_dir "$root" "$msg" || return 1
-    [ -f "$root/shell_modules/bootstrap.sh" ] \
-        || { menu_msg_err "$msg（缺少 shell_modules/bootstrap.sh，仓库不完整）"; return 1; }
-    [ -f "$root/shell_modules/menu_common.sh" ] \
-        || { menu_msg_err "$msg（缺少 menu_common.sh，请更新仓库）"; return 1; }
+menu_require_repo() {
+    local msg="${1:-请先 xm→2 安装本仓库到 ${XRK_ROOT:-/xrk}}"
+    if type xrk_is_script_repo &>/dev/null && xrk_is_script_repo; then
+        return 0
+    fi
+    menu_msg_err "$msg"
+    return 1
 }
 
 menu_check_file() {

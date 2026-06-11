@@ -1,11 +1,7 @@
 #!/bin/bash
 # 写入 .profile（xrk 环境与 puppeteer）
-root="${XRK_ROOT:-/xrk}"
-# shellcheck source=/dev/null
-[ -f "$root/shell_modules/xrk_boot.sh" ] && source "$root/shell_modules/xrk_boot.sh"
-xrk_ensure_bootstrap
-xrk_prepare_root
-xrk_ensure_repo_file "body/modules/tmux_profile.sh" 2>/dev/null || true
+XRK_ROOT="${XRK_ROOT:-/xrk}"
+[ -d "$XRK_ROOT" ] || { echo "请先 xm→2 安装本仓库到 $XRK_ROOT"; exit 1; }
 
 profile="$HOME/.profile"
 needed=(
