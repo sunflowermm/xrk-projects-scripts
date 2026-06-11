@@ -14,7 +14,7 @@ else
     fi
     xrk_ensure_bootstrap
 fi
-xrk_source_menu_head 0 0
+xrk_load_menu_head 0 0
 safe_source "shell_modules/update.sh"
 
 _env_run_action() {
