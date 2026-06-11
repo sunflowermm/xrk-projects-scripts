@@ -2,7 +2,11 @@
 # 高级：切换主题、重装脚本
 root="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
-source "$root/shell_modules/menu_head.sh" 0 1
+[ -f "$root/shell_modules/menu_boot.sh" ] && source "$root/shell_modules/menu_boot.sh" || {
+    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+    source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
+}
+xrk_source_menu_head 0 1
 
 THEMES=(".theme" ".theme2" ".theme3" ".theme4" ".theme5" ".theme6" ".theme7" ".theme8" ".theme9" ".theme10" ".theme11" ".theme12" ".theme13")
 THEME_NAMES=("向日葵原版主题" "暗夜锋芒" "甜心微爱" "极光幻境" "霓虹都市" "薄暮流云" "科技未来" "沙漠晨曦" "深海之谜" "森林密语" "莓果甜心" "星空梦境" "金属光泽")

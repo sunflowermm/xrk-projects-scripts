@@ -2,7 +2,11 @@
 # 插件代理：测试并切换 GitHub 代理
 root="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
-source "$root/shell_modules/menu_head.sh" 0 1 github.sh plugin_proxy.sh
+[ -f "$root/shell_modules/menu_boot.sh" ] && source "$root/shell_modules/menu_boot.sh" || {
+    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+    source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
+}
+xrk_source_menu_head 0 1 github.sh plugin_proxy.sh
 
 test_proxy() {
     local proxy="$1" rc=0

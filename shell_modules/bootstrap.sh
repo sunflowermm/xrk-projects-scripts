@@ -122,3 +122,102 @@ xrk_bootstrap() {
     init_repo_source "$source_arg" "$force"
     export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_SOURCE
 }
+
+# 确保 bootstrap 与 SCRIPT_RAW_BASE 就绪（无本地 /xrk 时从远程加载）
+xrk_ensure_bootstrap() {
+    if type load_module &>/dev/null; then
+        [ -n "${SCRIPT_RAW_BASE:-}" ] && return 0
+        xrk_bootstrap "${XRK_SOURCE:-3}" 0
+        return 0
+    fi
+    local root="${XRK_ROOT:-/xrk}"
+    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+    if [ -f "$root/shell_modules/bootstrap.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$root/shell_modules/bootstrap.sh"
+    else
+        local base="${SCRIPT_RAW_BASE:-$_XRK_DEFAULT_BASE}"
+        # shellcheck source=/dev/null
+        source <(curl -sL --connect-timeout 10 --max-time 30 "${base}/shell_modules/bootstrap.sh")
+    fi
+    xrk_bootstrap "${XRK_SOURCE:-3}" 0
+}
+
+# 执行仓库内 bash 脚本：本地优先，否则 curl
+xrk_exec_script() {
+    local path="$1"
+    shift
+    local root="${XRK_ROOT:-/xrk}"
+    xrk_ensure_bootstrap
+    if [ -f "$root/$path" ]; then
+        bash "$root/$path" "$@"
+    else
+        bash <(curl -sL --connect-timeout 10 --max-time 60 "${SCRIPT_RAW_BASE}/$path") "$@"
+    fi
+}
+
+# xm 入口底层
+xrk_load_xm() {
+    xrk_ensure_bootstrap
+    local root="${XRK_ROOT:-/xrk}"
+    if [ -f "$root/shell_modules/xrk_base.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$root/shell_modules/xrk_base.sh"
+        xrk_加载底层 xm
+    elif load_module "shell_modules/xrk_base.sh" 2>/dev/null; then
+        xrk_加载底层 xm 2>/dev/null || true
+    fi
+    if ! type menu_show &>/dev/null; then
+        load_module "shell_modules/common.sh" || true
+        safe_source "shell_modules/menu_common.sh"
+    fi
+    command -v git &>/dev/null || ensure_cmd git git 2>/dev/null || true
+    type menu_init &>/dev/null && menu_init 0 0
+}
+
+# 菜单脚本标准头部（need_common need_check [附加模块...]）
+xrk_load_menu_head() {
+    local need_common="${1:-0}" need_check="${2:-0}"
+    shift 2 2>/dev/null || true
+    local root="${XRK_ROOT:-/xrk}" _extra _path
+    xrk_ensure_bootstrap
+    if [ -f "$root/shell_modules/xrk_base.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$root/shell_modules/xrk_base.sh"
+        xrk_加载底层 menu
+        [ "$need_common" = "1" ] && ! type install_pkg &>/dev/null && xrk_加载底层 install
+    elif load_module "shell_modules/xrk_base.sh" 2>/dev/null; then
+        xrk_加载底层 menu 2>/dev/null || true
+        [ "$need_common" = "1" ] && ! type install_pkg &>/dev/null && xrk_加载底层 install 2>/dev/null || true
+    fi
+    if ! type menu_show &>/dev/null; then
+        load_module "shell_modules/common.sh" || true
+        load_module "shell_modules/init.sh" || true
+        safe_source "shell_modules/menu_common.sh"
+        [ "$need_common" = "1" ] && safe_source "shell_modules/install.sh"
+    fi
+    for _extra in "$@"; do
+        case "$_extra" in
+            */*) _path="$_extra" ;;
+            *)   _path="shell_modules/$_extra" ;;
+        esac
+        if [ -f "$root/$_path" ]; then
+            # shellcheck source=/dev/null
+            source "$root/$_path"
+        else
+            load_module "$_path" 2>/dev/null || safe_source "$_path"
+        fi
+    done
+    menu_init "$need_common" "$need_check"
+}
+
+# 本地 menu_head 或远程 xrk_load_menu_head
+xrk_source_menu_head() {
+    local root="${XRK_ROOT:-/xrk}"
+    if [ -f "$root/shell_modules/menu_head.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$root/shell_modules/menu_head.sh" "$@"
+    else
+        xrk_load_menu_head "$@"
+    fi
+}

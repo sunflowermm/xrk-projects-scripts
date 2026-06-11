@@ -7,8 +7,8 @@ if [ -f "${XRK_ROOT:-/xrk}/shell_modules/xrk_base.sh" ]; then
     source "${XRK_ROOT:-/xrk}/shell_modules/xrk_base.sh"
     xrk_加载底层 software
 else
-    source <(curl -sL "$SCRIPT_RAW_BASE/shell_modules/bootstrap.sh")
-    xrk_bootstrap
-    load_module "shell_modules/common.sh"
-    type xrk_init_software &>/dev/null && xrk_init_software
+    source <(curl -sL "${SCRIPT_RAW_BASE}/shell_modules/bootstrap.sh")
+    xrk_ensure_bootstrap
+    load_module "shell_modules/xrk_base.sh" && xrk_加载底层 software 2>/dev/null \
+        || { load_module "shell_modules/common.sh"; type xrk_init_software &>/dev/null && xrk_init_software; }
 fi

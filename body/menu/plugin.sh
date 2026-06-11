@@ -2,7 +2,11 @@
 # 插件菜单：安装/管理插件、Python 环境、代理
 root="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
-source "$root/shell_modules/menu_head.sh" 1 1 github.sh
+[ -f "$root/shell_modules/menu_boot.sh" ] && source "$root/shell_modules/menu_boot.sh" || {
+    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+    source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
+}
+xrk_source_menu_head 1 1 github.sh
 YZ_DIR="$(xrk_yz_dir)"
 MENU_DIR="$YZ_DIR/plugins/XRK-plugin/resources/plugins"
 

@@ -2,7 +2,11 @@
 # 报错修复：浏览器/Node/pnpm/yq/ffmpeg 重装
 root="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
-source "$root/shell_modules/menu_head.sh" 1 1
+[ -f "$root/shell_modules/menu_boot.sh" ] && source "$root/shell_modules/menu_boot.sh" || {
+    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+    source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
+}
+xrk_source_menu_head 1 1
 
 clean_existing() {
     echo "清理现有 $1 安装..."
