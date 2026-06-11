@@ -14,6 +14,7 @@ xrk_bootstrap "$XRK_SOURCE" 1
 
 mkdir -p "$HOME/.config"
 cat > "$HOME/.xrk_repo" << EOF
+XRK_SOURCE="$XRK_SOURCE"
 SCRIPT_RAW_BASE="$SCRIPT_RAW_BASE"
 SCRIPT_CLONE_URL="$SCRIPT_CLONE_URL"
 EOF

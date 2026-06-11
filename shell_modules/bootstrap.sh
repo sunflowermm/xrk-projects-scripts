@@ -42,7 +42,7 @@ init_repo_source() {
     local arg="$1" force="${2:-0}" root="${XRK_ROOT:-/xrk}"
 
     if [ "$force" = "1" ]; then
-        unset SCRIPT_RAW_BASE SCRIPT_CLONE_URL
+        unset SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_SOURCE
     else
         [ -f "$root/.repo_source" ] && source "$root/.repo_source"
         [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
