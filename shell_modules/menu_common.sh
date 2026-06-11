@@ -196,8 +196,9 @@ menu_run_loop() {
         _mrun_opts+=("$1")
         shift
     done
-    if [ $# -gt 0 ]; then
-        _mrun_handler="$1"
+    if [ "${1:-}" = "--" ]; then
+        shift
+        _mrun_handler="${1:-}"
     elif [ "${#_mrun_opts[@]}" -gt 0 ]; then
         local _last=$(( ${#_mrun_opts[@]} - 1 ))
         _mrun_handler="${_mrun_opts[$_last]}"
