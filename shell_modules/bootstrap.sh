@@ -54,6 +54,42 @@ init_repo_source() {
     [ -z "$SCRIPT_CLONE_URL" ] && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"
     [[ "$SCRIPT_CLONE_URL" != https://* ]] && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"
     export SCRIPT_RAW_BASE SCRIPT_CLONE_URL
+    [ -n "${XRK_ROOT:-}" ] && export XRK_ROOT
+}
+
+# 校验 curl 下来的内容像 shell 脚本（避免 HTML / markdown 被 source 后 line N: --- 报错）
+_xrk_script_body_ok() {
+    local f="$1"
+    [ -f "$f" ] && [ -s "$f" ] || return 1
+    head -1 "$f" | grep -qE '^#!.*(bash|sh)' || return 1
+    grep -qE '(^function |[a-zA-Z_][a-zA-Z0-9_]*\(\)|^[[:space:]]*#)' "$f" || return 1
+    grep -qiE '^<!DOCTYPE|<html' "$f" && return 1
+    return 0
+}
+
+# 下载远程脚本到临时文件；成功时 echo 路径（调用方 source/bash 后需 rm）
+xrk_fetch_script() {
+    local url="$1" tmp
+    tmp=$(mktemp "${TMPDIR:-/tmp}/xrk-script.XXXXXX") || return 1
+    if ! curl -fsSL --connect-timeout 10 --max-time 60 "$url" -o "$tmp" 2>/dev/null; then
+        rm -f "$tmp"
+        return 1
+    fi
+    if ! _xrk_script_body_ok "$tmp"; then
+        log_error "远程内容不是有效 shell 脚本: $url"
+        rm -f "$tmp"
+        return 1
+    fi
+    echo "$tmp"
+}
+
+xrk_source_url() {
+    local url="$1" tmp ret=1
+    tmp=$(xrk_fetch_script "$url") || return 1
+    # shellcheck source=/dev/null
+    source "$tmp" && ret=0
+    rm -f "$tmp"
+    return "$ret"
 }
 
 # 统一加载模块：优先本地，否则远程
@@ -65,16 +101,19 @@ load_module() {
         return 0
     fi
     SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-$_XRK_DEFAULT_BASE}"
-    # shellcheck source=/dev/null
-    source <(curl -sL --connect-timeout 10 --max-time 30 "${SCRIPT_RAW_BASE}/$path" 2>/dev/null) || return 1
+    xrk_source_url "${SCRIPT_RAW_BASE}/$path" || return 1
 }
 
 # 统一 source 模块：优先本地，否则远程（静默失败）
 safe_source() {
     local path="$1" root="${XRK_ROOT:-/xrk}"
-    [ -f "$root/$path" ] && source "$root/$path" && return 0
+    if [ -f "$root/$path" ]; then
+        # shellcheck source=/dev/null
+        source "$root/$path"
+        return 0
+    fi
     local base="${SCRIPT_RAW_BASE:-$_XRK_DEFAULT_BASE}"
-    source <(curl -sL "$base/$path" 2>/dev/null) 2>/dev/null || true
+    xrk_source_url "${base}/$path" 2>/dev/null || true
 }
 
 load_distro_deps() {
@@ -145,15 +184,19 @@ xrk_ensure_bootstrap() {
 
 # 执行仓库内 bash 脚本：本地优先，否则 curl
 xrk_exec_script() {
-    local path="$1"
+    local path="$1" tmp
     shift
     local root="${XRK_ROOT:-/xrk}"
     xrk_ensure_bootstrap
     if [ -f "$root/$path" ]; then
         bash "$root/$path" "$@"
-    else
-        bash <(curl -sL --connect-timeout 10 --max-time 60 "${SCRIPT_RAW_BASE}/$path") "$@"
+        return $?
     fi
+    tmp=$(xrk_fetch_script "${SCRIPT_RAW_BASE}/$path") || return 1
+    bash "$tmp" "$@"
+    local ret=$?
+    rm -f "$tmp"
+    return "$ret"
 }
 
 # xm 入口底层

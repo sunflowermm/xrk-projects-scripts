@@ -6,11 +6,22 @@
 
 set -e
 XRK_ROOT="${XRK_ROOT:-/xrk}"
+[ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
 [ -d "$XRK_ROOT" ] || { echo "请先安装脚本仓库到 $XRK_ROOT"; exit 1; }
 
 # shellcheck source=/dev/null
-source "${XRK_ROOT}/shell_modules/xrk_base.sh"
-xrk_加载底层 install
+if [ -f "${XRK_ROOT}/shell_modules/xrk_base.sh" ]; then
+    source "${XRK_ROOT}/shell_modules/xrk_base.sh"
+    xrk_加载底层 install
+elif type xrk_ensure_bootstrap &>/dev/null || [ -f "${XRK_ROOT}/shell_modules/bootstrap.sh" ]; then
+    [ -f "${XRK_ROOT}/shell_modules/bootstrap.sh" ] && source "${XRK_ROOT}/shell_modules/bootstrap.sh"
+    xrk_ensure_bootstrap
+    load_module "shell_modules/common.sh"
+    load_module "shell_modules/install.sh"
+else
+    echo "[tmux] 缺少 $XRK_ROOT/shell_modules/bootstrap.sh，请先 xm→2 安装或 git pull"
+    exit 1
+fi
 safe_source "shell_modules/github.sh"
 
 install_tmux_pkg() {

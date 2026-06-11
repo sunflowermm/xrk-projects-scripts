@@ -1,6 +1,24 @@
 #!/bin/bash
 # 统一环境与工具安装菜单
 
+_xrk_resolve_root() {
+    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+    if [ -f "${XRK_ROOT:-/xrk}/shell_modules/bootstrap.sh" ]; then
+        export XRK_ROOT="${XRK_ROOT:-/xrk}"
+        return 0
+    fi
+    local d
+    for d in "$HOME/.xrk" "$HOME/xrk" "/xrk"; do
+        if [ -f "$d/shell_modules/bootstrap.sh" ]; then
+            XRK_ROOT="$d"
+            export XRK_ROOT
+            return 0
+        fi
+    done
+    export XRK_ROOT="${XRK_ROOT:-/xrk}"
+}
+_xrk_resolve_root
+
 root="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
 [ -f "$root/shell_modules/menu_boot.sh" ] && source "$root/shell_modules/menu_boot.sh" || {
@@ -39,19 +57,20 @@ _env_run_action() {
         ffmpeg)   run_software "project-install/software/ffmpeg" ;;
         python)   run_software "body/modules/python_uv.sh" ;;
         tmux)
-            menu_check_dir "$XRK_ROOT" "请先安装脚本仓库到 $XRK_ROOT" || return 1
+            menu_check_xrk_repo "$XRK_ROOT" || return 1
             if [ ! -d "$HOME/.tmux/plugins/tpm" ] || { [ ! -f "$HOME/.tmux.conf" ] && [ ! -L "$HOME/.tmux.conf" ]; }; then
-                _xrk_bash_script "body/modules/tmux.sh"
+                _xrk_bash_script "body/modules/tmux.sh" || return 1
             fi
-            _xrk_bash_script "body/tmux.sh"
+            _xrk_bash_script "body/tmux.sh" || return 1
             ;;
         profile)
-            menu_check_dir "$XRK_ROOT" "请先安装脚本仓库" || return 1
-            XRK_PROFILE_QUIET=0 _xrk_bash_script "body/modules/profile.sh"
+            menu_check_xrk_repo "$XRK_ROOT" || return 1
+            XRK_PROFILE_QUIET=0 _xrk_bash_script "body/modules/profile.sh" || return 1
             ;;
         xrkk)
-            menu_check_dir "$XRK_ROOT" "请先安装脚本仓库" || return 1
-            xrkk同步 && menu_msg_ok "xrkk 已更新"
+            menu_check_xrk_repo "$XRK_ROOT" || return 1
+            xrkk同步 || return 1
+            menu_msg_ok "xrkk 已更新"
             ;;
         *) menu_msg_err "未知操作: $1"; return 1 ;;
     esac

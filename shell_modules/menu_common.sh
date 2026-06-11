@@ -137,7 +137,7 @@ menu_show() {
     MENU_OPT_COUNT=${#opts[@]}
 }
 
-# --- 统一交互 API（各菜单脚本复用，减少重复 read/echo）---
+# [统一交互 API] 各菜单脚本复用，减少重复 read/echo
 
 menu_normalize_choice() {
     echo "$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]'
@@ -191,12 +191,30 @@ menu_run_loop() {
     local title="$1" choice
     shift
     local -a _mrun_opts=()
+    local _mrun_handler=""
     while [ $# -gt 0 ] && [ "$1" != "--" ]; do
         _mrun_opts+=("$1")
         shift
     done
-    local _mrun_handler="${1:-}"
-    [ -z "$_mrun_handler" ] && return 1
+    if [ $# -gt 0 ]; then
+        _mrun_handler="$1"
+    elif [ "${#_mrun_opts[@]}" -gt 0 ]; then
+        local _last=$(( ${#_mrun_opts[@]} - 1 ))
+        _mrun_handler="${_mrun_opts[$_last]}"
+        unset "_mrun_opts[$_last]"
+    fi
+    if [ -z "$_mrun_handler" ]; then
+        menu_msg_err "menu_run_loop: 缺少 handler（请在选项后写 -- 函数名）"
+        return 1
+    fi
+    if [[ "$_mrun_handler" == -* ]]; then
+        menu_msg_err "menu_run_loop: 非法 handler「$_mrun_handler」（是否把 -- 写成了 ---？）"
+        return 1
+    fi
+    if ! type "$_mrun_handler" &>/dev/null; then
+        menu_msg_err "menu_run_loop: 未找到函数 $_mrun_handler（请 git pull 更新脚本仓库）"
+        return 1
+    fi
     while true; do
         menu_show "$title" "${_mrun_opts[@]}"
         choice=$(menu_read_choice "请选择 [1-${#_mrun_opts[@]}]，0/q 返回: ") || exit 0
@@ -321,6 +339,16 @@ menu_check_deps() {
 
 menu_check_dir() {
     [ -d "$1" ] || { menu_msg_err "${2:-目录 $1 不存在}"; return 1; }
+}
+
+# 脚本仓库须含 bootstrap（避免空目录 / 半拉子 clone 误判为已安装）
+menu_check_xrk_repo() {
+    local root="${1:-${XRK_ROOT:-/xrk}}" msg="${2:-请先 xm→2 安装脚本仓库，或 cd $root && git pull}"
+    menu_check_dir "$root" "$msg" || return 1
+    [ -f "$root/shell_modules/bootstrap.sh" ] \
+        || { menu_msg_err "$msg（缺少 shell_modules/bootstrap.sh，仓库不完整）"; return 1; }
+    [ -f "$root/shell_modules/menu_common.sh" ] \
+        || { menu_msg_err "$msg（缺少 menu_common.sh，请更新仓库）"; return 1; }
 }
 
 menu_check_file() {

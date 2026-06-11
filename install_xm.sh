@@ -17,6 +17,7 @@ cat > "$HOME/.xrk_repo" << EOF
 XRK_SOURCE="$XRK_SOURCE"
 SCRIPT_RAW_BASE="$SCRIPT_RAW_BASE"
 SCRIPT_CLONE_URL="$SCRIPT_CLONE_URL"
+XRK_ROOT="$XRK_ROOT"
 EOF
 
 if [ -f "$XRK_ROOT/shell_modules/xrk_base.sh" ]; then

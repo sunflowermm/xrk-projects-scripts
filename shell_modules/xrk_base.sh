@@ -124,7 +124,7 @@ xrk_加载底层() {
 
 xrk_load_base() { xrk_加载底层 "$@"; }
 
-# --- 中文 API（与 common/bootstrap/update 等价，供菜单脚本直接使用）---
+# [中文 API] 与 common/bootstrap/update 等价，供菜单脚本直接使用
 if ! type 检测系统 &>/dev/null; then
     检测系统() { detect_os "$@"; }
     检测架构() { detect_arch "$@"; }
