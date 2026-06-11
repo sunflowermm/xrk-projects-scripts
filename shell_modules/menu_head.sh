@@ -1,16 +1,7 @@
 #!/bin/bash
 # 菜单脚本标准头部
 # 用法：source "$root/shell_modules/menu_head.sh" <need_common:0|1> <need_check:0|1> [附加模块...]
-
 root="${XRK_ROOT:-/xrk}"
-if ! type xrk_load_menu_head &>/dev/null; then
-    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
-    if [ -f "$root/shell_modules/bootstrap.sh" ]; then
-        # shellcheck source=/dev/null
-        source "$root/shell_modules/bootstrap.sh"
-    else
-        # shellcheck source=/dev/null
-        source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
-    fi
-fi
-xrk_load_menu_head "$@"
+# shellcheck source=/dev/null
+[ -f "$root/shell_modules/menu_boot.sh" ] && source "$root/shell_modules/menu_boot.sh"
+xrk_source_menu_head "$@"

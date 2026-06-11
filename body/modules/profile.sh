@@ -1,8 +1,11 @@
 #!/bin/bash
-# 独立模块：仅写入 .profile 所需行（xrk 环境与 puppeteer）
-# 可单独执行：bash $XRK_ROOT/body/modules/profile.sh
-XRK_ROOT="${XRK_ROOT:-/xrk}"
-[ -d "$XRK_ROOT" ] || { echo "请先安装脚本仓库到 $XRK_ROOT"; exit 1; }
+# 写入 .profile（xrk 环境与 puppeteer）
+root="${XRK_ROOT:-/xrk}"
+# shellcheck source=/dev/null
+[ -f "$root/shell_modules/xrk_boot.sh" ] && source "$root/shell_modules/xrk_boot.sh"
+xrk_ensure_bootstrap
+xrk_prepare_root
+xrk_ensure_repo_file "body/modules/tmux_profile.sh" 2>/dev/null || true
 
 profile="$HOME/.profile"
 needed=(

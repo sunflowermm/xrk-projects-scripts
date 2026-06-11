@@ -92,6 +92,38 @@ xrk_source_url() {
     return "$ret"
 }
 
+# 解析 XRK_ROOT：完整 clone 优先，否则用 ~/.xrk 缓存
+xrk_prepare_root() {
+    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+    local d
+    for d in "${XRK_ROOT:-/xrk}" "$HOME/.xrk" "/xrk"; do
+        if [ -f "$d/shell_modules/bootstrap.sh" ]; then
+            XRK_ROOT="$d"
+            export XRK_ROOT
+            return 0
+        fi
+    done
+    XRK_ROOT="${XRK_ROOT:-$HOME/.xrk}"
+    mkdir -p "$XRK_ROOT"
+    export XRK_ROOT
+}
+
+# 无完整 clone 时按需拉取仓库内单文件到 $XRK_ROOT
+xrk_ensure_repo_file() {
+    local relpath="$1" dest
+    xrk_ensure_bootstrap
+    xrk_prepare_root
+    dest="$XRK_ROOT/$relpath"
+    [ -f "$dest" ] && return 0
+    mkdir -p "$(dirname "$dest")"
+    if type xrk_download &>/dev/null; then
+        xrk_download "${SCRIPT_RAW_BASE}/$relpath" "$dest" 3 || return 1
+    else
+        curl -fsSL "${SCRIPT_RAW_BASE}/$relpath" -o "$dest" || return 1
+    fi
+    [ -f "$dest" ]
+}
+
 # 统一加载模块：优先本地，否则远程
 load_module() {
     local path="$1" root="${XRK_ROOT:-/xrk}"
@@ -162,23 +194,13 @@ xrk_bootstrap() {
     export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_SOURCE
 }
 
-# 确保 bootstrap 与 SCRIPT_RAW_BASE 就绪（无本地 /xrk 时从远程加载）
+# 确保 bootstrap 与 SCRIPT_RAW_BASE 就绪
 xrk_ensure_bootstrap() {
-    if type load_module &>/dev/null; then
-        [ -n "${SCRIPT_RAW_BASE:-}" ] && return 0
-        xrk_bootstrap "${XRK_SOURCE:-3}" 0
-        return 0
+    if ! type load_module &>/dev/null; then
+        echo "[xrk] bootstrap 未加载，请先 source shell_modules/xrk_boot.sh" >&2
+        return 1
     fi
-    local root="${XRK_ROOT:-/xrk}"
-    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
-    if [ -f "$root/shell_modules/bootstrap.sh" ]; then
-        # shellcheck source=/dev/null
-        source "$root/shell_modules/bootstrap.sh"
-    else
-        local base="${SCRIPT_RAW_BASE:-$_XRK_DEFAULT_BASE}"
-        # shellcheck source=/dev/null
-        source <(curl -sL --connect-timeout 10 --max-time 30 "${base}/shell_modules/bootstrap.sh")
-    fi
+    [ -n "${SCRIPT_RAW_BASE:-}" ] && return 0
     xrk_bootstrap "${XRK_SOURCE:-3}" 0
 }
 

@@ -6,23 +6,15 @@ cd "$HOME" || exit
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 
 _xm_init() {
-    [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
-    if [ -f "$XRK_ROOT/shell_modules/xm_head.sh" ]; then
+    root="${XRK_ROOT:-/xrk}"
+    if [ -f "$root/shell_modules/xm_head.sh" ]; then
         # shellcheck source=/dev/null
-        source "$XRK_ROOT/shell_modules/xm_head.sh"
-    elif ! type xrk_load_xm &>/dev/null; then
-        # shellcheck source=/dev/null
-        source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
-        if type xrk_load_xm &>/dev/null; then
-            xrk_load_xm
-        else
-            xrk_bootstrap "${XRK_SOURCE:-3}" 0
-            load_module "shell_modules/common.sh"
-            safe_source "shell_modules/menu_common.sh"
-            command -v git &>/dev/null || ensure_cmd git git 2>/dev/null || true
-            menu_init 0 0
-        fi
+        source "$root/shell_modules/xm_head.sh"
     else
+        # shellcheck source=/dev/null
+        [ -f "$root/shell_modules/xrk_boot.sh" ] && source "$root/shell_modules/xrk_boot.sh" \
+            || source <(curl -sL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh")
+        xrk_ensure_bootstrap
         xrk_load_xm
     fi
 }

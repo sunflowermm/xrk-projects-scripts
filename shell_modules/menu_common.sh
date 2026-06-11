@@ -204,6 +204,9 @@ menu_run_loop() {
         _mrun_handler="${_mrun_opts[$_last]}"
         unset "_mrun_opts[$_last]"
     fi
+    if [ "${#_mrun_opts[@]}" -gt 0 ] && [[ "${_mrun_opts[0]}" =~ ^[[:space:]]+$ ]] && [ ${#_mrun_opts[0]} -le 4 ]; then
+        _mrun_opts=("${_mrun_opts[@]:1}")
+    fi
     if [ -z "$_mrun_handler" ]; then
         menu_msg_err "menu_run_loop: 缺少 handler（请在选项后写 -- 函数名）"
         return 1
@@ -218,9 +221,9 @@ menu_run_loop() {
     fi
     while true; do
         menu_show "$title" "${_mrun_opts[@]}"
-        choice=$(menu_read_choice "请选择 [1-${#_mrun_opts[@]}]，0/q 返回: ") || exit 0
+        choice=$(menu_read_choice "请选择 [1-${MENU_OPT_COUNT}]，0/q 返回: ") || exit 0
         menu_should_exit "$choice" back && return 0
-        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#_mrun_opts[@]}" ]; then
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "$MENU_OPT_COUNT" ]; then
             "$_mrun_handler" "$choice" || return $?
         else
             menu_msg_err
