@@ -21,19 +21,39 @@ install_tmux_pkg() {
 }
 
 setup_oh_my_tmux() {
-    if [ ! -d "$HOME/.tmux" ]; then
+    if [ ! -d "$HOME/.tmux/.git" ]; then
+        rm -rf "$HOME/.tmux"
         echo "[tmux] 克隆 oh-my-tmux..."
         xrk_git_clone "https://github.com/gpakosz/.tmux.git" "$HOME/.tmux"
+    else
+        _tmux_fix_github_remote "$HOME/.tmux" "https://github.com/gpakosz/.tmux.git"
     fi
+}
+
+_tmux_fix_github_remote() {
+    local dir="$1" url="$2"
+    [ -d "$dir/.git" ] || return 0
+    local cur
+    cur=$(git -C "$dir" remote get-url origin 2>/dev/null) || return 0
+    case "$cur" in
+        *github.com/*) return 0 ;;
+    esac
+    git -C "$dir" remote set-url origin "$url"
 }
 
 setup_tpm() {
     mkdir -p "$HOME/.tmux/plugins"
-    if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
+    if [ ! -d "$HOME/.tmux/plugins/tpm/.git" ]; then
+        rm -rf "$HOME/.tmux/plugins/tpm"
         echo "[tmux] 安装 tpm..."
         xrk_git_clone "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm"
     else
-        (cd "$HOME/.tmux/plugins/tpm" && git pull --rebase --autostash)
+        _tmux_fix_github_remote "$HOME/.tmux/plugins/tpm" "https://github.com/tmux-plugins/tpm.git"
+        if ! (cd "$HOME/.tmux/plugins/tpm" && git pull --rebase --autostash); then
+            echo "[tmux] tpm 更新失败，重新安装..."
+            rm -rf "$HOME/.tmux/plugins/tpm"
+            xrk_git_clone "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm"
+        fi
     fi
     chmod -R 755 "$HOME/.tmux/plugins" 2>/dev/null || true
 }
