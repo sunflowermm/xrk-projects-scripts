@@ -31,13 +31,10 @@ setup_oh_my_tmux() {
 }
 
 _tmux_fix_github_remote() {
-    local dir="$1" url="$2"
+    local dir="$1" url="$2" cur
     [ -d "$dir/.git" ] || return 0
-    local cur
     cur=$(git -C "$dir" remote get-url origin 2>/dev/null) || return 0
-    case "$cur" in
-        *github.com/*) return 0 ;;
-    esac
+    [ "$cur" = "$url" ] && return 0
     git -C "$dir" remote set-url origin "$url"
 }
 
