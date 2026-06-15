@@ -62,7 +62,6 @@ link_conf() {
 }
 
 install_tmux_pkg
-[ "${XRK_TMUX_PKG_ONLY:-0}" = "1" ] && exit 0
 setup_oh_my_tmux
 setup_tpm
 link_conf

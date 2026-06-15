@@ -3,14 +3,9 @@
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 SESSION_NAME="新年快乐"
 TMUX_CONF="${HOME}/.tmux.conf"
-[ -f "$TMUX_CONF" ] || TMUX_CONF="$XRK_ROOT/body/.tmux.conf"
 
 _tmux() {
-    if [ -f "$HOME/.tmux.conf" ]; then
-        tmux "$@"
-    else
-        tmux -f "$TMUX_CONF" "$@"
-    fi
+    tmux "$@"
 }
 
 # 取最近活动的会话名（有多个存活会话时用于恢复上次使用的）
@@ -65,19 +60,18 @@ handle_error() {
     exit 1
 }
 
-# 检查依赖
-check_dependencies() {
-    if ! command -v tmux &>/dev/null; then
-        [ -f "$XRK_ROOT/body/modules/tmux.sh" ] || handle_error "未找到 tmux 安装模块"
-        XRK_TMUX_PKG_ONLY=1 bash "$XRK_ROOT/body/modules/tmux.sh" || handle_error "未安装 tmux"
+# 依赖由 body/modules/tmux.sh 统一安装
+ensure_tmux_env() {
+    if command -v tmux &>/dev/null && [ -d "$HOME/.tmux/.git" ] && [ -e "$HOME/.tmux.conf" ]; then
+        return 0
     fi
-    [ -f "$TMUX_CONF" ] || {
-        if [ -f "$XRK_ROOT/body/.tmux.conf" ]; then
-            ln -sf "$XRK_ROOT/body/.tmux.conf" "$HOME/.tmux.conf" 2>/dev/null || true
-            TMUX_CONF="$HOME/.tmux.conf"
-        fi
-    }
-    [ -f "$TMUX_CONF" ] || handle_error "配置文件不存在: $TMUX_CONF（可先 xm→3→7 配置 tmux）"
+    [ -f "$XRK_ROOT/body/modules/tmux.sh" ] || handle_error "未找到 tmux 安装模块"
+    bash "$XRK_ROOT/body/modules/tmux.sh" || handle_error "tmux 环境未就绪（可先 xm→3→7 配置）"
+}
+
+check_dependencies() {
+    ensure_tmux_env
+    [ -e "$TMUX_CONF" ] || handle_error "配置文件不存在: $TMUX_CONF"
     [ -f "$XRK_ROOT/body/window_a.sh" ] || handle_error "window_a.sh 不存在"
     [ -f "$XRK_ROOT/body/window_b.sh" ] || handle_error "window_b.sh 不存在"
     [ -f "$XRK_ROOT/body/window_c.sh" ] || handle_error "window_c.sh 不存在"

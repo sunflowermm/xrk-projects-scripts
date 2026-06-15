@@ -15,13 +15,6 @@ if [ -z "${XRK_TMUX_NO_WRAPPER:-}" ] && command -v tmux &>/dev/null; then
                 bash "${XRK_ROOT:-/xrk}/body/tmux.sh"
                 return $?
             fi
-            local _s
-            _s=$(command tmux list-sessions -F '#{session_activity} #{session_name}' 2>/dev/null \
-                | sort -rn | head -1 | cut -d' ' -f2-)
-            if [ -n "$_s" ]; then
-                command tmux attach-session -t "$_s"
-                return $?
-            fi
         fi
         command tmux "$@"
     }
