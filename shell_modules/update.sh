@@ -1,10 +1,9 @@
 #!/bin/bash
-# 升级与配置：bin 同步、葵崽/葵子拉取、环境模块
+# 升级与 bin 同步、葵崽/葵子拉取
 [ -f "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh" ] && source "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 XRK_BIN="${XRK_BIN:-/usr/local/bin}"
 
-# 仓库脚本 → XRK_BIN（xrk / xrkk / xyz / xag / tmux 等）
 xrk_bin同步() {
     declare -A files=(
         ["$XRK_BIN/xrkk"]="$XRK_ROOT/body/linux.sh"
@@ -16,20 +15,26 @@ xrk_bin同步() {
         ["$XRK_BIN/xrk-tmux"]="$XRK_ROOT/body/tmux.sh"
         ["$XRK_BIN/xrk-tmux-setup"]="$XRK_ROOT/body/modules/tmux.sh"
     )
-    local dest src n=0
+    local dest src n=0 missing=()
     mkdir -p "$XRK_BIN" 2>/dev/null || true
     for dest in "${!files[@]}"; do
         src="${files[$dest]}"
-        [ -f "$src" ] || continue
+        if [ ! -f "$src" ]; then
+            missing+=("$(basename "$dest")")
+            continue
+        fi
         cat "$src" > "$dest" && chmod 755 "$dest" && n=$((n + 1))
     done
-    [ "$n" -gt 0 ]
+    [ ${#missing[@]} -gt 0 ] && echo "[bin] 跳过（源缺失）: ${missing[*]}" >&2
+    if [ "$n" -gt 0 ]; then
+        echo "[bin] 已同步 $n 个命令 → $XRK_BIN"
+        return 0
+    fi
+    echo "[bin] 同步失败：无可用源文件" >&2
+    return 1
 }
 
-# 兼容旧名：同步 xrkk 时一并写入 xrk 等全部命令
-xrkk同步() {
-    xrk_bin同步
-}
+xrkk同步() { xrk_bin同步; }
 
 葵崽升级() {
     xrk_bin同步

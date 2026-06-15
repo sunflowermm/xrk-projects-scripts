@@ -1,24 +1,12 @@
 #!/bin/bash
 # 统一环境与工具安装菜单
 root="${XRK_ROOT:-/xrk}"
-if [ -f "$root/shell_modules/menu_boot.sh" ]; then
+# shellcheck source=/dev/null
+source "$root/shell_modules/menu_boot.sh" 2>/dev/null || {
     # shellcheck source=/dev/null
-    source "$root/shell_modules/menu_boot.sh"
-else
-    # shellcheck source=/dev/null
-    if [ -f "$root/shell_modules/xrk_boot.sh" ]; then
-        source "$root/shell_modules/xrk_boot.sh"
-    elif [ -f "$root/shell_modules/bootstrap.sh" ]; then
-        source "$root/shell_modules/bootstrap.sh"
-    else
-        tmp=$(mktemp "${TMPDIR:-/tmp}/xrk-bootstrap.XXXXXX") || exit 1
-        curl -fsSL "${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}/shell_modules/bootstrap.sh" \
-            -o "$tmp" || exit 1
-        source "$tmp"
-        rm -f "$tmp"
-    fi
+    source "$root/shell_modules/xrk_boot.sh"
     xrk_ensure_bootstrap
-fi
+}
 xrk_load_menu_head 0 0
 safe_source "shell_modules/update.sh"
 
@@ -32,7 +20,20 @@ _env_run_action() {
         python)   run_software "body/modules/python_uv.sh" ;;
         tmux)
             menu_require_repo || return 0
-            xrk_exec_script "body/tmux.sh" || { menu_msg_err "tmux 进入失败"; return 0; }
+            local sub
+            sub=$(menu_read_choice "tmux [1]安装配置 [2]进入桌面 [0]返回: ") || return 0
+            case "$sub" in
+                1)
+                    xrk_exec_script "body/modules/tmux.sh" \
+                        && menu_msg_ok "tmux 已配置（xrk-tmux --status 可检查）"
+                    ;;
+                2)
+                    xrk_exec_script "body/tmux.sh" \
+                        || menu_msg_err "进入失败，可先选 1 安装配置"
+                    ;;
+                0) ;;
+                *) menu_msg_err "无效选项" ;;
+            esac
             ;;
         profile)
             menu_require_repo || return 1

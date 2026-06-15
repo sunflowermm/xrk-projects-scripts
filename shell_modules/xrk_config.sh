@@ -25,7 +25,12 @@ AGT_REPO_GITCODE="https://gitcode.com/Xrkseek/XRK-AGT.git"
 AGT_REPO_GITEE="https://gitee.com/xrkseek/XRK-AGT.git"
 AGT_REPO_GITHUB="https://github.com/sunflowermm/XRK-AGT.git"
 
+# tmux 向日葵桌面
+XRK_TMUX_SESSION="新年快乐"
+XRK_TMUX_WINDOW_NAMES="来财 来福 来运"
+
 export XRK_ROOT XRK_BIN
+export XRK_TMUX_SESSION XRK_TMUX_WINDOW_NAMES
 export YZ_DEFAULT_NAME YZ_DEFAULT_DIR
 export YZ_REPO_GITCODE YZ_REPO_GITEE YZ_REPO_GITHUB
 export AGT_DEFAULT_NAME AGT_DEFAULT_DIR

@@ -96,6 +96,12 @@ xrkk $XRKK_VERSION — 向日葵命令行
   path              刷新并显示葵崽/葵子路径
   menu <子菜单>     kuizai plugin js advanced env error nc xrk
 
+tmux:
+  xrk-tmux          进入向日葵桌面
+  xrk-tmux --setup  安装/配置 tmux
+  xrk-tmux --status 检查环境
+  前缀 Alt+Space | 分离 d | 重载 r | 帮助 ?
+
 兼容简写:
   i / f / mk / list / l
   plugin js dele diadele up error nc

@@ -1,7 +1,6 @@
 #!/bin/bash
-# 葵崽脚本统一底层入口：按场景加载模块，并提供中文函数别名
-# 用法：source shell_modules/xrk_base.sh && xrk_加载底层 [profile]
-# profile: bootstrap | common | install | menu | software | distro | xm | xrk | deploy | window | full
+# 葵崽脚本统一底层：xrk_加载底层 [profile]
+# profile: bootstrap common install menu software distro xm xrk deploy window full
 
 [ -f "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh" ] && source "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
@@ -41,18 +40,7 @@ _xrk_ensure_common() {
     source <(curl -sL --connect-timeout 10 --max-time 30 "${base}/shell_modules/common.sh")
 }
 
-# 统一加载底层模块
-# profile:
-#   bootstrap — 仅引导与源
-#   common    — bootstrap + common（默认）
-#   install   — common + install.sh（install_package 别名）
-#   menu      — common + init + menu_common
-#   software  — common + versions + github + 颜色
-#   distro    — bootstrap + 发行版安装依赖 + common + yunzai_distro
-#   xrk     — 源初始化 + menu + update（body/xrk 主菜单，.theme 由 .init 加载）
-#   deploy  — install + Yunzai_pieces + github + init + update（xrkwrite 等）
-#   window  — common + init + github（tmux 窗格）
-#   full    — menu + install + update
+# 统一加载底层模块（profile 见文件头）
 xrk_加载底层() {
     local profile="${1:-common}"
 

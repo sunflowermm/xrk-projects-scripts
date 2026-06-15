@@ -38,7 +38,7 @@ current_time=$(date "+%Y-%m-%d %H:%M:%S")
 echo -e "${caidan1}${sentence}${bg}"
 
 show_menu() {
-    local menu_width=$(menu_calc_width "向日葵脚本" "集中营 1013495491" "葵崽/葵子" "脚本相关" "安装 Napcat" "环境与模块")
+    local menu_width=$(menu_calc_width "向日葵脚本" "集中营 1075364017" "葵崽/葵子" "脚本相关" "安装 Napcat" "环境与模块")
     local status_width=16
     local prefix="        "
 
@@ -56,8 +56,7 @@ show_menu() {
     local border_bot=$(menu_build_border "$menu_width" bot)
     local status_top=$(menu_build_border "$status_width" top)
     local status_bot=$(menu_build_border "$status_width" bot)
-    
-    # 显示菜单（合并重复代码）
+
     echo -e "${caidan1}${prefix}${border_top}${bg}"
     echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "向日葵脚本" "$menu_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_mid}${bg}"

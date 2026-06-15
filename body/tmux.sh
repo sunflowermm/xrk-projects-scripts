@@ -1,10 +1,28 @@
 #!/bin/bash
-# 进入或切换到向日葵 tmux 桌面（菜单 7 / xrk-tmux；内外 tmux 统一入口）
+# 向日葵 tmux 桌面：xrk-tmux [--setup|--status|-h]
 
 XRK_ROOT="${XRK_ROOT:-/xrk}"
-SESSION_NAME="新年快乐"
+[ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+# shellcheck source=/dev/null
+[ -f "$XRK_ROOT/shell_modules/xrk_config.sh" ] && source "$XRK_ROOT/shell_modules/xrk_config.sh"
+
+SESSION_NAME="${XRK_TMUX_SESSION:-新年快乐}"
 TMUX_CONF="${HOME}/.tmux.conf"
-XRK_TMUX_WINDOWS=(来财 来福 来运)
+XRK_MENU="$HOME/.tmux/xrk-menu"
+read -ra XRK_TMUX_WINDOWS <<< "${XRK_TMUX_WINDOW_NAMES:-来财 来福 来运}"
+
+_tmux_usage() {
+    cat <<EOF
+用法: xrk-tmux [选项]
+  (无参数)    进入或创建「${SESSION_NAME}」桌面
+  --setup     仅安装/配置 tmux（tpm、插件、配置链接）
+  --status    检查 tmux 环境
+  -h, --help  本帮助
+
+快捷键: 前缀 Alt+Space | 分离 d | 重载 r | 帮助 ?
+窗口: ${XRK_TMUX_WINDOWS[*]}
+EOF
+}
 
 _tmux_ensure_utf8() {
     case "${LANG:-}" in
@@ -28,8 +46,38 @@ _tmux_latest_session() {
         | sort -rn | head -1 | cut -d' ' -f2-
 }
 
+_tmux_conf_ok() {
+    [ -e "$TMUX_CONF" ] || return 1
+    local want="$XRK_ROOT/body/.tmux.conf" cur
+    cur=$(readlink -f "$TMUX_CONF" 2>/dev/null || readlink "$TMUX_CONF" 2>/dev/null || echo "$TMUX_CONF")
+    want=$(readlink -f "$want" 2>/dev/null || echo "$want")
+    [ "$cur" = "$want" ] || [ -f "$TMUX_CONF" ]
+}
+
+_tmux_plugins_ok() {
+    [ -d "$HOME/.tmux/plugins/tmux-cpu" ] \
+        && [ -d "$HOME/.tmux/plugins/tmux-yank" ] \
+        && [ -d "$HOME/.tmux/plugins/tmux-resurrect" ]
+}
+
+_tmux_status() {
+    echo "tmux: $(command -v tmux >/dev/null && tmux -V || echo 未安装)"
+    echo "配置: $TMUX_CONF $(_tmux_conf_ok && echo OK || echo 未链接)"
+    echo "菜单: $XRK_MENU $([ -x "$XRK_MENU" ] && echo OK || echo 缺失)"
+    echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
+    echo "插件: $(_tmux_plugins_ok && echo 齐全 || echo 不完整)"
+    tmux has-session -t "$SESSION_NAME" 2>/dev/null \
+        && echo "会话: $SESSION_NAME 已存在" \
+        || echo "会话: $SESSION_NAME 未创建"
+}
+
 _tmux_reload_conf() {
-    tmux source-file "$TMUX_CONF" 2>/dev/null || true
+    if tmux source-file "$TMUX_CONF" 2>/dev/null; then
+        [ -n "$TMUX" ] && tmux display-message "配置已重载" 2>/dev/null || true
+        return 0
+    fi
+    echo "[tmux] 配置重载失败: $TMUX_CONF" >&2
+    return 1
 }
 
 _tmux_resolve_target() {
@@ -45,7 +93,8 @@ _tmux_connect() {
     if [ -n "$TMUX" ]; then
         cur=$(tmux display-message -p '#S' 2>/dev/null || true)
         if [ "$cur" = "$target" ]; then
-            echo "[tmux] 已在会话: $target（配置已重载）"
+            echo "[tmux] 已在会话: $target"
+            _tmux_reload_conf
             return 0
         fi
         echo "[tmux] 切换到会话: $target"
@@ -62,51 +111,79 @@ _tmux_connect() {
 }
 
 create_desktop_layout() {
+    local s="$SESSION_NAME"
     _tmux_ensure_utf8
-    tmux new-session -d -s "$SESSION_NAME" -n "来财" "bash $XRK_ROOT/body/window_a.sh; exec bash"
-    tmux split-window -v -t "$SESSION_NAME:来财" "bash $XRK_ROOT/body/window_a1.sh; exec bash"
-    tmux new-window -t "$SESSION_NAME" -n "来福" "bash $XRK_ROOT/body/window_b.sh; exec bash"
-    tmux split-window -h -t "$SESSION_NAME:来福" "bash $XRK_ROOT/body/window_b.sh; exec bash"
-    tmux new-window -t "$SESSION_NAME" -n "来运" "bash $XRK_ROOT/body/window_c.sh; exec bash"
-    tmux split-window -h -t "$SESSION_NAME:来运" "bash $XRK_ROOT/body/window_c.sh; exec bash"
-    tmux select-pane -t 0
-    tmux split-window -v "exec bash"
-    tmux select-window -t "$SESSION_NAME:来财"
-    _tmux_apply_window_names "$SESSION_NAME"
+
+    tmux new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}" \
+        "bash $XRK_ROOT/body/window_a.sh; exec bash" \
+        || { echo "[tmux] 创建会话失败" >&2; return 1; }
+    tmux split-window -v -t "$s:0" "bash $XRK_ROOT/body/window_a1.sh; exec bash"
+
+    tmux new-window -t "$s:1" -n "${XRK_TMUX_WINDOWS[1]}" \
+        "bash $XRK_ROOT/body/window_b.sh; exec bash"
+    tmux split-window -h -t "$s:1" "bash $XRK_ROOT/body/window_b.sh; exec bash"
+
+    tmux new-window -t "$s:2" -n "${XRK_TMUX_WINDOWS[2]}" \
+        "bash $XRK_ROOT/body/window_c.sh; exec bash"
+    tmux split-window -h -t "$s:2" "bash $XRK_ROOT/body/window_c.sh; exec bash"
+
+    tmux select-window -t "$s:0"
+    tmux select-pane -t "$s:0.0"
+    tmux split-window -v -t "$s:0.0" "exec bash"
+    tmux select-window -t "$s:0"
+    tmux select-pane -t "$s:0.0"
+    _tmux_apply_window_names "$s"
+    echo "[tmux] 桌面已创建: ${XRK_TMUX_WINDOWS[*]}"
 }
 
 ensure_tmux_env() {
-    command -v tmux &>/dev/null \
-        && [ -d "$HOME/.tmux/.git" ] \
-        && [ -e "$TMUX_CONF" ] && return 0
-    echo "[tmux] 环境未就绪，正在安装…"
+    local ok=1
+    command -v tmux &>/dev/null || ok=0
+    [ -f "$HOME/.tmux/plugins/tpm/tpm" ] || ok=0
+    _tmux_conf_ok || ok=0
+    [ -x "$XRK_MENU" ] || ok=0
+    _tmux_plugins_ok || ok=0
+    [ "$ok" -eq 1 ] && return 0
+
+    echo "[tmux] 环境未就绪，正在安装/修复…"
     bash "$XRK_ROOT/body/modules/tmux.sh" || {
-        echo "错误: tmux 环境未就绪（可先 xm→3→7 配置）" >&2
-        exit 1
+        echo "[tmux] 安装失败。可手动: bash $XRK_ROOT/body/modules/tmux.sh" >&2
+        return 1
     }
+    _tmux_plugins_ok || echo "[tmux] 提示: 插件可能未装全，可再运行 xrk-tmux --setup" >&2
+    return 0
 }
 
 goto_desktop() {
     local target
 
     _tmux_ensure_utf8
-    _tmux_reload_conf
+    ensure_tmux_env || exit 1
+    _tmux_reload_conf || true
     target=$(_tmux_resolve_target)
     if [ -n "$target" ]; then
         _tmux_connect "$target"
         return
     fi
 
-    echo "[tmux] 创建向日葵桌面布局…"
-    create_desktop_layout
-    _tmux_reload_conf
+    echo "[tmux] 创建向日葵桌面…"
+    create_desktop_layout || exit 1
+    _tmux_reload_conf || true
     _tmux_connect "$SESSION_NAME"
 }
 
-ensure_tmux_env
-for _w in window_a window_b window_c; do
+case "${1:-}" in
+    -h|--help)   _tmux_usage; exit 0 ;;
+    --status)    _tmux_status; exit 0 ;;
+    --setup)
+        bash "$XRK_ROOT/body/modules/tmux.sh"
+        exit $?
+        ;;
+esac
+
+for _w in window_a window_a1 window_b window_c; do
     [ -f "$XRK_ROOT/body/${_w}.sh" ] || {
-        echo "错误: ${_w}.sh 不存在" >&2
+        echo "[tmux] 缺少 $XRK_ROOT/body/${_w}.sh" >&2
         exit 1
     }
 done
