@@ -85,6 +85,11 @@ while true; do
             ;;
         4)
             require_xrk || continue
+            if [ -f "$XRK_ROOT/shell_modules/update.sh" ]; then
+                # shellcheck source=/dev/null
+                source "$XRK_ROOT/shell_modules/update.sh"
+                xrk_bin同步 && echo "[xm] 命令已写入 $XRK_BIN"
+            fi
             exec bash "$XRK_ROOT/body/xrk"
             ;;
         *) menu_msg_err ;;

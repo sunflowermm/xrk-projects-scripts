@@ -1,59 +1,94 @@
 #!/bin/bash
-# 葵崽(XRK-Yunzai)路径检测：check_changes、search_directories（供 .init / xrk / 菜单 使用）
-# 约定：search_root 默认 $HOME，最多检测 5 级目录；先检查标志目录(plugins/XRK、plugins/other)，
-#       再读 package.json 确认 name=xrk-yunzai，避免扫描 node_modules 等影响性能
+# 葵崽(XRK-Yunzai) / 葵子(XRK-AGT) 路径检测（供 .init / xrk / 菜单 使用）
+# 约定：先检查默认目录与缓存路径，再按 package.json name 深度搜索
 
-XRK_MARKER_DIRS="plugins/XRK plugins/other"
+KUIZI_PKG_YUNZAI="${KUIZI_PKG_YUNZAI:-xrk-yunzai}"
+KUIZI_PKG_AGT="${KUIZI_PKG_AGT:-xrk-agt}"
 
-check_changes() {
-    search_root="${search_root:-$HOME}"
-    if [ -n "${xyz:-}" ] && [ -f "${xyz}/package.json" ] && check_directory "$xyz" 2>/dev/null; then
-        export yz="$xyz" xyz="$xyz"
-        return 0
-    fi
-    export xyz="" yz=""
-}
-
-check_directory() {
+_read_pkg_name() {
     local dir="$1" name
-    [ ! -f "$dir/package.json" ] && return 1
+    [ -f "$dir/package.json" ] || return 1
     name=$(jq -r '.name // empty' "$dir/package.json" 2>/dev/null)
     if [ -z "$name" ]; then
         name=$(grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]+"' "$dir/package.json" 2>/dev/null \
             | head -1 | sed -n 's/.*"\([^"]*\)"$/\1/p')
     fi
-    [[ "$name" == "xrk-yunzai" ]] || return 1
-    if [ -z "${xyz:-}" ]; then
-        export xyz="$dir" yz="$dir"
-    fi
-    return 0
+    [ -n "$name" ] && echo "$name"
 }
 
-# 若目录下存在 XRK 专属子目录则认为是候选，再读 package.json 确认
-has_xrk_marker() {
-    local dir="$1" sub
-    for sub in $XRK_MARKER_DIRS; do
-        [ -d "$dir/$sub" ] && return 0
-    done
-    return 1
+_bind_product_dir() {
+    local dir="$1" pkg="$2"
+    case "$pkg" in
+        "$KUIZI_PKG_YUNZAI")
+            [ -n "${yz:-}" ] && return 0
+            export yz="$dir" xyz="$dir"
+            ;;
+        "$KUIZI_PKG_AGT")
+            [ -n "${agt:-}" ] && return 0
+            export agt="$dir"
+            ;;
+    esac
+}
+
+_try_register_dir() {
+    local dir="$1" name
+    name=$(_read_pkg_name "$dir") || return 1
+    case "$name" in
+        "$KUIZI_PKG_YUNZAI") _bind_product_dir "$dir" "$KUIZI_PKG_YUNZAI" ;;
+        "$KUIZI_PKG_AGT")    _bind_product_dir "$dir" "$KUIZI_PKG_AGT" ;;
+        *) return 1 ;;
+    esac
+}
+
+_check_cached_path() {
+    local dir="$1" pkg="$2" name
+    [ -n "$dir" ] || return 1
+    [ -d "$dir" ] || return 1
+    name=$(_read_pkg_name "$dir") || return 1
+    [ "$name" = "$pkg" ]
+}
+
+check_changes() {
+    local ok_yz=0 ok_agt=0
+
+    if [ -n "${xyz:-}" ] && _check_cached_path "$xyz" "$KUIZI_PKG_YUNZAI"; then
+        export yz="$xyz"
+        ok_yz=1
+    else
+        unset yz xyz
+    fi
+
+    if [ -n "${agt:-}" ] && _check_cached_path "$agt" "$KUIZI_PKG_AGT"; then
+        ok_agt=1
+    else
+        unset agt
+    fi
+
+    [ "$ok_yz" = "1" ] || [ "$ok_agt" = "1" ]
 }
 
 search_common_paths() {
-    check_directory "${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}"
+    _try_register_dir "${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}"
+    _try_register_dir "${AGT_DEFAULT_DIR:-$HOME/XRK-AGT}"
 }
 
-# 最多 5 级目录；先按专属目录筛选再读 package.json
 search_all_directories() {
     local dir
-    while IFS= read -r -d $'\0' dir; do
-        has_xrk_marker "$dir" && check_directory "$dir" && return 0
-    done < <(find "$search_root" -maxdepth 5 -type d -print0 2>/dev/null)
+    while IFS= read -r -d '' dir; do
+        _try_register_dir "$dir"
+        [ -n "${yz:-}" ] && [ -n "${agt:-}" ] && return 0
+    done < <(find "${search_root:-$HOME}" -maxdepth 5 -type d -print0 2>/dev/null)
     return 1
 }
 
 search_directories() {
-    search_common_paths || search_all_directories
+    search_common_paths
+    [ -n "${yz:-}" ] && [ -n "${agt:-}" ] && return 0
+    search_all_directories
 }
 
 检测葵崽路径() { search_directories; }
 刷新葵崽路径() { check_changes; search_directories; }
+
+# 兼容旧名
+check_directory() { _try_register_dir "$1"; }

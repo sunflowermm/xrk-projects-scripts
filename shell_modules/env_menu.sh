@@ -38,10 +38,10 @@ _env_run_action() {
             menu_require_repo || return 1
             XRK_PROFILE_QUIET=0 xrk_exec_script "body/modules/profile.sh" || return 1
             ;;
-        xrkk)
+        bin|xrkk)
             menu_require_repo || return 1
-            xrkk同步 || return 1
-            menu_msg_ok "xrkk 已更新"
+            xrk_bin同步 || return 1
+            menu_msg_ok "命令已同步到 ${XRK_BIN:-/usr/local/bin}"
             ;;
         *) menu_msg_err "未知操作: $1"; return 1 ;;
     esac
@@ -63,5 +63,5 @@ _env_handle() {
 
 menu_run_loop "环境与工具安装" \
     "yq" "Chromium" "Node.js" "pnpm" "ffmpeg" "Python + uv" \
-    "tmux 安装/进入" "配置 .profile" "同步 xrkk 到 bin" "返回" \
+    "tmux 安装/进入" "配置 .profile" "同步命令到 bin" "返回" \
     -- _env_handle

@@ -1,0 +1,31 @@
+#!/bin/bash
+root="${XRK_ROOT:-/xrk}"
+# shellcheck source=/dev/null
+source "$root/shell_modules/menu_head.sh" 0 1
+safe_source "shell_modules/kuizi_products.sh"
+
+show_help() {
+    echo "用法: xag [参数]"
+    echo "选项:"
+    echo "  无参数    - 正常启动葵子"
+    echo "  数字参数  - 启动葵子并传递该数字参数"
+    echo "  --h, -h   - 显示此帮助信息"
+    exit 0
+}
+
+if [[ "$1" == "--h" || "$1" == "-h" ]]; then
+    show_help
+fi
+
+kuizi_refresh_paths
+_agt="$(kuizi_agt_dir)"
+[ -d "$_agt" ] || { echo "未找到葵子目录: ${AGT_DEFAULT_DIR:-$HOME/XRK-AGT}"; exit 1; }
+
+echo "正在启动葵子"
+redis-server --daemonize yes --save 900 1 --save 300 10 2>/dev/null || true
+
+if [ -z "$1" ]; then
+    cd "$_agt" && node --expose-gc app
+else
+    cd "$_agt" && node --expose-gc app "$1"
+fi

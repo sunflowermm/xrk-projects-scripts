@@ -19,7 +19,7 @@ if [[ "$1" == "--h" || "$1" == "-h" ]]; then
 fi
 
 _yz="$(xrk_yz_dir)"
-[ -d "$_yz" ] || { echo "未找到葵崽目录: $_yz"; exit 1; }
+[ -d "$_yz" ] || { echo "未找到葵崽目录（默认: ${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}）"; exit 1; }
 
 echo "正在启动葵崽"
 redis-server --daemonize yes --save 900 1 --save 300 10 2>/dev/null || true

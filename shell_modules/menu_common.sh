@@ -241,11 +241,18 @@ xrk_dialog_infobox() {
     xrk_dialog --infobox "$1" "${2:-3}" "${3:-44}"
 }
 
-# 葵崽根目录（menu_init 探测后使用）
+# 葵崽根目录（仅返回已探测到的路径，未安装时为空）
 xrk_yz_dir() {
-    echo "${yz:-${xyz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}}"
+    echo "${yz:-${xyz:-}}"
 }
+
+# 葵子根目录（仅返回已探测到的路径，未安装时为空）
+xrk_agt_dir() {
+    echo "${agt:-}"
+}
+
 葵崽路径() { xrk_yz_dir; }
+葵子路径() { xrk_agt_dir; }
 
 menu_show_double() {
     local title="$1" hint width opts=()
@@ -308,12 +315,10 @@ menu_init() {
     ensure_menu_colors
     if [ "$need_check" = "1" ]; then
         type check_changes &>/dev/null && check_changes
-        if [ -z "${xyz:-}" ] && [ -z "${yz:-}" ]; then
+        if [ -z "${yz:-}" ] || [ -z "${agt:-}" ]; then
             type search_directories &>/dev/null && search_directories
         fi
     fi
-    yz="${yz:-${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}}"
-    xyz="${xyz:-$yz}"
     red="${color_red:-\033[31m}"
     green="${bold_green:-\033[1;32m}"
     yellow="${color_yellow:-\033[33m}"

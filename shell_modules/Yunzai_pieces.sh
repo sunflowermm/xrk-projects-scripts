@@ -9,6 +9,9 @@ SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/x
 [ -z "$SCRIPT_CLONE_URL" ] && SCRIPT_CLONE_URL="${_XRK_DEFAULT_CLONE:-https://gitee.com/xrkseek/xrk-projects-scripts.git}"
 export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_ROOT
 
+[ -f "$XRK_ROOT/shell_modules/kuizi_repos.sh" ] && source "$XRK_ROOT/shell_modules/kuizi_repos.sh"
+[ -f "$XRK_ROOT/shell_modules/kuizi_products.sh" ] && source "$XRK_ROOT/shell_modules/kuizi_products.sh"
+
 克隆脚本() {
     echo -e "${color_light_blue}正在克隆脚本文件...${reset_color}"
     if git clone --depth=1 "$SCRIPT_CLONE_URL" "$XRK_ROOT"; then
@@ -21,39 +24,23 @@ export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_ROOT
     fi
 }
 
-克隆葵崽() {
-    local repo_url="$1"
-    local repo_name="$2"
-    echo -e "${color_light_blue}正在克隆 $repo_name...${reset_color}"
-    if git clone --depth=1 "$repo_url" "$HOME/$repo_name"; then
-        echo -e "${color_light_green}$repo_name 克隆成功${reset_color}"
-        chmod +x "$XRK_ROOT/judge.sh"
-        . "$XRK_ROOT/judge.sh"
-    else
-        echo -e "${color_red}$repo_name 克隆失败${reset_color}"
-        exit 1
-    fi
-}
-
-# 检测已安装葵崽，若存在则询问是否删除后继续
+# 检测已安装葵崽，若存在则询问是否删除后继续（不影响葵子）
 检测葵崽存在魔法() {
     source "$XRK_ROOT/shell_modules/init.sh"
     check_changes
     search_directories
-    [ -z "${xyz:-}" ] && [ -z "${yz:-}" ] && return 0
-    if ! xrk_confirm "检测到已安装葵崽(XRK-Yunzai)，是否删除并继续脚本 (是/否)" '^(是|[Yy])$'; then
+    local yz_dir
+    yz_dir="${yz:-${xyz:-}}"
+    [ -z "$yz_dir" ] && return 0
+    [ -d "$yz_dir" ] || return 0
+    if ! xrk_confirm "检测到已安装葵崽($yz_dir)，是否删除并继续 (是/否)" '^(是|[Yy])$'; then
         echo -e "${color_red}操作取消，退出脚本${reset_color}"
         exit 1
     fi
-    local to_del="${yz:-$xyz}"
-    [ -z "$to_del" ] && to_del="${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}"
-    if [ ! -d "$to_del" ]; then
-        echo -e "${color_red}未找到葵崽路径，无法删除${reset_color}"
-        exit 1
-    fi
     echo -e "${color_light_blue}正在删除葵崽...${reset_color}"
-    rm -rf "$to_del" && echo -e "${color_light_green}葵崽已成功删除${reset_color}" \
+    rm -rf "$yz_dir" && echo -e "${color_light_green}葵崽已成功删除${reset_color}" \
         || { echo -e "${color_red}删除葵崽失败${reset_color}"; exit 1; }
+    unset yz xyz
 }
 
 检测npm-node-pnpm安装() {
@@ -80,21 +67,19 @@ export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_ROOT
 葵崽安装菜单() {
     local yz_dir="${YZ_DEFAULT_DIR:-$HOME/XRK-Yunzai}" name="${YZ_DEFAULT_NAME:-XRK-Yunzai}"
     echo -e "${color_cyan}++++++++++++++++++++++++${reset_color}"
-    echo " 1. $name (葵崽)"
+    echo " 1. $name (葵崽) — 源: $(kuizi_source_label) / 三仓库"
+    kuizi_list_mirror_urls yunzai | sed 's/^/    /'
     echo -e "${color_cyan}++++++++++++++++++++++++${reset_color}"
     read -t 1 -rp "[自动选择葵崽]： " choice
     [ -z "$choice" ] && { echo -e "${color_red}超时未选择，默认选择葵崽${reset_color}"; choice=1; }
     [ "$choice" != "1" ] && echo -e "${color_red}无效选择，默认选择葵崽${reset_color}"
-    克隆葵崽 "https://gitcode.com/Xrkseek/XRK-Yunzai.git" "$name"
-    export xyz="$yz_dir" yz="$yz_dir"
-    source "$XRK_ROOT/shell_modules/github.sh"
+
+    kuizi_install_yunzai || {
+        echo -e "${color_red}葵崽安装失败${reset_color}"
+        exit 1
+    }
+
     if [[ -d "$yz_dir" ]]; then
-        echo -e "${color_light_blue}正在安装 $name 依赖...${reset_color}"
-        cd "$yz_dir" || exit
-        xrk_git_clone "https://github.com/yoimiya-kokomi/miao-plugin.git" "./plugins/miao-plugin/"
-        git clone https://gitee.com/TimeRainStarSky/Yunzai-genshin.git ./plugins/genshin/
-        export PUPPETEER_SKIP_DOWNLOAD='true'
-        pnpm update puppeteer@19.8.3 -w
         cd "$HOME" || exit
         bash "$XRK_ROOT/body/xrkwrite.sh"
         echo -e "${color_light_green}输入 xyz 启动葵崽 ($name)${reset_color}"
