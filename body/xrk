@@ -86,7 +86,7 @@ while true; do
         3) run_software "project-install/NapCat.sh" ;;
         4) bash "$XRK_ROOT/body/modules/env_module.sh" ;;
         r)
-            echo -e "开始更新至最新脚本"
+            echo -e "${caidan2}开始更新至最新脚本${bg}"
             xrk_repo_sync || { echo "[xrk] 脚本更新失败"; exit 1; }
             葵崽升级
             echo "更新完成，正在退出"
@@ -96,4 +96,5 @@ while true; do
             menu_msg_err
             ;;
     esac
+    重新加载主菜单环境
 done

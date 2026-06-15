@@ -10,5 +10,6 @@ menu_init 0 1
 
 重新加载主菜单环境() {
     xrk_加载底层 xrk
+    unset XRK_THEME_ACTIVE
     menu_init 0 1
 }

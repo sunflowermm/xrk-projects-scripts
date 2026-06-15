@@ -1,6 +1,6 @@
 #!/bin/bash
 # 葵崽脚本统一底层：xrk_加载底层 [profile]
-# profile: bootstrap common install menu software distro xm xrk deploy window full
+# profile: bootstrap common install menu software distro xm xrk deploy full
 
 [ -f "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh" ] && source "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
@@ -71,6 +71,7 @@ xrk_加载底层() {
         menu)
             xrk_加载底层 common
             safe_source "shell_modules/init.sh"
+            safe_source "shell_modules/theme.sh"
             safe_source "shell_modules/menu_common.sh"
             ;;
         software)
@@ -90,13 +91,6 @@ xrk_加载底层() {
             safe_source "shell_modules/github.sh"
             safe_source "shell_modules/init.sh"
             safe_source "shell_modules/update.sh"
-            ;;
-        window)
-            _xrk_ensure_bootstrap
-            _xrk_ensure_common
-            safe_source "shell_modules/init.sh"
-            safe_source "shell_modules/github.sh"
-            safe_source "shell_modules/menu_common.sh"
             ;;
         full)
             xrk_加载底层 menu

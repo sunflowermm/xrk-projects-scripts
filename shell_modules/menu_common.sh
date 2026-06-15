@@ -1,14 +1,18 @@
 #!/bin/bash
 # 菜单公共：宽度/对齐/边框、menu_show、menu_init、run_software 等；依赖 SCRIPT_RAW_BASE（.init 或 repo_source）
 
-ensure_menu_colors() {
+_ensure_menu_colors() {
+    if type xrk_ensure_menu_colors &>/dev/null; then
+        xrk_ensure_menu_colors
+        return 0
+    fi
     [ -z "$bg" ] && bg="\033[0m"
     [ -z "$caidan1" ] && caidan1="\033[1;32m"
     [ -z "$caidan2" ] && caidan2="\033[1;36m"
     [ -z "$caidan3" ] && caidan3="\033[0;33m"
     MENU_HINT_EXIT="${caidan3}输入 q 或 0 退出${bg}"
 }
-ensure_menu_colors
+_ensure_menu_colors
 
 # 统一 dialog 主题（供 jsdialog / 插件等触屏菜单复用）
 XRK_DIALOG_BACKTITLE="${XRK_DIALOG_BACKTITLE:-向日葵脚本助手}"
@@ -304,29 +308,34 @@ menu_init() {
             source "$root/shell_modules/common.sh"
         fi
     fi
-    if [ -z "${caidan1:-}" ] && [ -f "$root/.init" ]; then
+    if [ -f "$root/shell_modules/theme.sh" ]; then
         # shellcheck source=/dev/null
-        source "$root/.init"
-    elif [ -z "${color_red:-}" ] && [ -f "$root/shell_modules/color.sh" ]; then
+        source "$root/shell_modules/theme.sh"
+        xrk_load_theme
+    elif [ -f "$root/.color" ]; then
         # shellcheck source=/dev/null
-        source "$root/shell_modules/color.sh"
-        [ -f "$root/.color" ] && source "$root/.color" 2>/dev/null || true
+        source "$root/.color"
+    else
+        _ensure_menu_colors
     fi
-    ensure_menu_colors
+    if type xrk_sync_menu_aliases &>/dev/null; then
+        xrk_sync_menu_aliases
+    else
+        red="${color_red:-\033[31m}"
+        green="${bold_green:-\033[1;32m}"
+        yellow="${color_yellow:-\033[33m}"
+        bg="${bg:-\033[0m}"
+        RED="${RED:-$red}"
+        GREEN="${GREEN:-$green}"
+        YELLOW="${YELLOW:-$yellow}"
+        NC="${NC:-$bg}"
+    fi
     if [ "$need_check" = "1" ]; then
         type check_changes &>/dev/null && check_changes
         if [ -z "${yz:-}" ] || [ -z "${agt:-}" ]; then
             type search_directories &>/dev/null && search_directories
         fi
     fi
-    red="${color_red:-\033[31m}"
-    green="${bold_green:-\033[1;32m}"
-    yellow="${color_yellow:-\033[33m}"
-    bg="${bg:-\033[0m}"
-    RED="${RED:-$red}"
-    GREEN="${GREEN:-$green}"
-    YELLOW="${YELLOW:-$yellow}"
-    NC="${NC:-$bg}"
 }
 
 menu_check_deps() {

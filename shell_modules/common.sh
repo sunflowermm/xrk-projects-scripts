@@ -446,10 +446,17 @@ show_progress() {
 
 # 导出简写颜色变量（供菜单/安装脚本复用 color.sh）
 xrk_colors() {
-    [ -n "${RED:-}" ] && return 0
-    if [ -f "${XRK_ROOT:-/xrk}/shell_modules/color.sh" ]; then
+    local root="${XRK_ROOT:-/xrk}"
+    if [ -f "$root/shell_modules/theme.sh" ]; then
         # shellcheck source=/dev/null
-        source "${XRK_ROOT:-/xrk}/shell_modules/color.sh"
+        source "$root/shell_modules/theme.sh"
+        xrk_load_theme
+        return 0
+    fi
+    [ -n "${RED:-}" ] && return 0
+    if [ -f "$root/shell_modules/color.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$root/shell_modules/color.sh"
         return 0
     fi
     RED="${RED:-\033[31m}"
