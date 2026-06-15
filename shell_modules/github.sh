@@ -58,8 +58,8 @@ _xrk_pick_github_proxy() {
     echo ""
 }
 
-# 剥离已有代理前缀，还原 github.com URL
-_xrk_clean_github_url() {
+# 剥离已有代理前缀，还原 github.com URL（供 git / tmux 模块等复用）
+xrk_clean_github_url() {
     local url="$1"
     url=$(echo "$url" | sed -E '
         s|^https?://[^/]+/https://github\.com|https://github.com|;
@@ -163,7 +163,7 @@ xrk_git_clone() {
         return 0
     fi
 
-    direct="$(_xrk_clean_github_url "$url")"
+    direct="$(xrk_clean_github_url "$url")"
     case "$direct" in
         https://github.com/*|https://raw.githubusercontent.com/*)
             if [ "$direct" != "$url" ]; then

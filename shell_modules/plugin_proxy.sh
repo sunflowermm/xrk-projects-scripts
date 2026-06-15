@@ -8,19 +8,20 @@ XRK_PROXY_SPEED_THRESHOLD="${XRK_PROXY_SPEED_THRESHOLD:-2}"
 XRK_PROXY_CURL_TIMEOUT="${XRK_PROXY_CURL_TIMEOUT:-3}"
 XRK_PROXY_GIT_CHECK_REPO="${XRK_PROXY_GIT_CHECK_REPO:-https://github.com/tmux-plugins/tpm.git}"
 
-# 剥离已有代理前缀，还原为 github.com URL
-xrk_clean_github_url() {
-    type _xrk_clean_github_url &>/dev/null && _xrk_clean_github_url "$@" && return 0
-    local url="$1"
-    url=$(echo "$url" | sed -E '
-        s|^https?://[^/]+/https://github\.com|https://github.com|;
-        s|^https?://[^/]+/github\.com|https://github.com|;
-        s|^https?://gitclone\.com/github\.com/|https://github.com/|;
-        s|^https?://gh(proxy)?[.][^/]+/|https://|;
-        s|/$||
-    ')
-    echo "$url"
-}
+# xrk_clean_github_url 由 github.sh 提供；未加载时补后备实现
+if ! declare -f xrk_clean_github_url &>/dev/null; then
+    xrk_clean_github_url() {
+        local url="$1"
+        url=$(echo "$url" | sed -E '
+            s|^https?://[^/]+/https://github\.com|https://github.com|;
+            s|^https?://[^/]+/github\.com|https://github.com|;
+            s|^https?://gitclone\.com/github\.com/|https://github.com/|;
+            s|^https?://gh(proxy)?[.][^/]+/|https://|;
+            s|/$||
+        ')
+        echo "$url"
+    }
+fi
 
 # 测试单个代理：0=快速可用 1=慢 2=不可用（HTTP raw + git ls-remote 双重校验）
 xrk_test_github_proxy() {

@@ -47,7 +47,7 @@ install_fzf_if_missing() {
 }
 
 _tmux_fix_github_remote() {
-    local dir="$1" url="$2" cur
+    local dir="$1" url="$2" cur clean want
     [ -d "$dir/.git" ] || return 0
     cur=$(git -C "$dir" remote get-url origin 2>/dev/null) || return 0
     clean=$(xrk_clean_github_url "$cur")
