@@ -38,7 +38,7 @@ current_time=$(date "+%Y-%m-%d %H:%M:%S")
 echo -e "${caidan1}${sentence}${bg}"
 
 show_menu() {
-    local menu_width=$(menu_calc_width "向日葵脚本" "集中营 1075364017" "葵崽/葵子" "脚本相关" "安装 Napcat" "环境与模块")
+    local menu_width=$(menu_calc_width "向日葵脚本" "集中营 1095906276" "葵崽/葵子" "脚本相关" "安装 Napcat" "环境与模块")
     local status_width=16
     local prefix="        "
 
@@ -60,7 +60,7 @@ show_menu() {
     echo -e "${caidan1}${prefix}${border_top}${bg}"
     echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "向日葵脚本" "$menu_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_mid}${bg}"
-    echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "集中营 1075364017" "$menu_width")${caidan1}│${bg}"
+    echo -e "${caidan1}${prefix}│${caidan2}$(menu_center_title "集中营 1095906276" "$menu_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_mid}${bg}   ${caidan1}${status_top}${bg}"
     echo -e "${caidan1}${prefix}│${caidan2}$(menu_line_option 1 "葵崽/葵子" "$menu_width")${caidan1}│${bg}   ${caidan1}│${caidan3}$(menu_center_title "脚本状态" "$status_width")${caidan1}│${bg}"
     echo -e "${caidan1}${prefix}${border_mid}${bg}   ${caidan1}│${caidan2}$(menu_center_title "最新: $ver1_display" "$status_width")${caidan1}│${bg}"
