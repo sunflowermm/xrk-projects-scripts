@@ -1,30 +1,21 @@
 #!/bin/bash
-# Copyright (c) 2026 Xrkseek
-# Licensed under MIT License
-# NapCat 安装脚本（支持远程/本地执行，复用底层 github.sh 代理、common.sh 架构/包管理）
-
-# 统一初始化：加载 install_script_common.sh 并初始化环境
-# 支持远程执行：bash <(curl -sL https://raw.gitcode.com/.../NapCat.sh)
+# NapCat 安装（Linux QQ + Shell 注入，不含 CLI；启动用 nt）
 SCRIPT_RAW_BASE="${SCRIPT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
-if [ -f "/xrk/shell_modules/install_script_common.sh" ]; then
-    source /xrk/shell_modules/install_script_common.sh
-elif [ -f "$(cd "$(dirname "$0")" && pwd)/../shell_modules/install_script_common.sh" ]; then
-    source "$(cd "$(dirname "$0")" && pwd)/../shell_modules/install_script_common.sh"
-else
-    source <(curl -sL "${SCRIPT_RAW_BASE}/shell_modules/install_script_common.sh" 2>/dev/null) || {
-        # 如果 install_script_common.sh 不存在，使用简化加载逻辑
-        SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd 2>/dev/null || echo ".")"
-        [ -f "/xrk/shell_modules/github.sh" ] && source /xrk/shell_modules/github.sh || [ -f "${SCRIPT_DIR}/../shell_modules/github.sh" ] && source "${SCRIPT_DIR}/../shell_modules/github.sh" 2>/dev/null || true
-        [ -f "/xrk/shell_modules/common.sh" ] && source /xrk/shell_modules/common.sh || [ -f "${SCRIPT_DIR}/../shell_modules/common.sh" ] && source "${SCRIPT_DIR}/../shell_modules/common.sh" 2>/dev/null || true
-    }
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo .)"
+for _bootstrap in "/xrk/shell_modules/install_script_common.sh" "${_script_dir}/../shell_modules/install_script_common.sh"; do
+    if [ -f "$_bootstrap" ]; then
+        # shellcheck source=/dev/null
+        source "$_bootstrap"
+        break
+    fi
+done
+if ! type init_install_env &>/dev/null; then
+    # shellcheck source=/dev/null
+    source <(curl -sL "${SCRIPT_RAW_BASE}/shell_modules/install_script_common.sh" 2>/dev/null) || true
 fi
-
-# 初始化安装环境（如果 install_script_common.sh 加载成功，默认 3=Gitee，与全局一致）
 type init_install_env &>/dev/null && init_install_env "${XRK_SOURCE:-3}" || true
-
 type xrk_colors &>/dev/null && xrk_colors 2>/dev/null || true
-CYAN='\033[0;1;36;96m'
-BLUE='\033[0;1;34;94m'
+CYAN="${BLUE:-\033[1;36m}"
 NC="${NC:-\033[0m}"
 RED="${RED:-\033[31m}"
 GREEN="${GREEN:-\033[1;32m}"
@@ -446,78 +437,29 @@ function modify_qq_config() {
     fi
 }
 
-function check_napcat_cli() {
-    if [ "${use_cli}" = "y" ]; then
-        install_napcat_cli
-    elif [ "${use_cli}" = "n" ]; then
-        if [ -f "/usr/local/bin/napcat" ]; then
-            log "检测到已安装CLI, 开始更新..." 
-            install_napcat_cli
-            log "CLI更新成功。"
-            use_cli="y"
-        else
-            log "跳过安装CLI。"
-        fi
-    else
-        # 默认安装CLI
-        use_cli="y"
-        install_napcat_cli
-    fi
-}
-
-function install_napcat_cli() {
-    log "安装NapCatQQ CLI..."   
-    napcat_cli_download_url="https://raw.githubusercontent.com/NapNeko/NapCat-Installer/refs/heads/main/script/napcat"
-    default_file="napcatcli"
-    log "NapCatQQ CLI 下载链接: ${napcat_cli_download_url}"
-    xrk_download "${napcat_cli_download_url}" "./${default_file}" 3 || { log "文件下载失败"; clean; exit 1; }
-    cp -f "./${default_file}" /usr/local/bin/napcat && chmod +x /usr/local/bin/napcat || { log "文件移动失败，请以root身份运行"; clean; exit 1; }
-    rm -f "./${default_file}"
-}
-
 function show_main_info() {
     log "\n================== NapCat安装完成 =================="
     log "此为向日葵借鉴缩减的版本，原作者是NapCat官方"
     log "WEBUI_TOKEN 请查看: ${TARGET_FOLDER}/napcat/config/webui.json"
+    log "启动 QQ 客户端请使用: nt"
     log "脚本将默认使用 tmux 以及相关配置"
-    log "===================================================="
-    if [ "${use_cli}" = "y" ]; then
-        show_cli_info
-    fi
-}
-
-function show_cli_info() {
-    log "\n=============== NapCat CLI 使用说明 ==============="
-    log "输入 napcat help 获取帮助"
-    log "建议非root用户使用sudo执行命令"
-    log "例如: sudo napcat help"
     log "===================================================="
 }
 
 function shell_help() {
-    help_content="
-================== 命令选项(高级用法) ==================
-您可以在原安装命令后面添加以下参数：
+    cat <<'EOF'
+================== 命令选项 ==================
+  --force           强制重装 LinuxQQ 与 NapCat
+  --auto-force      版本不匹配时自动强制重装（默认开启）
+  --no-auto-force   关闭自动强制重装
+  -h, --help        显示本帮助
 
-1. --qq \"123456789\": 传入docker安装时的QQ号
-2. --proxy [0|1|2|3|4|5]: 传入代理
-   0: 不使用代理
-   1-5: 使用内置代理
-3. --cli [y/n]: shell安装时是否安装cli
-4. --force: 强制重装
-5. --auto-force: 版本不匹配时自动强制重装
-
-使用示例: 
-1. 直接安装:
-   bash napcat.sh --qq \"123456789\" --proxy 1 --cli y
-   
-2. 不安装cli，不使用代理，强制重装:
-   bash napcat.sh --qq \"123456789\" --proxy 0 --cli n --force
-   
-3. 自动处理版本不匹配（推荐）:
-   bash napcat.sh --auto-force
-========================================================"
-    echo "${help_content}"
+示例:
+  bash NapCat.sh
+  bash NapCat.sh --force
+  bash NapCat.sh --no-auto-force
+==============================================
+EOF
 }
 
 function main() {
@@ -526,32 +468,17 @@ function main() {
     
     while [[ $# -ge 1 ]]; do
         case $1 in
-            --qq)
-                shift
-                qq="$1"
-                shift
-                ;;
-            --proxy)
-                shift
-                proxy_num="$1"
-                shift
-                ;;
-            --cli)
-                shift
-                use_cli="$1"
-                shift
-                ;;
             --force)
-                shift
                 force="y"
+                shift
                 ;;
             --auto-force)
-                shift
                 auto_force="y"
+                shift
                 ;;
             --no-auto-force)
-                shift
                 auto_force="n"
+                shift
                 ;;
             --help|-h)
                 shell_help
@@ -573,7 +500,6 @@ function main() {
     download_napcat
     check_linuxqq
     check_napcat
-    check_napcat_cli
     show_main_info
     clean
 }
