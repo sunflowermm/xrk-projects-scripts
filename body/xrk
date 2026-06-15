@@ -87,7 +87,7 @@ while true; do
         4) bash "$XRK_ROOT/body/modules/env_module.sh" ;;
         r)
             echo -e "开始更新至最新脚本"
-            cd "$XRK_ROOT" && git pull --no-rebase
+            xrk_repo_sync || { echo "[xrk] 脚本更新失败"; exit 1; }
             葵崽升级
             echo "更新完成，正在退出"
             exit 0

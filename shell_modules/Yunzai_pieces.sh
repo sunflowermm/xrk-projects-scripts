@@ -98,7 +98,13 @@ export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_ROOT
             rm -rf "$XRK_ROOT"
             克隆脚本
         else
-            (cd "$XRK_ROOT" && git pull --no-rebase)
+            # shellcheck source=/dev/null
+            [ -f "$XRK_ROOT/shell_modules/update.sh" ] && source "$XRK_ROOT/shell_modules/update.sh"
+            if type xrk_repo_sync &>/dev/null; then
+                xrk_repo_sync
+            else
+                (cd "$XRK_ROOT" && git fetch origin && git reset --hard origin/master)
+            fi
         fi
     else
         克隆脚本

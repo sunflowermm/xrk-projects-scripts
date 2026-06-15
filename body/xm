@@ -40,7 +40,9 @@ update_xm() {
         return 1
     fi
     if type xrk_is_script_repo &>/dev/null && xrk_is_script_repo; then
-        (cd "$XRK_ROOT" && git pull --no-rebase) && echo "[xm] 脚本仓库 $XRK_ROOT 已更新" || echo "[xm] $XRK_ROOT 更新失败或非 git 目录"
+        # shellcheck source=/dev/null
+        [ -f "$XRK_ROOT/shell_modules/update.sh" ] && source "$XRK_ROOT/shell_modules/update.sh"
+        xrk_repo_sync && echo "[xm] 脚本仓库 $XRK_ROOT 已更新" || echo "[xm] $XRK_ROOT 更新失败"
     fi
     echo "[xm] 更新完成"
 }

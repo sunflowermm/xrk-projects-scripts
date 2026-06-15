@@ -4,6 +4,42 @@
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 XRK_BIN="${XRK_BIN:-/usr/local/bin}"
 
+# 同步 /xrk 脚本仓库：fetch + reset，本地改动一律以远程为准（避免 pull 冲突）
+# 用户配置写在 ~/.tmux.conf 等，勿改仓库内 body/*.conf
+xrk_repo_sync() {
+    local root="${XRK_ROOT:-/xrk}" remote="origin" branch n_dirty
+    cd "$root" || { echo "[xrk] 目录不存在: $root" >&2; return 1; }
+    git rev-parse --is-inside-work-tree &>/dev/null || {
+        echo "[xrk] 非 git 仓库: $root" >&2
+        return 1
+    }
+
+    branch=$(git symbolic-ref -q --short HEAD 2>/dev/null || true)
+    [ -n "$branch" ] || branch=master
+
+    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        n_dirty=$(git status -s | wc -l)
+        echo "[xrk] 检测到 ${n_dirty} 个本地改动，将以远程脚本覆盖（勿在服务器上改 /xrk 内文件）"
+        git status -s | head -5 | sed 's/^/  /'
+        [ "$n_dirty" -gt 5 ] && echo "  …"
+    fi
+
+    if ! git fetch "$remote" "$branch"; then
+        echo "[xrk] git fetch 失败，请检查网络" >&2
+        return 1
+    fi
+
+    if ! git reset --hard "${remote}/${branch}"; then
+        echo "[xrk] 同步失败: ${remote}/${branch}" >&2
+        return 1
+    fi
+
+    echo "[xrk] 脚本仓库已同步 → $(git log -1 --oneline)"
+    return 0
+}
+
+脚本仓库同步() { xrk_repo_sync; }
+
 xrk_bin同步() {
     declare -A files=(
         ["$XRK_BIN/xrkk"]="$XRK_ROOT/body/linux.sh"
@@ -38,6 +74,7 @@ xrkk同步() { xrk_bin同步; }
 
 葵崽升级() {
     xrk_bin同步
+    [ -f "$XRK_ROOT/body/modules/tmux.sh" ] && bash "$XRK_ROOT/body/modules/tmux.sh" --link-only 2>/dev/null || true
     safe_source "shell_modules/kuizi_repos.sh"
     type kuizi_upgrade_products &>/dev/null && kuizi_upgrade_products
 }
