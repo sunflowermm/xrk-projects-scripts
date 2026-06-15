@@ -38,17 +38,24 @@ EOF
 }
 
 link_conf() {
-    local main="$XRK_ROOT/body/.tmux.conf"
-    local entry="$HOME/.tmux.conf"
-    local mouse_conf="$HOME/.tmux/xrk-mouse.conf"
-    [ -f "$main" ] || { echo "[tmux] 未找到 body/.tmux.conf" >&2; return 1; }
+    local main mouse_conf entry root_abs
+    root_abs="$(cd "$XRK_ROOT" 2>/dev/null && pwd)" || root_abs="$XRK_ROOT"
+    main="${root_abs}/body/.tmux.conf"
+    entry="$HOME/.tmux.conf"
+    mouse_conf="$HOME/.tmux/xrk-mouse.conf"
+    [ -f "$main" ] || {
+        echo "[tmux] 未找到主配置: $main" >&2
+        echo "[tmux] 请确认仓库在 $root_abs 且已 git 同步" >&2
+        return 1
+    }
     install_menu_wrapper
     cat > "$entry" << EOF
-# 向日葵 tmux 入口（xrk-tmux --setup 生成）
-source-file $main
-source-file $mouse_conf
+# 向日葵 tmux 入口（xrk-tmux --setup 生成，勿手改路径）
+source-file ${main}
+source-file ${mouse_conf}
 EOF
     echo "[tmux] 已写入 $entry"
+    echo "[tmux]   → $main"
 }
 
 cleanup_removed_plugins() {
@@ -103,35 +110,54 @@ _setup_github() {
 
 setup_tpm() {
     mkdir -p "$HOME/.tmux/plugins"
-    if [ ! -d "$HOME/.tmux/plugins/tpm/.git" ]; then
-        rm -rf "$HOME/.tmux/plugins/tpm"
-        echo "[tmux] 安装 tpm…"
-        xrk_git_clone "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm"
+    if [ -d "$HOME/.tmux/plugins/tpm/.git" ]; then
+        echo "[tmux]   tpm: 已有"
+        return 0
     fi
+    rm -rf "$HOME/.tmux/plugins/tpm"
+    echo "[tmux] 安装 tpm…"
+    if xrk_git_clone "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm"; then
+        echo "[tmux]   tpm: 完成"
+        return 0
+    fi
+    echo "[tmux]   tpm: 失败（继续安装其它插件）" >&2
+    return 1
 }
 
 _ensure_plugin() {
     local name="$1" repo="$2" dest="$HOME/.tmux/plugins/$name"
-    [ -d "$dest/.git" ] && return 0
-    echo "[tmux] 克隆插件 $name…"
-    rm -rf "$dest"
-    xrk_git_clone "$repo" "$dest" || {
-        echo "[tmux] 插件 $name 失败: $repo" >&2
-        return 1
-    }
+    if [ -d "$dest/.git" ]; then
+        echo "[tmux]   $name: 已有"
+        return 0
+    fi
+    if xrk_git_clone "$repo" "$dest"; then
+        echo "[tmux]   $name: 完成"
+        return 0
+    fi
+    echo "[tmux]   $name: 失败" >&2
+    return 1
 }
 
 install_plugins() {
-    local entry name repo failed=0
+    local entry name repo failed=0 ok=0
     _setup_github
-    setup_tpm
+    type xrk_git_clone &>/dev/null || {
+        echo "[tmux] github 模块未加载，无法克隆插件" >&2
+        return 1
+    }
+    setup_tpm || failed=$((failed + 1))
     echo "[tmux] 安装插件（${#XRK_TMUX_PLUGIN_REPOS[@]} 个，不含 yank）…"
     for entry in "${XRK_TMUX_PLUGIN_REPOS[@]}"; do
         name="${entry%%|*}"
         repo="${entry#*|}"
-        _ensure_plugin "$name" "$repo" || failed=$((failed + 1))
+        if _ensure_plugin "$name" "$repo"; then
+            ok=$((ok + 1))
+        else
+            failed=$((failed + 1))
+        fi
     done
-    [ "$failed" -gt 0 ] && echo "[tmux] ${failed} 个插件失败，可重试 xrk-tmux --setup" >&2
+    echo "[tmux] 插件结果: ${ok} 成功, ${failed} 失败"
+    [ "$failed" -gt 0 ] && echo "[tmux] 失败项可重试: xrk-tmux --setup" >&2
     return 0
 }
 

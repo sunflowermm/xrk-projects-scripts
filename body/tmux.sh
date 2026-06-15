@@ -42,17 +42,29 @@ _tmux_apply_window_names() {
     done
 }
 
+_tmux_main_conf() {
+    local root="${XRK_ROOT:-/xrk}"
+    if [ -d "$root" ]; then
+        root="$(cd "$root" && pwd)"
+    fi
+    echo "${root}/body/.tmux.conf"
+}
+
 _tmux_conf_ok() {
+    local main
+    main=$(_tmux_main_conf)
     [ -f "$TMUX_CONF" ] || return 1
+    [ -f "$main" ] || return 1
     grep -q "source-file.*body/.tmux.conf" "$TMUX_CONF" 2>/dev/null || return 1
     grep -q "xrk-mouse.conf" "$TMUX_CONF" 2>/dev/null || return 1
+    [ -f "$HOME/.tmux/xrk-mouse.conf" ] || return 1
     return 0
 }
 
 _tmux_repair_config() {
     local mod="$XRK_ROOT/body/modules/tmux.sh"
     [ -f "$mod" ] || return 1
-    bash "$mod" --link-only >/dev/null 2>&1 || return 1
+    bash "$mod" --link-only || return 1
     _tmux_conf_ok
 }
 
@@ -60,6 +72,7 @@ _tmux_status() {
     local name
     echo "tmux: $(command -v tmux >/dev/null && tmux -V || echo 未安装)"
     echo "配置: $TMUX_CONF $(_tmux_conf_ok && echo OK || echo 未链接)"
+    echo "主配置: $(_tmux_main_conf) $([ -f "$(_tmux_main_conf)" ] && echo OK || echo 缺失)"
     [ -x "$XRK_MENU" ] && echo "菜单: $XRK_MENU OK" || echo "菜单: 缺失（xrk-tmux --setup）"
     echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
     echo "插件:"
@@ -148,7 +161,9 @@ ensure_tmux_env() {
         return 1
     }
     _tmux_conf_ok || _tmux_repair_config || {
-        echo "[tmux] 配置未就绪，请菜单 7→1" >&2
+        echo "[tmux] 配置未就绪: 主配置 $(_tmux_main_conf)" >&2
+        echo "[tmux] 请: cd ${XRK_ROOT:-/xrk} && git fetch origin && git reset --hard origin/master" >&2
+        echo "[tmux] 然后: xrk-tmux --setup" >&2
         return 1
     }
     [ -x "$XRK_MENU" ] || _tmux_repair_config || {

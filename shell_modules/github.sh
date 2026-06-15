@@ -2,9 +2,39 @@
 # GitHub 访问：国内区域自动代理，海外直连（detect_region：IP → 时区回退）
 
 _is_cn_region() {
+    case "${XRK_REGION:-}" in
+        cn) return 0 ;;
+        overseas) return 1 ;;
+    esac
+    case "${XRK_SOURCE:-}" in
+        3|cn) return 0 ;;
+    esac
     local region
     type detect_region &>/dev/null && region=$(detect_region 2>/dev/null) || region="overseas"
     [ "$region" = "cn" ]
+}
+
+# 直连 GitHub URL → 代理前缀 URL
+_xrk_proxied_url() {
+    local proxy="$1" direct="$2"
+    case "$proxy" in
+        https://gitclone.com/github.com)
+            echo "${proxy}/${direct#https://github.com/}"
+            ;;
+        *)
+            echo "${proxy}/${direct}"
+            ;;
+    esac
+}
+
+_xrk_cache_proxy_from_clone_url() {
+    local url="$1" p
+    for p in "${PROXIES[@]}"; do
+        case "$url" in
+            "${p}"/*) _XRK_GITHUB_PROXY_CACHED="$p"; return 0 ;;
+        esac
+    done
+    return 1
 }
 
 # 代理列表：仅保留常见公共加速；探测时用 git ls-remote 验证（避免 HTTP 200 但 git 要登录的源）
@@ -61,14 +91,24 @@ _xrk_pick_github_proxy() {
     echo "[git] 探测 GitHub 加速（约数秒）…" >&2
     if command -v shuf &>/dev/null; then
         while IFS= read -r proxy; do
-            _xrk_proxy_git_ok "$proxy" && { _XRK_GITHUB_PROXY_CACHED="$proxy"; echo "$proxy"; return 0; }
+            if _xrk_proxy_git_ok "$proxy"; then
+                _XRK_GITHUB_PROXY_CACHED="$proxy"
+                echo "[git] 加速可用: ${proxy#https://}" >&2
+                echo "$proxy"
+                return 0
+            fi
         done < <(printf "%s\n" "${PROXIES[@]}" | shuf)
     else
         for proxy in "${PROXIES[@]}"; do
-            _xrk_proxy_git_ok "$proxy" && { _XRK_GITHUB_PROXY_CACHED="$proxy"; echo "$proxy"; return 0; }
+            if _xrk_proxy_git_ok "$proxy"; then
+                _XRK_GITHUB_PROXY_CACHED="$proxy"
+                echo "[git] 加速可用: ${proxy#https://}" >&2
+                echo "$proxy"
+                return 0
+            fi
         done
     fi
-    echo "[git] 无可用加速，将尝试直连 GitHub" >&2
+    echo "[git] 探测无可用加速，clone 时将依次尝试直连与各代理" >&2
     echo ""
 }
 
@@ -165,58 +205,97 @@ git() {
     GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= command git "${args[@]}"
 }
 
-# 浅克隆 GitHub 仓库（国内走加速；多策略重试）
-_xrk_do_git_clone() {
-    local url="$1" dest="$2" depth="$3"
-    rm -rf "$dest"
-    if command -v timeout &>/dev/null; then
-        timeout 90 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
-            command git clone --depth="$depth" "$url" "$dest" 2>/dev/null
-    else
-        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
-            command git clone --depth="$depth" "$url" "$dest" 2>/dev/null
-    fi
-}
+# 单次 clone：带标签与失败原因（不再吞 stderr）
+_xrk_git_clone_once() {
+    local label="$1" url="$2" dest="$3" depth="$4"
+    local errf last_line rc
 
-xrk_git_clone() {
-    local url="$1" dest="$2" depth="${3:-1}"
-    local direct proxy proxied attempt
-
-    [ -z "$url" ] || [ -z "$dest" ] && return 1
-    command -v git &>/dev/null || return 1
-
-    direct="$(xrk_clean_github_url "$url")"
-    echo "[git] 克隆 ${direct##*/} …" >&2
-
-    # 1) 自动加速（git 包装）
-    if git clone --depth="$depth" "$direct" "$dest" 2>/dev/null; then
-        return 0
-    fi
+    errf="${TMPDIR:-/tmp}/xrk_git_err_$$_${RANDOM}"
+    echo "[git] → ${label}" >&2
     rm -rf "$dest" 2>/dev/null || true
 
-    # 2) 直连
-    if _xrk_do_git_clone "$direct" "$dest" "$depth"; then
+    if command -v timeout &>/dev/null; then
+        timeout 90 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+            command git clone --depth="$depth" "$url" "$dest" 2>"$errf"
+    else
+        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+            command git clone --depth="$depth" "$url" "$dest" 2>"$errf"
+    fi
+    rc=$?
+
+    if [ "$rc" -eq 0 ] && [ -d "$dest/.git" ]; then
+        echo "[git] ✓ ${label}" >&2
+        rm -f "$errf"
         return 0
     fi
 
-    # 3) 逐个代理重试（国内常见 clone 失败原因：加速探测通过但 clone 超时/限流）
-    if _is_cn_region; then
-        for proxy in "${PROXIES[@]}"; do
-            case "$proxy" in
-                https://gitclone.com/github.com)
-                    proxied="${proxy}/${direct#https://github.com/}"
-                    ;;
-                *)
-                    proxied="${proxy}/${direct}"
-                    ;;
-            esac
-            if _xrk_do_git_clone "$proxied" "$dest" "$depth"; then
-                _XRK_GITHUB_PROXY_CACHED="$proxy"
-                return 0
+    last_line=$(tail -n 1 "$errf" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    case "$rc" in
+        124) echo "[git] ✗ ${label}（超时 90s）" >&2 ;;
+        *)
+            if [ -n "$last_line" ]; then
+                echo "[git] ✗ ${label}: ${last_line}" >&2
+            else
+                echo "[git] ✗ ${label}" >&2
             fi
-        done
+            ;;
+    esac
+    rm -f "$errf"
+    rm -rf "$dest" 2>/dev/null || true
+    return 1
+}
+
+_xrk_git_clone_add_attempt() {
+    local url="$1" label="$2" u
+    local -n _urls=$3 _labels=$4
+    [ -z "$url" ] && return 0
+    for u in "${_urls[@]}"; do
+        [ "$u" = "$url" ] && return 0
+    done
+    _urls+=("$url")
+    _labels+=("$label")
+}
+
+# 浅克隆 GitHub 仓库：缓存代理 → 探测代理 → 直连 → 全部代理（逐步打日志）
+xrk_git_clone() {
+    local url="$1" dest="$2" depth="${3:-1}"
+    local direct name region proxy proxied i
+    local -a urls=() labels=()
+
+    [ -z "$url" ] || [ -z "$dest" ] && return 1
+    command -v git &>/dev/null || { echo "[git] 未找到 git" >&2; return 1; }
+
+    direct="$(xrk_clean_github_url "$url")"
+    name="${direct##*/}"
+    region="overseas"
+    type detect_region &>/dev/null && region=$(detect_region 2>/dev/null || echo overseas)
+
+    echo "[git] 克隆 ${name} | 区域: ${region} | 目标: ${dest}" >&2
+
+    if [ -n "${_XRK_GITHUB_PROXY_CACHED:-}" ]; then
+        proxied="$(_xrk_proxied_url "$_XRK_GITHUB_PROXY_CACHED" "$direct")"
+        _xrk_git_clone_add_attempt "$proxied" "缓存代理 ${_XRK_GITHUB_PROXY_CACHED#https://}" urls labels
     fi
 
-    echo "[git] 克隆失败: $direct" >&2
+    if _is_cn_region; then
+        proxy="$(_xrk_pick_github_proxy)"
+        [ -n "$proxy" ] && _xrk_git_clone_add_attempt "$(_xrk_proxied_url "$proxy" "$direct")" "探测代理 ${proxy#https://}" urls labels
+    fi
+
+    _xrk_git_clone_add_attempt "$direct" "直连 GitHub" urls labels
+
+    for proxy in "${PROXIES[@]}"; do
+        _xrk_git_clone_add_attempt "$(_xrk_proxied_url "$proxy" "$direct")" "代理 ${proxy#https://}" urls labels
+    done
+
+    for i in "${!urls[@]}"; do
+        if _xrk_git_clone_once "${labels[$i]}" "${urls[$i]}" "$dest" "$depth"; then
+            _xrk_cache_proxy_from_clone_url "${urls[$i]}" || true
+            return 0
+        fi
+    done
+
+    echo "[git] 克隆失败（已试 ${#urls[@]} 种方式）: $direct" >&2
+    echo "[git] 提示: export XRK_REGION=cn 后重试，或检查防火墙/DNS" >&2
     return 1
 }
