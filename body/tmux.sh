@@ -8,6 +8,7 @@ XRK_ROOT="${XRK_ROOT:-/xrk}"
 
 SESSION_NAME="${XRK_TMUX_SESSION:-新年快乐}"
 TMUX_CONF="${HOME}/.tmux.conf"
+TMUX_BOOTSTRAP="${XRK_ROOT}/body/.tmux.bootstrap.conf"
 XRK_MENU="$HOME/.tmux/xrk-menu"
 read -ra XRK_TMUX_WINDOWS <<< "${XRK_TMUX_WINDOW_NAMES:-来财 来福 来运}"
 
@@ -55,7 +56,7 @@ _tmux_conf_ok() {
 
 _tmux_plugins_ok() {
     local name
-    for name in tmux-sensible tmux-resurrect tmux-continuum tmux-yank tmux-cpu tmux-open tmux-prefix-highlight; do
+    for name in tmux-sensible tmux-resurrect tmux-continuum tmux-yank tmux-open tmux-prefix-highlight; do
         [ -d "$HOME/.tmux/plugins/$name" ] || return 1
     done
     return 0
@@ -69,7 +70,6 @@ _tmux_status_plugins() {
         "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect.git" \
         "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git" \
         "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git" \
-        "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git" \
         "tmux-open|https://github.com/tmux-plugins/tmux-open.git" \
         "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git"; do
         name="${entry%%|*}"
@@ -105,6 +105,29 @@ _tmux_reload_conf() {
     return 1
 }
 
+_tmux_clean_resurrect_if_huge() {
+    local dir="$HOME/.tmux/resurrect" sz
+    [ -d "$dir" ] || return 0
+    sz=$(du -sm "$dir" 2>/dev/null | cut -f1)
+    [ "${sz:-0}" -le 20 ] && return 0
+    rm -rf "${dir:?}"/*
+    echo "[tmux] 已清理过大的 resurrect 缓存 (${sz}MB)，避免恢复时卡死"
+}
+
+_tmux_load_full_conf() {
+    _tmux_clean_resurrect_if_huge
+    tmux source-file "$TMUX_CONF" 2>/dev/null || {
+        echo "[tmux] 加载完整配置失败: $TMUX_CONF" >&2
+        return 1
+    }
+}
+
+_tmux_can_attach() {
+    [ "${XRK_TMUX_NO_ATTACH:-0}" = "1" ] && return 1
+    [ -t 0 ] && [ -t 1 ] && return 0
+    return 1
+}
+
 _tmux_resolve_target() {
     tmux has-session -t "$SESSION_NAME" 2>/dev/null && { echo "$SESSION_NAME"; return; }
     _tmux_latest_session
@@ -128,6 +151,11 @@ _tmux_connect() {
     fi
 
     echo "[tmux] 连接到会话: $target"
+    if ! _tmux_can_attach; then
+        echo "[tmux] 会话已在后台运行（当前终端不适合 attach，避免卡死 Web 面板）"
+        echo "[tmux] 请在新 SSH 窗口执行: tmux attach -t $target"
+        return 0
+    fi
     if [ ! -t 0 ] && [ -r /dev/tty ]; then
         tmux attach-session -t "$target" </dev/tty
     else
@@ -136,11 +164,14 @@ _tmux_connect() {
 }
 
 create_desktop_layout() {
-    local s="$SESSION_NAME"
+    local s="$SESSION_NAME" boot="${TMUX_BOOTSTRAP}"
     _tmux_ensure_utf8
+    [ -f "$boot" ] || { echo "[tmux] 缺少 $boot" >&2; return 1; }
 
-    # 窗格只开 bash，不在启动时跑任何 body 脚本（避免重复加载、扫盘）
-    tmux new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}" "exec bash" \
+    tmux has-session -t "$s" 2>/dev/null && tmux kill-session -t "$s" 2>/dev/null || true
+
+    # 先用 bootstrap 配置创建（不跑 tpm/continuum/resurrect）
+    tmux -f "$boot" new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}" "exec bash" \
         || { echo "[tmux] 创建会话失败" >&2; return 1; }
     tmux split-window -v -t "$s:0" "exec bash"
     tmux new-window -t "$s:1" -n "${XRK_TMUX_WINDOWS[1]}" "exec bash"
@@ -151,6 +182,7 @@ create_desktop_layout() {
     tmux select-window -t "$s:0"
     tmux select-pane -t "$s:0.0"
     _tmux_apply_window_names "$s"
+    _tmux_load_full_conf || true
     tmux display-message -d 4000 \
         "向日葵 tmux | 前缀 Alt+Space ? | 主菜单 xrk | 葵崽 xyz | 葵子 xag"
     echo "[tmux] 桌面已创建: ${XRK_TMUX_WINDOWS[*]}"

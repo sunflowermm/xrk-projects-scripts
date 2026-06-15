@@ -17,7 +17,6 @@ XRK_TMUX_PLUGIN_REPOS=(
     "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect.git"
     "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git"
     "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git"
-    "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git"
     "tmux-open|https://github.com/tmux-plugins/tmux-open.git"
     "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git"
 )
@@ -118,9 +117,18 @@ _ensure_tpm_plugin() {
 install_plugins() {
     local entry name repo failed=0
     local total="${#XRK_TMUX_PLUGIN_REPOS[@]}"
+    local dir="$HOME/.tmux/resurrect" sz
 
-    # 已下架仓库残留
-    rm -rf "$HOME/.tmux/plugins/tmux-mem" "$HOME/.tmux/plugins/tmux-fzf" 2>/dev/null || true
+    # 已下架/已移除插件残留
+    rm -rf "$HOME/.tmux/plugins/tmux-mem" "$HOME/.tmux/plugins/tmux-fzf" "$HOME/.tmux/plugins/tmux-cpu" 2>/dev/null || true
+
+    if [ -d "$dir" ]; then
+        sz=$(du -sm "$dir" 2>/dev/null | cut -f1)
+        if [ "${sz:-0}" -gt 20 ]; then
+            rm -rf "${dir:?}"/*
+            echo "[tmux] 已清理 resurrect 缓存 (${sz}MB)，避免进入桌面时卡死"
+        fi
+    fi
 
     echo "[tmux] 安装/校验插件（共 ${total} 个）…"
 
