@@ -11,8 +11,7 @@ _H="run-shell ${_MENU} help"
 _xrk_tmux_help() {
     tmux display-message -d 10000 \
         "向日葵 tmux | 前缀 Alt+Space | 分离 d | 重载 r | 重命名 n
-窗格 Alt+hjkl | 分割 v/s | 复制: [ y（tmux 缓冲区）
-窗口 Alt+0~5 | 右键菜单"
+窗格 Alt+hjkl | 分割 v/s | 复制: 前缀 [ 再 y | 窗口 Alt+0~5 | 右键菜单"
 }
 
 _xrk_menu_pane() {
@@ -74,7 +73,7 @@ _xrk_menu_window() {
 }
 
 _xrk_menu_system() {
-    tmux display-menu -T '#[align=centre]向日葵 · 系统' -t = -x M -y W \
+    tmux display-menu -T '#[align=centre]向日葵 · 系统' -t = -x W -y W \
         '[系统]' '' '' \
         '  快捷键帮助' '?' "$_H" \
         '  重载配置' 'r' "$_R" \

@@ -47,16 +47,18 @@ _tmux_main_conf() {
     if [ -d "$root" ]; then
         root="$(cd "$root" && pwd)"
     fi
-    echo "${root}/body/.tmux.conf"
+    if [ -f "${root}/body/tmux.conf" ]; then
+        echo "${root}/body/tmux.conf"
+    elif [ -f "${root}/body/.tmux.conf" ]; then
+        echo "${root}/body/.tmux.conf"
+    else
+        echo "${root}/body/tmux.conf"
+    fi
 }
 
 _tmux_conf_ok() {
-    local main
-    main=$(_tmux_main_conf)
     [ -f "$TMUX_CONF" ] || return 1
-    [ -f "$main" ] || return 1
-    grep -q "source-file.*body/.tmux.conf" "$TMUX_CONF" 2>/dev/null || return 1
-    grep -q "xrk-mouse.conf" "$TMUX_CONF" 2>/dev/null || return 1
+    grep -q '向日葵 tmux' "$TMUX_CONF" 2>/dev/null || return 1
     [ -f "$HOME/.tmux/xrk-mouse.conf" ] || return 1
     return 0
 }
@@ -69,17 +71,10 @@ _tmux_repair_config() {
 }
 
 _tmux_status() {
-    local name
     echo "tmux: $(command -v tmux >/dev/null && tmux -V || echo 未安装)"
     echo "配置: $TMUX_CONF $(_tmux_conf_ok && echo OK || echo 未链接)"
     echo "主配置: $(_tmux_main_conf) $([ -f "$(_tmux_main_conf)" ] && echo OK || echo 缺失)"
     [ -x "$XRK_MENU" ] && echo "菜单: $XRK_MENU OK" || echo "菜单: 缺失（xrk-tmux --setup）"
-    echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
-    echo "插件:"
-    for name in tmux-sensible tmux-resurrect tmux-continuum tmux-cpu tmux-open tmux-prefix-highlight; do
-        [ -d "$HOME/.tmux/plugins/$name/.git" ] && echo "  $name: OK" || echo "  $name: 缺失"
-    done
-    [ -d "$HOME/.tmux/plugins/tmux-yank" ] && echo "  tmux-yank: 已移除（勿装）"
     tmux has-session -t "$SESSION_NAME" 2>/dev/null \
         && echo "会话: $SESSION_NAME 已存在" \
         || echo "会话: $SESSION_NAME 未创建"
@@ -170,8 +165,6 @@ ensure_tmux_env() {
         echo "[tmux] 菜单脚本缺失，请菜单 7→1" >&2
         return 1
     }
-    [ -f "$HOME/.tmux/plugins/tpm/tpm" ] \
-        || echo "[tmux] 提示: 未装 tpm，请菜单 7→1" >&2
 }
 
 goto_desktop() {
@@ -195,10 +188,6 @@ case "${1:-}" in
     --no-attach) export XRK_TMUX_NO_ATTACH=1; shift ;;
     --setup)
         bash "$XRK_ROOT/body/modules/tmux.sh"
-        exit $?
-        ;;
-    --setup-plugins)
-        bash "$XRK_ROOT/body/modules/tmux.sh" --setup-plugins
         exit $?
         ;;
 esac

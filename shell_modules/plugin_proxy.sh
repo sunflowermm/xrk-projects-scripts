@@ -6,7 +6,7 @@ XRK_PLUGIN_FILTER_DIRS=('example' 'other' 'system' 'adapter')
 XRK_PROXY_CHECK_PATH="${XRK_PROXY_CHECK_PATH:-NapNeko/NapCatQQ/main/package.json}"
 XRK_PROXY_SPEED_THRESHOLD="${XRK_PROXY_SPEED_THRESHOLD:-2}"
 XRK_PROXY_CURL_TIMEOUT="${XRK_PROXY_CURL_TIMEOUT:-3}"
-XRK_PROXY_GIT_CHECK_REPO="${XRK_PROXY_GIT_CHECK_REPO:-https://github.com/tmux-plugins/tpm.git}"
+XRK_PROXY_GIT_CHECK_REPO="${XRK_PROXY_GIT_CHECK_REPO:-https://github.com/octocat/Hello-World.git}"
 
 # xrk_clean_github_url 由 github.sh 提供；未加载时补后备实现
 if ! declare -f xrk_clean_github_url &>/dev/null; then

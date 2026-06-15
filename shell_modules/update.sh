@@ -5,7 +5,7 @@ XRK_ROOT="${XRK_ROOT:-/xrk}"
 XRK_BIN="${XRK_BIN:-/usr/local/bin}"
 
 # 同步 /xrk 脚本仓库：fetch + reset，本地改动一律以远程为准（避免 pull 冲突）
-# 用户配置写在 ~/.tmux.conf 等，勿改仓库内 body/*.conf
+# 用户配置写在 ~/.tmux.conf；仓库内主模板为 body/tmux.conf
 xrk_repo_sync() {
     local root="${XRK_ROOT:-/xrk}" remote="origin" branch n_dirty
     cd "$root" || { echo "[xrk] 目录不存在: $root" >&2; return 1; }

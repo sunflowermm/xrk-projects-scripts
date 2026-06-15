@@ -1,8 +1,19 @@
 #!/bin/bash
-# 安装 tmux + 写入配置（纯 conf，无 tpm/插件，对齐 sunflower）
+# 安装 tmux + 写入配置（纯 conf，无插件，对齐 sunflower）
 set -e
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+
+_tmux_main_src() {
+    local root_abs="$1"
+    if [ -f "${root_abs}/body/tmux.conf" ]; then
+        echo "${root_abs}/body/tmux.conf"
+    elif [ -f "${root_abs}/body/.tmux.conf" ]; then
+        echo "${root_abs}/body/.tmux.conf"
+    else
+        return 1
+    fi
+}
 
 install_menu_wrapper() {
     local menu="$HOME/.tmux/xrk-menu"
@@ -30,22 +41,24 @@ EOF
 link_conf() {
     local main mouse_conf entry root_abs
     root_abs="$(cd "$XRK_ROOT" 2>/dev/null && pwd)" || root_abs="$XRK_ROOT"
-    main="${root_abs}/body/.tmux.conf"
     entry="$HOME/.tmux.conf"
     mouse_conf="$HOME/.tmux/xrk-mouse.conf"
-    [ -f "$main" ] || {
-        echo "[tmux] 未找到主配置: $main" >&2
+    main="$(_tmux_main_src "$root_abs")" || {
+        echo "[tmux] 未找到主配置: ${root_abs}/body/tmux.conf" >&2
         echo "[tmux] 请确认仓库在 $root_abs 且已 git 同步" >&2
         return 1
     }
     install_menu_wrapper
-    cat > "$entry" << EOF
-# 向日葵 tmux 入口（xrk-tmux --setup 生成，勿手改路径）
-source-file ${main}
-source-file ${mouse_conf}
-EOF
+    {
+        echo "# 向日葵 tmux 入口（xrk-tmux --setup 生成；更新配置请重跑 setup）"
+        echo "# xrk-src: ${main}"
+        cat "$main"
+        echo ""
+        echo "# 鼠标右键菜单"
+        echo "source-file ${mouse_conf}"
+    } > "$entry"
     echo "[tmux] 已写入 $entry"
-    echo "[tmux]   → $main"
+    echo "[tmux]   ← ${main}"
 }
 
 cleanup_legacy_tmux_plugins() {

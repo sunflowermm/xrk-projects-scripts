@@ -71,15 +71,17 @@ _xrk_git_ls_remote() {
     printf '%s\n' "$out"
 }
 
+_XRK_GITHUB_PROBE_REPO="${_XRK_GITHUB_PROBE_REPO:-https://github.com/octocat/Hello-World.git}"
+
 # HTTP 回退：部分代理 raw 可用但 ls-remote 偶发失败
 _xrk_proxy_http_ok() {
     local proxy="$1"
-    local path="${2:-tmux-plugins/tpm/master/README.md}"
+    local path="${2:-octocat/Hello-World/master/README}"
     _xrk_http_ok "${proxy}/https://raw.githubusercontent.com/${path}"
 }
 
 _xrk_proxy_git_ok() {
-    local proxy="$1" repo="${2:-https://github.com/tmux-plugins/tpm.git}"
+    local proxy="$1" repo="${2:-$_XRK_GITHUB_PROBE_REPO}"
     local proxied="${proxy}/${repo}" out
 
     [ -z "$proxy" ] && return 1
