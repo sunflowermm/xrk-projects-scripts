@@ -57,11 +57,14 @@ _xrk_http_ok() {
 
 # git 加速探测：必须能 ls-remote 且不弹登录；带超时避免长时间挂起
 _xrk_git_ls_remote() {
-    local url="$1"
+    local url="$1" git_bin
+    git_bin=$(command -v git) || return 1
     if command -v timeout &>/dev/null; then
-        timeout 8 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= git ls-remote --heads "$url" HEAD 2>/dev/null
+        timeout 8 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+            "$git_bin" ls-remote --heads "$url" HEAD 2>/dev/null
     else
-        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=5 \
+        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+            "$git_bin" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=5 \
             ls-remote --heads "$url" HEAD 2>/dev/null
     fi
 }
@@ -208,18 +211,19 @@ git() {
 # 单次 clone：带标签与失败原因（不再吞 stderr）
 _xrk_git_clone_once() {
     local label="$1" url="$2" dest="$3" depth="$4"
-    local errf last_line rc
+    local errf last_line rc git_bin
 
+    git_bin=$(command -v git) || { echo "[git] 未找到 git" >&2; return 1; }
     errf="${TMPDIR:-/tmp}/xrk_git_err_$$_${RANDOM}"
     echo "[git] → ${label}" >&2
     rm -rf "$dest" 2>/dev/null || true
 
     if command -v timeout &>/dev/null; then
         timeout 90 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
-            command git clone --depth="$depth" "$url" "$dest" 2>"$errf"
+            "$git_bin" clone --depth="$depth" "$url" "$dest" 2>"$errf"
     else
         GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
-            command git clone --depth="$depth" "$url" "$dest" 2>"$errf"
+            "$git_bin" clone --depth="$depth" "$url" "$dest" 2>"$errf"
     fi
     rc=$?
 
