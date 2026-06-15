@@ -103,21 +103,18 @@ _ensure_tpm_plugin() {
 }
 
 install_plugins() {
-    local entry name repo failed=0 installer
-    local installer="$HOME/.tmux/plugins/tpm/bin/install_plugins"
+    local entry name repo failed=0
+    local total="${#XRK_TMUX_PLUGIN_REPOS[@]}"
 
     install_fzf_if_missing
+
+    echo "[tmux] 安装/校验插件（共 ${total} 个，git 克隆可能需 1～2 分钟）…"
 
     for entry in "${XRK_TMUX_PLUGIN_REPOS[@]}"; do
         name="${entry%%|*}"
         repo="${entry#*|}"
         _ensure_tpm_plugin "$name" "$repo" || failed=$((failed + 1))
     done
-
-    if [ -x "$installer" ]; then
-        echo "[tmux] tpm 校验插件…"
-        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= bash "$installer" 2>/dev/null || true
-    fi
 
     if [ "$failed" -gt 0 ]; then
         echo "[tmux] ${failed} 个插件克隆失败，可稍后重试: xrk-tmux --setup" >&2

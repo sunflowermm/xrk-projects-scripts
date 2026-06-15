@@ -82,7 +82,11 @@ install_pkg() {
         echo -e "\033[0;34m正在安装 $pkg...\033[0m"
         case "$os" in
             termux) pkg install -y "$pkg" && _install_success "$pkg" && return 0 ;;
-            debian|ubuntu) apt-get update -qq && apt-get install -y "$pkg" && _install_success "$pkg" && return 0 ;;
+            debian|ubuntu)
+                DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+                    apt-get update -qq && DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+                    apt-get install -y "$pkg" && _install_success "$pkg" && return 0
+                ;;
             arch) pacman --disable-sandbox -Sy --noconfirm "$pkg" && _install_success "$pkg" && return 0 ;;
             centos) (command -v dnf &>/dev/null && dnf install -y "$pkg" || yum install -y "$pkg") && _install_success "$pkg" && return 0 ;;
             opensuse) zypper -n install "$pkg" && _install_success "$pkg" && return 0 ;;

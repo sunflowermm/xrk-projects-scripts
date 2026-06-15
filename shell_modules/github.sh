@@ -25,7 +25,17 @@ _xrk_http_ok() {
     curl -s --fail --connect-timeout 2 --max-time 4 -o /dev/null "$1" 2>/dev/null
 }
 
-# git 加速探测：必须能 ls-remote 且不弹登录（g.in0.re 等 HTTP 可用但 git 要账号的会被剔除）
+# git 加速探测：必须能 ls-remote 且不弹登录；带超时避免长时间挂起
+_xrk_git_ls_remote() {
+    local url="$1"
+    if command -v timeout &>/dev/null; then
+        timeout 8 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= git ls-remote --heads "$url" HEAD 2>/dev/null
+    else
+        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=5 \
+            ls-remote --heads "$url" HEAD 2>/dev/null
+    fi
+}
+
 _xrk_proxy_git_ok() {
     local proxy="$1" repo="${2:-https://github.com/tmux-plugins/tpm.git}"
     local proxied="${proxy}/${repo}"
@@ -38,23 +48,27 @@ _xrk_proxy_git_ok() {
             ;;
     esac
 
-    out=$(GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= git ls-remote --heads "$proxied" HEAD 2>/dev/null) || return 1
+    out=$(_xrk_git_ls_remote "$proxied") || return 1
     [ -n "$out" ] || return 1
     return 0
 }
 
-# 随机挑选可用代理（git 实测，不缓存）
+# 随机挑选可用代理（git 实测；同进程内缓存，避免每个 clone 重复探测）
 _xrk_pick_github_proxy() {
     local proxy
+    [ -n "${_XRK_GITHUB_PROXY_CACHED:-}" ] && { echo "$_XRK_GITHUB_PROXY_CACHED"; return 0; }
+
+    echo "[git] 探测 GitHub 加速（约数秒）…" >&2
     if command -v shuf &>/dev/null; then
         while IFS= read -r proxy; do
-            _xrk_proxy_git_ok "$proxy" && { echo "$proxy"; return 0; }
+            _xrk_proxy_git_ok "$proxy" && { _XRK_GITHUB_PROXY_CACHED="$proxy"; echo "$proxy"; return 0; }
         done < <(printf "%s\n" "${PROXIES[@]}" | shuf)
     else
         for proxy in "${PROXIES[@]}"; do
-            _xrk_proxy_git_ok "$proxy" && { echo "$proxy"; return 0; }
+            _xrk_proxy_git_ok "$proxy" && { _XRK_GITHUB_PROXY_CACHED="$proxy"; echo "$proxy"; return 0; }
         done
     fi
+    echo "[git] 无可用加速，将尝试直连 GitHub" >&2
     echo ""
 }
 
@@ -159,7 +173,12 @@ xrk_git_clone() {
     [ -z "$url" ] || [ -z "$dest" ] && return 1
     command -v git &>/dev/null || return 1
 
-    if git clone --depth="$depth" "$url" "$dest" 2>/dev/null; then
+    echo "[git] 克隆 ${url##*/} …" >&2
+    if command -v timeout &>/dev/null; then
+        if timeout 120 git clone --depth="$depth" "$url" "$dest" 2>/dev/null; then
+            return 0
+        fi
+    elif git clone --depth="$depth" "$url" "$dest" 2>/dev/null; then
         return 0
     fi
 
@@ -167,8 +186,13 @@ xrk_git_clone() {
     case "$direct" in
         https://github.com/*|https://raw.githubusercontent.com/*)
             if [ "$direct" != "$url" ]; then
-                echo "[git] 加速源失败，尝试直连: $direct" >&2
-                GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= command git clone --depth="$depth" "$direct" "$dest" && return 0
+                echo "[git] 加速失败，尝试直连: $direct" >&2
+                if command -v timeout &>/dev/null; then
+                    timeout 120 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+                        git clone --depth="$depth" "$direct" "$dest" && return 0
+                else
+                    GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= command git clone --depth="$depth" "$direct" "$dest" && return 0
+                fi
             fi
             ;;
     esac
