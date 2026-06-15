@@ -18,7 +18,8 @@ fi
 response=$(curl -s "https://v1.hitokoto.cn" 2>/dev/null)
 sentence=$(echo "$response" | jq -r '.hitokoto // empty' 2>/dev/null)
 
-ver1=$(curl -s "$SCRIPT_RAW_BASE/package.json" 2>/dev/null | jq -r '.version // empty' 2>/dev/null)
+ver1=$(curl -fsSL --connect-timeout 5 --max-time 15 "${SCRIPT_RAW_BASE}/package.json" 2>/dev/null \
+    | jq -r '.version // empty' 2>/dev/null)
 ver2=$(jq -r '.version // empty' "$XRK_ROOT/package.json" 2>/dev/null)
 ver1_display="${ver1:-?}"
 ver2_display="${ver2:-?}"
@@ -27,6 +28,8 @@ if [ -n "$ver1" ] && [ -n "$ver2" ] && [ "$ver1" != "$ver2" ]; then
     zhuangtai="${color_red}[请更新]${bg}"
 elif [ -n "$ver1" ] && [ -n "$ver2" ]; then
     zhuangtai="[已最新]"
+elif [ -n "$ver2" ]; then
+    zhuangtai="[未联网]"
 else
     zhuangtai="[未知]"
 fi
