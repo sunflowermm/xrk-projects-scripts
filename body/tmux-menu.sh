@@ -13,7 +13,7 @@ _xrk_tmux_help() {
     tmux display-message -d 10000 \
         "向日葵 tmux | 前缀 Alt+Space | 分离 d | 重载 r | 重命名 n
 窗格 Alt+hjkl | 大小 Alt+Shift+hjkl | 分割 v/s | 关 pane w / window q
-窗口 Alt+0~5 Alt+n/m | 复制: [ 进入复制模式, y 复制 | 右键: 窗格/窗口栏/左下角会话名"
+窗口 Alt+0~5 Alt+n/m | 复制: [ y | fzf: f | 打开: 复制模式 o | 右键各区域"
 }
 
 _xrk_menu_pane() {

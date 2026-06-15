@@ -55,9 +55,35 @@ _tmux_conf_ok() {
 }
 
 _tmux_plugins_ok() {
-    [ -d "$HOME/.tmux/plugins/tmux-cpu" ] \
-        && [ -d "$HOME/.tmux/plugins/tmux-yank" ] \
-        && [ -d "$HOME/.tmux/plugins/tmux-resurrect" ]
+    local name
+    for name in tmux-sensible tmux-resurrect tmux-continuum tmux-yank tmux-cpu tmux-mem tmux-open tmux-prefix-highlight; do
+        [ -d "$HOME/.tmux/plugins/$name" ] || return 1
+    done
+    return 0
+}
+
+_tmux_status_plugins() {
+    local entry name repo dest
+    for entry in \
+        "tpm|https://github.com/tmux-plugins/tpm.git" \
+        "tmux-sensible|https://github.com/tmux-plugins/tmux-sensible.git" \
+        "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect.git" \
+        "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git" \
+        "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git" \
+        "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git" \
+        "tmux-mem|https://github.com/tmux-plugins/tmux-mem.git" \
+        "tmux-open|https://github.com/tmux-plugins/tmux-open.git" \
+        "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git" \
+        "tmux-fzf|https://github.com/sainnhe/tmux-fzf.git"; do
+        name="${entry%%|*}"
+        dest="$HOME/.tmux/plugins/$name"
+        if [ -d "$dest/.git" ]; then
+            echo "  $name: OK"
+        else
+            echo "  $name: 缺失"
+        fi
+    done
+    command -v fzf &>/dev/null && echo "  fzf: OK" || echo "  fzf: 未安装（tmux-fzf 需要）"
 }
 
 _tmux_status() {
@@ -65,7 +91,9 @@ _tmux_status() {
     echo "配置: $TMUX_CONF $(_tmux_conf_ok && echo OK || echo 未链接)"
     [ -x "$XRK_MENU" ] && echo "菜单脚本: $XRK_MENU OK" || echo "菜单脚本: 缺失（请 xrk-tmux --setup）"
     echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
-    echo "插件: $(_tmux_plugins_ok && echo 齐全 || echo 不完整)"
+    echo "插件:"
+    _tmux_status_plugins
+    echo "汇总: $(_tmux_plugins_ok && echo 核心齐全 || echo 不完整)"
     tmux has-session -t "$SESSION_NAME" 2>/dev/null \
         && echo "会话: $SESSION_NAME 已存在" \
         || echo "会话: $SESSION_NAME 未创建"

@@ -6,26 +6,32 @@ XRK_PLUGIN_FILTER_DIRS=('example' 'other' 'system' 'adapter')
 XRK_PROXY_CHECK_PATH="${XRK_PROXY_CHECK_PATH:-NapNeko/NapCatQQ/main/package.json}"
 XRK_PROXY_SPEED_THRESHOLD="${XRK_PROXY_SPEED_THRESHOLD:-2}"
 XRK_PROXY_CURL_TIMEOUT="${XRK_PROXY_CURL_TIMEOUT:-3}"
+XRK_PROXY_GIT_CHECK_REPO="${XRK_PROXY_GIT_CHECK_REPO:-https://github.com/tmux-plugins/tpm.git}"
 
 # 剥离已有代理前缀，还原为 github.com URL
 xrk_clean_github_url() {
+    type _xrk_clean_github_url &>/dev/null && _xrk_clean_github_url "$@" && return 0
     local url="$1"
     url=$(echo "$url" | sed -E '
         s|^https?://[^/]+/https://github\.com|https://github.com|;
         s|^https?://[^/]+/github\.com|https://github.com|;
+        s|^https?://gitclone\.com/github\.com/|https://github.com/|;
         s|^https?://gh(proxy)?[.][^/]+/|https://|;
         s|/$||
     ')
     echo "$url"
 }
 
-# 测试单个代理：0=快速可用 1=慢 2=不可用
+# 测试单个代理：0=快速可用 1=慢 2=不可用（HTTP raw + git ls-remote 双重校验）
 xrk_test_github_proxy() {
     local proxy="$1"
     local proxied_check_url="${proxy}/https://raw.githubusercontent.com/${XRK_PROXY_CHECK_PATH}"
     local result http_code time_total
 
     [ -z "$proxy" ] && return 2
+    type _xrk_proxy_git_ok &>/dev/null || return 2
+    _xrk_proxy_git_ok "$proxy" "$XRK_PROXY_GIT_CHECK_REPO" || return 2
+
     result=$(curl --silent --fail --max-time "$XRK_PROXY_CURL_TIMEOUT" -w "%{http_code} %{time_total}" -o /dev/null "$proxied_check_url" 2>/dev/null) || return 2
     http_code=$(echo "$result" | awk '{print $1}')
     time_total=$(echo "$result" | awk '{print $2}')
@@ -85,7 +91,14 @@ xrk_apply_github_proxy() {
     clean=$(xrk_clean_github_url "$current_url")
     [[ "$clean" == https://github.com/* ]] || return 2
 
-    new_url="${proxy}/${clean}"
+    case "$proxy" in
+        https://gitclone.com/github.com)
+            new_url="${proxy}/${clean#https://github.com/}"
+            ;;
+        *)
+            new_url="${proxy}/${clean}"
+            ;;
+    esac
     (cd "$target_dir" && git config remote.origin.url "$new_url" && git pull)
 }
 
