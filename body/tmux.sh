@@ -154,31 +154,28 @@ create_desktop_layout() {
 
     tmux select-window -t "$s:0"
     tmux select-pane -t "$s:0.0"
-    tmux split-window -v -t "$s:0.0" "exec bash"
-    tmux select-window -t "$s:0"
-    tmux select-pane -t "$s:0.0"
     _tmux_apply_window_names "$s"
     echo "[tmux] 桌面已创建: ${XRK_TMUX_WINDOWS[*]}"
 }
 
 ensure_tmux_env() {
-    local ok=1
-    command -v tmux &>/dev/null || ok=0
-    [ -f "$HOME/.tmux/plugins/tpm/tpm" ] || ok=0
-    _tmux_conf_ok || ok=0
-    [ -x "$XRK_MENU" ] || ok=0
-    _tmux_plugins_ok || ok=0
-    [ "$ok" -eq 1 ] && return 0
-
-    echo "[tmux] 环境未就绪，正在安装/修复…"
-    bash "$XRK_ROOT/body/modules/tmux.sh" || {
-        echo "[tmux] 安装失败。可手动: bash $XRK_ROOT/body/modules/tmux.sh" >&2
+    command -v tmux &>/dev/null || {
+        echo "[tmux] 未安装 tmux，请先菜单 7→1 或 xrk-tmux --setup" >&2
         return 1
     }
-    _tmux_plugins_ok || {
-        echo "[tmux] 插件仍未装全，请运行 xrk-tmux --setup" >&2
+    _tmux_conf_ok || {
+        echo "[tmux] 配置未就绪，请先: xrk-tmux --setup" >&2
         return 1
     }
+    [ -x "$XRK_MENU" ] || {
+        echo "[tmux] 菜单脚本缺失，请先: xrk-tmux --setup" >&2
+        return 1
+    }
+    [ -f "$HOME/.tmux/plugins/tpm/tpm" ] || {
+        echo "[tmux] tpm 缺失，请先: xrk-tmux --setup" >&2
+        return 1
+    }
+    _tmux_plugins_ok || echo "[tmux] 部分插件缺失，可先进入；补装: xrk-tmux --setup" >&2
     return 0
 }
 
