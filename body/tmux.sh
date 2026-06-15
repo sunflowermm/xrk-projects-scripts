@@ -57,9 +57,15 @@ _tmux_repair_config() {
 }
 
 _tmux_status() {
+    local name
     echo "tmux: $(command -v tmux >/dev/null && tmux -V || echo 未安装)"
     echo "配置: $TMUX_CONF $(_tmux_conf_ok && echo OK || echo 未链接)"
     [ -x "$XRK_MENU" ] && echo "菜单: $XRK_MENU OK" || echo "菜单: 缺失（xrk-tmux --setup）"
+    echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
+    echo "插件:"
+    for name in tmux-sensible tmux-yank tmux-prefix-highlight tmux-open; do
+        [ -d "$HOME/.tmux/plugins/$name/.git" ] && echo "  $name: OK" || echo "  $name: 缺失"
+    done
     tmux has-session -t "$SESSION_NAME" 2>/dev/null \
         && echo "会话: $SESSION_NAME 已存在" \
         || echo "会话: $SESSION_NAME 未创建"
@@ -148,6 +154,8 @@ ensure_tmux_env() {
         echo "[tmux] 菜单脚本缺失，请菜单 7→1" >&2
         return 1
     }
+    [ -f "$HOME/.tmux/plugins/tpm/tpm" ] \
+        || echo "[tmux] 提示: 插件未装全，样式/复制可能无效，请菜单 7→1" >&2
 }
 
 goto_desktop() {

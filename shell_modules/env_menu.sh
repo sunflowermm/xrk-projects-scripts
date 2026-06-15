@@ -25,7 +25,7 @@ _env_run_action() {
             case "$sub" in
                 1)
                     xrk_exec_script "body/modules/tmux.sh" \
-                        && menu_msg_ok "tmux 已就绪（纯配置，无插件；重启后 7→2 即可）"
+                        && menu_msg_ok "tmux 已就绪（含复制/样式插件；不含 resurrect）"
                     ;;
                 2)
                     XRK_TMUX_NO_ATTACH=1 xrk_exec_script "body/tmux.sh" --no-attach \

@@ -1,8 +1,16 @@
 #!/bin/bash
-# 安装 tmux，写入 ~/.tmux.conf 与右键菜单（无 tpm/插件）
+# 安装 tmux + 轻量插件，写入 ~/.tmux.conf
 set -e
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+
+# 与 body/.tmux.conf 中 @plugin 一致（禁止 resurrect/continuum/cpu 等重型插件）
+XRK_TMUX_PLUGIN_REPOS=(
+    "tmux-sensible|https://github.com/tmux-plugins/tmux-sensible.git"
+    "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git"
+    "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git"
+    "tmux-open|https://github.com/tmux-plugins/tmux-open.git"
+)
 
 install_menu_wrapper() {
     local menu="$HOME/.tmux/xrk-menu"
@@ -41,14 +49,24 @@ EOF
     echo "[tmux] 已写入 $entry"
 }
 
-cleanup_legacy_plugins() {
-    local removed=0
-    for path in "$HOME/.tmux/plugins" "$HOME/.tmux/resurrect"; do
-        [ -e "$path" ] || continue
-        rm -rf "$path"
-        removed=1
-    done
-    [ "$removed" = "1" ] && echo "[tmux] 已删除旧版 tpm 插件与 resurrect 数据"
+cleanup_heavy_plugins() {
+    rm -rf \
+        "$HOME/.tmux/resurrect" \
+        "$HOME/.tmux/plugins/tmux-resurrect" \
+        "$HOME/.tmux/plugins/tmux-continuum" \
+        "$HOME/.tmux/plugins/tmux-mem" \
+        "$HOME/.tmux/plugins/tmux-fzf" \
+        "$HOME/.tmux/plugins/tmux-cpu" \
+        2>/dev/null || true
+}
+
+install_clipboard_tools() {
+    command -v xclip &>/dev/null || command -v xsel &>/dev/null || command -v wl-copy &>/dev/null \
+        && return 0
+    echo "[tmux] 安装剪贴板工具 xclip（供 yank 插件）…"
+    if command -v apt-get &>/dev/null; then
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xclip 2>/dev/null || true
+    fi
 }
 
 install_tmux_pkg() {
@@ -79,6 +97,49 @@ install_tmux_pkg() {
     echo "[tmux] 已安装: $(tmux -V)"
 }
 
+_setup_github() {
+    # shellcheck source=/dev/null
+    [ -f "$XRK_ROOT/shell_modules/bootstrap.sh" ] && source "$XRK_ROOT/shell_modules/bootstrap.sh"
+    xrk_ensure_bootstrap
+    # shellcheck source=/dev/null
+    source "$XRK_ROOT/shell_modules/xrk_base.sh"
+    safe_source "shell_modules/github.sh"
+}
+
+setup_tpm() {
+    mkdir -p "$HOME/.tmux/plugins"
+    if [ ! -d "$HOME/.tmux/plugins/tpm/.git" ]; then
+        rm -rf "$HOME/.tmux/plugins/tpm"
+        echo "[tmux] 安装 tpm…"
+        xrk_git_clone "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm"
+    fi
+}
+
+_ensure_plugin() {
+    local name="$1" repo="$2" dest="$HOME/.tmux/plugins/$name"
+    [ -d "$dest/.git" ] && return 0
+    echo "[tmux] 克隆插件 $name…"
+    rm -rf "$dest"
+    xrk_git_clone "$repo" "$dest" || {
+        echo "[tmux] 插件 $name 失败: $repo" >&2
+        return 1
+    }
+}
+
+install_plugins() {
+    local entry name repo failed=0
+    _setup_github
+    setup_tpm
+    echo "[tmux] 安装轻量插件（${#XRK_TMUX_PLUGIN_REPOS[@]} 个）…"
+    for entry in "${XRK_TMUX_PLUGIN_REPOS[@]}"; do
+        name="${entry%%|*}"
+        repo="${entry#*|}"
+        _ensure_plugin "$name" "$repo" || failed=$((failed + 1))
+    done
+    [ "$failed" -gt 0 ] && echo "[tmux] ${failed} 个插件失败，可重试 xrk-tmux --setup" >&2
+    return 0
+}
+
 case "${1:-}" in
     --link-only)
         link_conf
@@ -87,7 +148,9 @@ case "${1:-}" in
         ;;
 esac
 
-cleanup_legacy_plugins
+cleanup_heavy_plugins
 install_tmux_pkg
+install_clipboard_tools
 link_conf
-echo "[tmux] 完成。进入桌面: xrk-tmux | 检查: xrk-tmux --status"
+install_plugins || true
+echo "[tmux] 完成。插件: sensible/yank/样式/open | 进入: xrk-tmux"
