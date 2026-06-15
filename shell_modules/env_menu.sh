@@ -21,11 +21,15 @@ _env_run_action() {
         tmux)
             menu_require_repo || return 0
             local sub
-            sub=$(menu_read_choice "tmux [1]首次安装(插件) [2]进入桌面 [0]返回: ") || return 0
+            sub=$(menu_read_choice "tmux [1]安装(配置+tpm) [2]进入桌面 [3]预装插件 [0]返回: ") || return 0
             case "$sub" in
                 1)
                     xrk_exec_script "body/modules/tmux.sh" \
-                        && menu_msg_ok "tmux 已就绪（含样式/cpu 等；不含 yank 复制插件）"
+                        && menu_msg_ok "tmux 已就绪（样式/快捷键；插件进 tmux 后自动装）"
+                    ;;
+                3)
+                    xrk_exec_script "body/modules/tmux.sh" --setup-plugins \
+                        && menu_msg_ok "插件已预装（含 resurrect/cpu 等）"
                     ;;
                 2)
                     XRK_TMUX_NO_ATTACH=1 xrk_exec_script "body/tmux.sh" --no-attach \

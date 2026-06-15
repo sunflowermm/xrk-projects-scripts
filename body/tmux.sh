@@ -171,7 +171,7 @@ ensure_tmux_env() {
         return 1
     }
     [ -f "$HOME/.tmux/plugins/tpm/tpm" ] \
-        || echo "[tmux] 提示: 插件未装全，请菜单 7→1" >&2
+        || echo "[tmux] 提示: 未装 tpm，请菜单 7→1" >&2
 }
 
 goto_desktop() {
@@ -195,6 +195,10 @@ case "${1:-}" in
     --no-attach) export XRK_TMUX_NO_ATTACH=1; shift ;;
     --setup)
         bash "$XRK_ROOT/body/modules/tmux.sh"
+        exit $?
+        ;;
+    --setup-plugins)
+        bash "$XRK_ROOT/body/modules/tmux.sh" --setup-plugins
         exit $?
         ;;
 esac
