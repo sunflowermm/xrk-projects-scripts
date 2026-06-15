@@ -28,9 +28,9 @@ _env_run_action() {
                         && menu_msg_ok "tmux 已就绪（纯配置，无插件）"
                     ;;
                 2)
-                    XRK_TMUX_NO_ATTACH=1 xrk_exec_script "body/tmux.sh" --no-attach \
-                        && menu_msg_ok "桌面已在后台创建，请新开 SSH 执行: tmux attach -t 新年快乐" \
-                        || menu_msg_err "进入失败：首次请先选 1 安装"
+                    xrk_exec_script "body/tmux.sh" \
+                        && menu_msg_ok "已进入或已刷新向日葵桌面" \
+                        || menu_msg_err "失败：请先选 1 安装配置"
                     ;;
                 0) ;;
                 *) menu_msg_err "无效选项" ;;
