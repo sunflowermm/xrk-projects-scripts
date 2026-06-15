@@ -146,6 +146,15 @@ install_plugins() {
     return 0
 }
 
+case "${1:-}" in
+    --link-only)
+        xrk_ensure_bootstrap
+        link_conf
+        echo "[tmux] 已补写 ~/.tmux.conf 与右键菜单（无需重装插件）"
+        exit 0
+        ;;
+esac
+
 install_tmux_pkg
 install_clipboard_tools
 setup_tpm

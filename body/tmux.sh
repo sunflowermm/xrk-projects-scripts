@@ -54,6 +54,14 @@ _tmux_conf_ok() {
     return 0
 }
 
+_tmux_repair_config() {
+    local mod="$XRK_ROOT/body/modules/tmux.sh"
+    [ -f "$mod" ] || return 1
+    [ -f "$XRK_ROOT/body/.tmux.conf" ] || return 1
+    bash "$mod" --link-only >/dev/null 2>&1 || return 1
+    _tmux_conf_ok
+}
+
 _tmux_plugins_ok() {
     local name
     for name in tmux-sensible tmux-resurrect tmux-continuum tmux-yank tmux-open tmux-prefix-highlight; do
@@ -124,8 +132,17 @@ _tmux_load_full_conf() {
 
 _tmux_can_attach() {
     [ "${XRK_TMUX_NO_ATTACH:-0}" = "1" ] && return 1
-    [ -t 0 ] && [ -t 1 ] && return 0
-    return 1
+    # Web 面板/非 SSH 常有伪 tty，attach 会卡死且 Ctrl+C 无效
+    [ -n "${SSH_CONNECTION:-}" ] || return 1
+    [ -t 0 ] && [ -t 1 ] || return 1
+    return 0
+}
+
+_tmux_print_attach_hint() {
+    local target="${1:-$SESSION_NAME}"
+    echo "[tmux] 桌面会话: $target（已在后台运行）"
+    echo "[tmux] 请新开 SSH 窗口执行: tmux attach -t $target"
+    echo "[tmux] 分离会话: 前缀 Alt+Space 然后按 d"
 }
 
 _tmux_resolve_target() {
@@ -152,15 +169,10 @@ _tmux_connect() {
 
     echo "[tmux] 连接到会话: $target"
     if ! _tmux_can_attach; then
-        echo "[tmux] 会话已在后台运行（当前终端不适合 attach，避免卡死 Web 面板）"
-        echo "[tmux] 请在新 SSH 窗口执行: tmux attach -t $target"
+        _tmux_print_attach_hint "$target"
         return 0
     fi
-    if [ ! -t 0 ] && [ -r /dev/tty ]; then
-        tmux attach-session -t "$target" </dev/tty
-    else
-        tmux attach-session -t "$target"
-    fi
+    tmux attach-session -t "$target"
 }
 
 create_desktop_layout() {
@@ -170,21 +182,21 @@ create_desktop_layout() {
 
     tmux has-session -t "$s" 2>/dev/null && tmux kill-session -t "$s" 2>/dev/null || true
 
-    # 先用 bootstrap 配置创建（不跑 tpm/continuum/resurrect）
-    tmux -f "$boot" new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}" "exec bash" \
-        || { echo "[tmux] 创建会话失败" >&2; return 1; }
-    tmux split-window -v -t "$s:0" "exec bash"
-    tmux new-window -t "$s:1" -n "${XRK_TMUX_WINDOWS[1]}" "exec bash"
-    tmux split-window -h -t "$s:1" "exec bash"
-    tmux new-window -t "$s:2" -n "${XRK_TMUX_WINDOWS[2]}" "exec bash"
-    tmux split-window -h -t "$s:2" "exec bash"
+    (
+        set -e
+        tmux -f "$boot" new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}" "exec bash"
+        tmux split-window -v -t "$s:0" "exec bash"
+        tmux new-window -t "$s:1" -n "${XRK_TMUX_WINDOWS[1]}" "exec bash"
+        tmux split-window -h -t "$s:1" "exec bash"
+        tmux new-window -t "$s:2" -n "${XRK_TMUX_WINDOWS[2]}" "exec bash"
+        tmux split-window -h -t "$s:2" "exec bash"
+        tmux select-window -t "$s:0"
+    ) || { echo "[tmux] 创建会话失败" >&2; return 1; }
 
-    tmux select-window -t "$s:0"
-    tmux select-pane -t "$s:0.0"
     _tmux_apply_window_names "$s"
     _tmux_load_full_conf || true
-    tmux display-message -d 4000 \
-        "向日葵 tmux | 前缀 Alt+Space ? | 主菜单 xrk | 葵崽 xyz | 葵子 xag"
+    tmux display-message -t "$s" -d 4000 \
+        "向日葵 tmux | 前缀 Alt+Space ? | 主菜单 xrk | 葵崽 xyz | 葵子 xag" 2>/dev/null || true
     echo "[tmux] 桌面已创建: ${XRK_TMUX_WINDOWS[*]}"
 }
 
@@ -193,19 +205,25 @@ ensure_tmux_env() {
         echo "[tmux] 未安装 tmux，请先菜单 7→1 或 xrk-tmux --setup" >&2
         return 1
     }
-    _tmux_conf_ok || {
-        echo "[tmux] 配置未就绪，请先: xrk-tmux --setup" >&2
+    if ! _tmux_conf_ok; then
+        if _tmux_repair_config; then
+            echo "[tmux] 已自动补写配置（重启后无需重装，直接进桌面即可）"
+        else
+            echo "[tmux] 配置未就绪，请先菜单 7→1 安装一次" >&2
+            return 1
+        fi
+    fi
+    if [ ! -x "$XRK_MENU" ]; then
+        _tmux_repair_config || {
+            echo "[tmux] 菜单脚本缺失，请先菜单 7→1" >&2
+            return 1
+        }
+    fi
+    if [ ! -f "$HOME/.tmux/plugins/tpm/tpm" ]; then
+        echo "[tmux] 首次使用需安装插件，请菜单 7→1（只需一次）" >&2
         return 1
-    }
-    [ -x "$XRK_MENU" ] || {
-        echo "[tmux] 菜单脚本缺失，请先: xrk-tmux --setup" >&2
-        return 1
-    }
-    [ -f "$HOME/.tmux/plugins/tpm/tpm" ] || {
-        echo "[tmux] tpm 缺失，请先: xrk-tmux --setup" >&2
-        return 1
-    }
-    _tmux_plugins_ok || echo "[tmux] 部分插件缺失，可先进入；补装: xrk-tmux --setup" >&2
+    fi
+    _tmux_plugins_ok || echo "[tmux] 部分插件缺失，可先进入；完整补装: 菜单 7→1" >&2
     return 0
 }
 
@@ -228,6 +246,7 @@ goto_desktop() {
 case "${1:-}" in
     -h|--help)   _tmux_usage; exit 0 ;;
     --status)    _tmux_status; exit 0 ;;
+    --no-attach) export XRK_TMUX_NO_ATTACH=1; shift ;;
     --setup)
         bash "$XRK_ROOT/body/modules/tmux.sh"
         exit $?

@@ -21,15 +21,16 @@ _env_run_action() {
         tmux)
             menu_require_repo || return 0
             local sub
-            sub=$(menu_read_choice "tmux [1]安装配置 [2]进入桌面 [0]返回: ") || return 0
+            sub=$(menu_read_choice "tmux [1]首次安装(插件) [2]进入桌面 [0]返回: ") || return 0
             case "$sub" in
                 1)
                     xrk_exec_script "body/modules/tmux.sh" \
-                        && menu_msg_ok "tmux 已配置（xrk-tmux --status 可检查）"
+                        && menu_msg_ok "tmux 已配置（重启后选 2 即可，不必重复 1）"
                     ;;
                 2)
-                    xrk_exec_script "body/tmux.sh" \
-                        || menu_msg_err "进入失败，可先选 1 安装配置"
+                    XRK_TMUX_NO_ATTACH=1 xrk_exec_script "body/tmux.sh" --no-attach \
+                        && menu_msg_ok "桌面已在后台创建，请新开 SSH 执行: tmux attach -t 新年快乐" \
+                        || menu_msg_err "进入失败：首次请先选 1 安装"
                     ;;
                 0) ;;
                 *) menu_msg_err "无效选项" ;;
