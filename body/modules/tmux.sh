@@ -76,15 +76,28 @@ link_conf() {
 }
 
 install_menu_wrapper() {
+    local menu="$HOME/.tmux/xrk-menu"
+    local mouse_conf="$HOME/.tmux/xrk-mouse.conf"
     mkdir -p "$HOME/.tmux"
-    cat > "$HOME/.tmux/xrk-menu" << EOF
+    cat > "$menu" << EOF
 #!/bin/bash
-[ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
+export HOME="${HOME:-$(getent passwd "$(id -un 2>/dev/null || echo root)" | cut -d: -f6)}"
+[ -f "\$HOME/.xrk_repo" ] && source "\$HOME/.xrk_repo"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 exec bash "\$XRK_ROOT/body/tmux-menu.sh" "\$@"
 EOF
-    chmod +x "$HOME/.tmux/xrk-menu"
-    echo "[tmux] 已安装 $HOME/.tmux/xrk-menu"
+    chmod +x "$menu"
+    cat > "$mouse_conf" << EOF
+# 由 xrk-tmux --setup 生成（绝对路径，避免 tmux 内 HOME 为空）
+bind ? run-shell '$menu help'
+bind -n MouseDown3Pane if-shell -F -t = "#{mouse_any_flag}" "send-keys -M" "run-shell '$menu pane'"
+bind -n MouseDown3StatusLeft run-shell '$menu session'
+bind -n M-MouseDown3StatusLeft run-shell '$menu session'
+bind -n MouseDown3Status run-shell '$menu window'
+bind -n MouseDown3StatusRight run-shell '$menu system'
+EOF
+    echo "[tmux] 已安装 $menu"
+    echo "[tmux] 已安装 $mouse_conf"
 }
 
 _ensure_tpm_plugin() {

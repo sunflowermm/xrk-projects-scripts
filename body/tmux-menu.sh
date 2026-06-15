@@ -2,6 +2,7 @@
 # tmux 中文右键菜单（由 ~/.tmux/xrk-menu 调用）
 [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
+HOME="${HOME:-$(getent passwd "$(id -un 2>/dev/null || echo root)" | cut -d: -f6)}"
 
 _MENU="${HOME}/.tmux/xrk-menu"
 _R='source-file ~/.tmux.conf \; display "配置已重载"'

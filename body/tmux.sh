@@ -96,6 +96,7 @@ _tmux_status() {
     echo "tmux: $(command -v tmux >/dev/null && tmux -V || echo 未安装)"
     echo "配置: $TMUX_CONF $(_tmux_conf_ok && echo OK || echo 未链接)"
     [ -x "$XRK_MENU" ] && echo "菜单脚本: $XRK_MENU OK" || echo "菜单脚本: 缺失（请 xrk-tmux --setup）"
+    [ -f "$HOME/.tmux/xrk-mouse.conf" ] && echo "右键绑定: $HOME/.tmux/xrk-mouse.conf OK" || echo "右键绑定: 缺失（请 xrk-tmux --setup）"
     echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
     echo "插件:"
     _tmux_status_plugins
