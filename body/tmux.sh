@@ -4,6 +4,24 @@
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 SESSION_NAME="新年快乐"
 TMUX_CONF="${HOME}/.tmux.conf"
+XRK_TMUX_WINDOWS=(来财 来福 来运)
+
+_tmux_ensure_utf8() {
+    case "${LANG:-}" in
+        *UTF-8*|*utf8*) ;;
+        *) export LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8 ;;
+    esac
+}
+
+_tmux_apply_window_names() {
+    local session="$1" i name
+    [ -n "$session" ] || return 0
+    tmux has-session -t "$session" 2>/dev/null || return 0
+    for i in "${!XRK_TMUX_WINDOWS[@]}"; do
+        name="${XRK_TMUX_WINDOWS[$i]}"
+        tmux rename-window -t "$session:$i" "$name" 2>/dev/null || true
+    done
+}
 
 _tmux_latest_session() {
     tmux list-sessions -F '#{session_activity} #{session_name}' 2>/dev/null \
@@ -22,6 +40,7 @@ _tmux_resolve_target() {
 _tmux_connect() {
     local target="$1" cur
     [ -z "$target" ] && return 1
+    [ "$target" = "$SESSION_NAME" ] && _tmux_apply_window_names "$target"
 
     if [ -n "$TMUX" ]; then
         cur=$(tmux display-message -p '#S' 2>/dev/null || true)
@@ -43,6 +62,7 @@ _tmux_connect() {
 }
 
 create_desktop_layout() {
+    _tmux_ensure_utf8
     tmux new-session -d -s "$SESSION_NAME" -n "来财" "bash $XRK_ROOT/body/window_a.sh; exec bash"
     tmux split-window -v -t "$SESSION_NAME:来财" "bash $XRK_ROOT/body/window_a1.sh; exec bash"
     tmux new-window -t "$SESSION_NAME" -n "来福" "bash $XRK_ROOT/body/window_b.sh; exec bash"
@@ -52,6 +72,7 @@ create_desktop_layout() {
     tmux select-pane -t 0
     tmux split-window -v "exec bash"
     tmux select-window -t "$SESSION_NAME:来财"
+    _tmux_apply_window_names "$SESSION_NAME"
 }
 
 ensure_tmux_env() {
@@ -68,6 +89,7 @@ ensure_tmux_env() {
 goto_desktop() {
     local target
 
+    _tmux_ensure_utf8
     _tmux_reload_conf
     target=$(_tmux_resolve_target)
     if [ -n "$target" ]; then
