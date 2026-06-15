@@ -47,14 +47,13 @@ _tmux_latest_session() {
 }
 
 _tmux_conf_ok() {
-    [ -e "$TMUX_CONF" ] || return 1
-    local want="$XRK_ROOT/body/.tmux.conf" cur
-    cur=$(readlink -f "$TMUX_CONF" 2>/dev/null || readlink "$TMUX_CONF" 2>/dev/null || echo "$TMUX_CONF")
-    want=$(readlink -f "$want" 2>/dev/null || echo "$want")
-    [ "$cur" = "$want" ] || [ -f "$TMUX_CONF" ]
+    [ -f "$TMUX_CONF" ] || return 1
+    grep -q "source-file.*body/.tmux.conf" "$TMUX_CONF" 2>/dev/null || return 1
+    grep -q "xrk-mouse.conf" "$TMUX_CONF" 2>/dev/null || return 1
+    return 0
 }
 
-_tmux_core_plugins_ok() {
+_tmux_plugins_ok() {
     local name
     for name in tmux-sensible tmux-resurrect tmux-continuum tmux-yank tmux-cpu tmux-open tmux-prefix-highlight; do
         [ -d "$HOME/.tmux/plugins/$name" ] || return 1
@@ -62,14 +61,8 @@ _tmux_core_plugins_ok() {
     return 0
 }
 
-_tmux_plugins_ok() {
-    _tmux_core_plugins_ok || return 1
-    [ -d "$HOME/.tmux/plugins/tmux-mem" ] || return 1
-    return 0
-}
-
 _tmux_status_plugins() {
-    local entry name repo dest
+    local entry name dest
     for entry in \
         "tpm|https://github.com/tmux-plugins/tpm.git" \
         "tmux-sensible|https://github.com/tmux-plugins/tmux-sensible.git" \
@@ -77,10 +70,8 @@ _tmux_status_plugins() {
         "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git" \
         "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git" \
         "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git" \
-        "tmux-mem|https://github.com/tmux-plugins/tmux-mem.git" \
         "tmux-open|https://github.com/tmux-plugins/tmux-open.git" \
-        "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git" \
-        "tmux-fzf|https://github.com/sainnhe/tmux-fzf.git"; do
+        "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git"; do
         name="${entry%%|*}"
         dest="$HOME/.tmux/plugins/$name"
         if [ -d "$dest/.git" ]; then
@@ -89,7 +80,6 @@ _tmux_status_plugins() {
             echo "  $name: 缺失"
         fi
     done
-    command -v fzf &>/dev/null && echo "  fzf: OK" || echo "  fzf: 未安装（tmux-fzf 需要）"
 }
 
 _tmux_status() {
@@ -100,15 +90,7 @@ _tmux_status() {
     echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
     echo "插件:"
     _tmux_status_plugins
-    if _tmux_core_plugins_ok; then
-        echo -n "汇总: 核心齐全"
-    else
-        echo -n "汇总: 核心缺失"
-    fi
-    echo -n " | 可选: "
-    { [ -d "$HOME/.tmux/plugins/tmux-mem" ] && echo -n "mem "; true; }
-    { [ -d "$HOME/.tmux/plugins/tmux-fzf" ] && echo -n "fzf"; true; }
-    echo
+    echo "汇总: $(_tmux_plugins_ok && echo 齐全 || echo 不完整)"
     tmux has-session -t "$SESSION_NAME" 2>/dev/null \
         && echo "会话: $SESSION_NAME 已存在" \
         || echo "会话: $SESSION_NAME 未创建"
@@ -185,7 +167,7 @@ ensure_tmux_env() {
     [ -f "$HOME/.tmux/plugins/tpm/tpm" ] || ok=0
     _tmux_conf_ok || ok=0
     [ -x "$XRK_MENU" ] || ok=0
-    _tmux_core_plugins_ok || ok=0
+    _tmux_plugins_ok || ok=0
     [ "$ok" -eq 1 ] && return 0
 
     echo "[tmux] 环境未就绪，正在安装/修复…"
@@ -193,11 +175,10 @@ ensure_tmux_env() {
         echo "[tmux] 安装失败。可手动: bash $XRK_ROOT/body/modules/tmux.sh" >&2
         return 1
     }
-    _tmux_core_plugins_ok || {
-        echo "[tmux] 核心插件仍未装全，请运行 xrk-tmux --setup" >&2
+    _tmux_plugins_ok || {
+        echo "[tmux] 插件仍未装全，请运行 xrk-tmux --setup" >&2
         return 1
     }
-    _tmux_plugins_ok || echo "[tmux] 提示: mem/fzf 可选插件未装全，不影响进入桌面" >&2
     return 0
 }
 

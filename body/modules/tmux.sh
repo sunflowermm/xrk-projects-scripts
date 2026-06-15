@@ -11,17 +11,15 @@ source "$XRK_ROOT/shell_modules/xrk_base.sh"
 xrk_加载底层 install
 safe_source "shell_modules/github.sh"
 
-# name|git_url|core|optional（与 body/.tmux.conf 中 @plugin 对应）
+# name|git_url（与 body/.tmux.conf 中 @plugin 对应）
 XRK_TMUX_PLUGIN_REPOS=(
-    "tmux-sensible|https://github.com/tmux-plugins/tmux-sensible.git|core"
-    "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect.git|core"
-    "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git|core"
-    "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git|core"
-    "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git|core"
-    "tmux-open|https://github.com/tmux-plugins/tmux-open.git|core"
-    "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git|core"
-    "tmux-mem|https://github.com/tmux-plugins/tmux-mem.git|optional"
-    "tmux-fzf|https://github.com/sainnhe/tmux-fzf.git|optional"
+    "tmux-sensible|https://github.com/tmux-plugins/tmux-sensible.git"
+    "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect.git"
+    "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git"
+    "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git"
+    "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git"
+    "tmux-open|https://github.com/tmux-plugins/tmux-open.git"
+    "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git"
 )
 
 install_tmux_pkg() {
@@ -38,12 +36,6 @@ install_clipboard_tools() {
         && return 0
     echo "[tmux] 安装剪贴板工具 xclip…"
     安装系统包 "xclip" 2>/dev/null || install_package "xclip" 2>/dev/null || true
-}
-
-install_fzf_if_missing() {
-    command -v fzf &>/dev/null && return 0
-    echo "[tmux] 安装 fzf（tmux-fzf 依赖）…"
-    安装系统包 "fzf" 2>/dev/null || install_package "fzf" 2>/dev/null || true
 }
 
 _tmux_fix_github_remote() {
@@ -70,9 +62,17 @@ setup_tpm() {
 }
 
 link_conf() {
-    [ -f "$XRK_ROOT/body/.tmux.conf" ] || { echo "[tmux] 未找到 body/.tmux.conf"; return 1; }
-    ln -sf "$XRK_ROOT/body/.tmux.conf" "$HOME/.tmux.conf"
-    echo "[tmux] 已链接 ~/.tmux.conf"
+    local main="$XRK_ROOT/body/.tmux.conf"
+    local entry="$HOME/.tmux.conf"
+    local mouse_conf="$HOME/.tmux/xrk-mouse.conf"
+    [ -f "$main" ] || { echo "[tmux] 未找到 body/.tmux.conf"; return 1; }
+    install_menu_wrapper
+    cat > "$entry" << EOF
+# 向日葵 tmux 入口（setup 生成，含绝对路径）
+source-file $main
+source-file $mouse_conf
+EOF
+    echo "[tmux] 已写入 $entry"
 }
 
 install_menu_wrapper() {
@@ -116,38 +116,25 @@ _ensure_tpm_plugin() {
 }
 
 install_plugins() {
-    local entry name repo tier failed_core=0 failed_opt=0
+    local entry name repo failed=0
     local total="${#XRK_TMUX_PLUGIN_REPOS[@]}"
 
-    install_fzf_if_missing
+    # 已下架仓库残留
+    rm -rf "$HOME/.tmux/plugins/tmux-mem" "$HOME/.tmux/plugins/tmux-fzf" 2>/dev/null || true
 
-    echo "[tmux] 安装/校验插件（共 ${total} 个，git 克隆可能需 1～2 分钟）…"
+    echo "[tmux] 安装/校验插件（共 ${total} 个）…"
 
     for entry in "${XRK_TMUX_PLUGIN_REPOS[@]}"; do
         name="${entry%%|*}"
         repo="${entry#*|}"
-        repo="${repo%%|*}"
-        tier="${entry##*|}"
-        if _ensure_tpm_plugin "$name" "$repo"; then
-            continue
-        fi
-        if [ "$tier" = "optional" ]; then
-            failed_opt=$((failed_opt + 1))
-            echo "[tmux] 可选插件 $name 未装成（不影响进入桌面）" >&2
-        else
-            failed_core=$((failed_core + 1))
-        fi
+        _ensure_tpm_plugin "$name" "$repo" || failed=$((failed + 1))
     done
 
-    if [ "$failed_core" -gt 0 ]; then
-        echo "[tmux] ${failed_core} 个核心插件克隆失败，请重试: xrk-tmux --setup" >&2
+    if [ "$failed" -gt 0 ]; then
+        echo "[tmux] ${failed} 个插件克隆失败，请重试: xrk-tmux --setup" >&2
         return 1
     fi
-    if [ "$failed_opt" -gt 0 ]; then
-        echo "[tmux] ${failed_opt} 个可选插件未装成（mem/fzf），可稍后 xrk-tmux --setup 重试" >&2
-    else
-        echo "[tmux] 插件安装完成"
-    fi
+    echo "[tmux] 插件安装完成"
     return 0
 }
 
@@ -155,6 +142,5 @@ install_tmux_pkg
 install_clipboard_tools
 setup_tpm
 link_conf
-install_menu_wrapper
 install_plugins || true
 echo "[tmux] 完成。进入桌面: xrk-tmux | 检查: xrk-tmux --status"
