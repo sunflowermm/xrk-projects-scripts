@@ -20,7 +20,7 @@ _tmux_usage() {
   --no-attach 只创建/检查，不 attach（菜单 7→2 使用）
   -h, --help  本帮助
 
-快捷键: 前缀 Alt+Space | 分离 d | 重载 r | 帮助 ?
+快捷键: 前缀 Alt+Space | 菜单 \\ 或 F9 | 右键 | 分离 d | 重载 r
 窗口: ${XRK_TMUX_WINDOWS[*]}
 EOF
 }
@@ -59,7 +59,17 @@ _tmux_main_conf() {
 _tmux_conf_ok() {
     [ -f "$TMUX_CONF" ] || return 1
     grep -q '向日葵 tmux' "$TMUX_CONF" 2>/dev/null || return 1
-    [ -f "$HOME/.tmux/xrk-mouse.conf" ] || return 1
+    [ -f "$HOME/.tmux/xrk-menus.conf" ] || return 1
+    [ -x "$XRK_MENU" ] || return 1
+    return 0
+}
+
+_tmux_reload_config() {
+    [ -f "$TMUX_CONF" ] || return 1
+    if ! tmux info &>/dev/null; then
+        tmux -f "$TMUX_CONF" start-server 2>/dev/null || return 1
+    fi
+    tmux source-file "$TMUX_CONF" 2>/dev/null || return 1
     return 0
 }
 
@@ -119,6 +129,7 @@ _tmux_connect() {
         _tmux_print_attach_hint "$target"
         return 0
     fi
+    _tmux_reload_config || true
     echo "[tmux] 连接: $target"
     tmux attach-session -t "$target"
 }
@@ -126,9 +137,14 @@ _tmux_connect() {
 create_desktop_layout() {
     local s="$SESSION_NAME"
     _tmux_ensure_utf8
+    _tmux_reload_config || {
+        echo "[tmux] 配置加载失败，请先 xrk-tmux --setup" >&2
+        return 1
+    }
 
     if _tmux_session_usable "$s"; then
         _tmux_apply_window_names "$s"
+        _tmux_reload_config || true
         echo "[tmux] 桌面已存在: ${XRK_TMUX_WINDOWS[*]}"
         return 0
     fi
@@ -147,6 +163,7 @@ create_desktop_layout() {
     ) || { echo "[tmux] 创建失败" >&2; return 1; }
 
     _tmux_apply_window_names "$s"
+    _tmux_reload_config || true
     echo "[tmux] 桌面已创建: ${XRK_TMUX_WINDOWS[*]}"
 }
 

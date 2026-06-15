@@ -1,5 +1,5 @@
 #!/bin/bash
-# 安装 tmux + 写入配置（纯 conf，无插件，对齐 sunflower）
+# 安装 tmux + 写入 ~/.tmux.conf（纯 conf，无插件）
 set -e
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
@@ -17,7 +17,6 @@ _tmux_main_src() {
 
 install_menu_wrapper() {
     local menu="$HOME/.tmux/xrk-menu"
-    local mouse_conf="$HOME/.tmux/xrk-mouse.conf"
     mkdir -p "$HOME/.tmux"
     cat > "$menu" << EOF
 #!/bin/bash
@@ -27,44 +26,43 @@ XRK_ROOT="${XRK_ROOT:-/xrk}"
 exec bash "\$XRK_ROOT/body/tmux-menu.sh" "\$@"
 EOF
     chmod +x "$menu"
-    cat > "$mouse_conf" << EOF
-# 由 xrk-tmux --setup 生成
-bind ? run-shell '$menu help'
-bind -n MouseDown3Pane if-shell -F -t = "#{mouse_any_flag}" "send-keys -M" "run-shell '$menu pane'"
-bind -n MouseDown3StatusLeft run-shell '$menu session'
-bind -n M-MouseDown3StatusLeft run-shell '$menu session'
-bind -n MouseDown3Status run-shell '$menu window'
-bind -n MouseDown3StatusRight run-shell '$menu system'
-EOF
 }
 
 link_conf() {
-    local main mouse_conf entry root_abs
+    local main menus_tpl menus_out entry root_abs menu
     root_abs="$(cd "$XRK_ROOT" 2>/dev/null && pwd)" || root_abs="$XRK_ROOT"
     entry="$HOME/.tmux.conf"
-    mouse_conf="$HOME/.tmux/xrk-mouse.conf"
     main="$(_tmux_main_src "$root_abs")" || {
         echo "[tmux] 未找到主配置: ${root_abs}/body/tmux.conf" >&2
-        echo "[tmux] 请确认仓库在 $root_abs 且已 git 同步" >&2
+        return 1
+    }
+    menus_tpl="${root_abs}/body/tmux-menus.conf"
+    [ -f "$menus_tpl" ] || {
+        echo "[tmux] 未找到菜单配置: $menus_tpl" >&2
         return 1
     }
     install_menu_wrapper
+    menu="$HOME/.tmux/xrk-menu"
+    menus_out="$HOME/.tmux/xrk-menus.conf"
+    sed "s|@XRK_MENU@|${menu}|g" "$menus_tpl" > "$menus_out"
     {
-        echo "# 向日葵 tmux 入口（xrk-tmux --setup 生成；更新配置请重跑 setup）"
+        echo "# 向日葵 tmux（xrk-tmux --setup 生成；更新请重跑 setup）"
         echo "# xrk-src: ${main}"
-        cat "$main"
+        sed "s|@XRK_MENU@|${menu}|g" "$main"
         echo ""
-        echo "# 鼠标右键菜单"
-        echo "source-file ${mouse_conf}"
+        echo "# 鼠标右键菜单（内联 display-menu）"
+        echo "source-file ${menus_out}"
     } > "$entry"
     echo "[tmux] 已写入 $entry"
     echo "[tmux]   ← ${main}"
+    echo "[tmux]   ← ${menus_out}"
 }
 
 cleanup_legacy_tmux_plugins() {
+    rm -f "$HOME/.tmux/xrk-mouse.conf" 2>/dev/null || true
     if [ -d "$HOME/.tmux/plugins" ] || [ -d "$HOME/.tmux/resurrect" ]; then
         rm -rf "$HOME/.tmux/plugins" "$HOME/.tmux/resurrect" 2>/dev/null || true
-        echo "[tmux] 已移除旧 tpm/插件目录（纯配置模式）"
+        echo "[tmux] 已移除旧 tpm/插件目录"
     fi
 }
 
@@ -107,4 +105,4 @@ esac
 cleanup_legacy_tmux_plugins
 install_tmux_pkg
 link_conf
-echo "[tmux] 完成。纯配置模式（无插件）"
+echo "[tmux] 完成 → tmux kill-server 2>/dev/null; xrk-tmux"
