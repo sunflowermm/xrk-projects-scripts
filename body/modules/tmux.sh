@@ -11,17 +11,17 @@ source "$XRK_ROOT/shell_modules/xrk_base.sh"
 xrk_加载底层 install
 safe_source "shell_modules/github.sh"
 
-# name|git_url（与 body/.tmux.conf 中 @plugin 对应，tpm 自身不在此列）
+# name|git_url|core|optional（与 body/.tmux.conf 中 @plugin 对应）
 XRK_TMUX_PLUGIN_REPOS=(
-    "tmux-sensible|https://github.com/tmux-plugins/tmux-sensible.git"
-    "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect.git"
-    "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git"
-    "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git"
-    "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git"
-    "tmux-mem|https://github.com/tmux-plugins/tmux-mem.git"
-    "tmux-open|https://github.com/tmux-plugins/tmux-open.git"
-    "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git"
-    "tmux-fzf|https://github.com/sainnhe/tmux-fzf.git"
+    "tmux-sensible|https://github.com/tmux-plugins/tmux-sensible.git|core"
+    "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect.git|core"
+    "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git|core"
+    "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git|core"
+    "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git|core"
+    "tmux-open|https://github.com/tmux-plugins/tmux-open.git|core"
+    "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git|core"
+    "tmux-mem|https://github.com/tmux-plugins/tmux-mem.git|optional"
+    "tmux-fzf|https://github.com/sainnhe/tmux-fzf.git|optional"
 )
 
 install_tmux_pkg() {
@@ -103,7 +103,7 @@ _ensure_tpm_plugin() {
 }
 
 install_plugins() {
-    local entry name repo failed=0
+    local entry name repo tier failed_core=0 failed_opt=0
     local total="${#XRK_TMUX_PLUGIN_REPOS[@]}"
 
     install_fzf_if_missing
@@ -113,14 +113,28 @@ install_plugins() {
     for entry in "${XRK_TMUX_PLUGIN_REPOS[@]}"; do
         name="${entry%%|*}"
         repo="${entry#*|}"
-        _ensure_tpm_plugin "$name" "$repo" || failed=$((failed + 1))
+        repo="${repo%%|*}"
+        tier="${entry##*|}"
+        if _ensure_tpm_plugin "$name" "$repo"; then
+            continue
+        fi
+        if [ "$tier" = "optional" ]; then
+            failed_opt=$((failed_opt + 1))
+            echo "[tmux] 可选插件 $name 未装成（不影响进入桌面）" >&2
+        else
+            failed_core=$((failed_core + 1))
+        fi
     done
 
-    if [ "$failed" -gt 0 ]; then
-        echo "[tmux] ${failed} 个插件克隆失败，可稍后重试: xrk-tmux --setup" >&2
+    if [ "$failed_core" -gt 0 ]; then
+        echo "[tmux] ${failed_core} 个核心插件克隆失败，请重试: xrk-tmux --setup" >&2
         return 1
     fi
-    echo "[tmux] 插件安装完成"
+    if [ "$failed_opt" -gt 0 ]; then
+        echo "[tmux] ${failed_opt} 个可选插件未装成（mem/fzf），可稍后 xrk-tmux --setup 重试" >&2
+    else
+        echo "[tmux] 插件安装完成"
+    fi
     return 0
 }
 

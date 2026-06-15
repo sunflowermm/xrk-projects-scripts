@@ -165,36 +165,58 @@ git() {
     GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= command git "${args[@]}"
 }
 
-# 浅克隆 GitHub 仓库（国内走加速；失败则直连重试）
+# 浅克隆 GitHub 仓库（国内走加速；多策略重试）
+_xrk_do_git_clone() {
+    local url="$1" dest="$2" depth="$3"
+    rm -rf "$dest"
+    if command -v timeout &>/dev/null; then
+        timeout 90 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+            command git clone --depth="$depth" "$url" "$dest" 2>/dev/null
+    else
+        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+            command git clone --depth="$depth" "$url" "$dest" 2>/dev/null
+    fi
+}
+
 xrk_git_clone() {
     local url="$1" dest="$2" depth="${3:-1}"
-    local direct
+    local direct proxy proxied attempt
 
     [ -z "$url" ] || [ -z "$dest" ] && return 1
     command -v git &>/dev/null || return 1
 
-    echo "[git] 克隆 ${url##*/} …" >&2
-    if command -v timeout &>/dev/null; then
-        if timeout 120 git clone --depth="$depth" "$url" "$dest" 2>/dev/null; then
-            return 0
-        fi
-    elif git clone --depth="$depth" "$url" "$dest" 2>/dev/null; then
+    direct="$(xrk_clean_github_url "$url")"
+    echo "[git] 克隆 ${direct##*/} …" >&2
+
+    # 1) 自动加速（git 包装）
+    if git clone --depth="$depth" "$direct" "$dest" 2>/dev/null; then
+        return 0
+    fi
+    rm -rf "$dest" 2>/dev/null || true
+
+    # 2) 直连
+    if _xrk_do_git_clone "$direct" "$dest" "$depth"; then
         return 0
     fi
 
-    direct="$(xrk_clean_github_url "$url")"
-    case "$direct" in
-        https://github.com/*|https://raw.githubusercontent.com/*)
-            if [ "$direct" != "$url" ]; then
-                echo "[git] 加速失败，尝试直连: $direct" >&2
-                if command -v timeout &>/dev/null; then
-                    timeout 120 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
-                        git clone --depth="$depth" "$direct" "$dest" && return 0
-                else
-                    GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= command git clone --depth="$depth" "$direct" "$dest" && return 0
-                fi
+    # 3) 逐个代理重试（国内常见 clone 失败原因：加速探测通过但 clone 超时/限流）
+    if _is_cn_region; then
+        for proxy in "${PROXIES[@]}"; do
+            case "$proxy" in
+                https://gitclone.com/github.com)
+                    proxied="${proxy}/${direct#https://github.com/}"
+                    ;;
+                *)
+                    proxied="${proxy}/${direct}"
+                    ;;
+            esac
+            if _xrk_do_git_clone "$proxied" "$dest" "$depth"; then
+                _XRK_GITHUB_PROXY_CACHED="$proxy"
+                return 0
             fi
-            ;;
-    esac
+        done
+    fi
+
+    echo "[git] 克隆失败: $direct" >&2
     return 1
 }

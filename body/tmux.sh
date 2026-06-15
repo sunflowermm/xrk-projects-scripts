@@ -54,11 +54,17 @@ _tmux_conf_ok() {
     [ "$cur" = "$want" ] || [ -f "$TMUX_CONF" ]
 }
 
-_tmux_plugins_ok() {
+_tmux_core_plugins_ok() {
     local name
-    for name in tmux-sensible tmux-resurrect tmux-continuum tmux-yank tmux-cpu tmux-mem tmux-open tmux-prefix-highlight; do
+    for name in tmux-sensible tmux-resurrect tmux-continuum tmux-yank tmux-cpu tmux-open tmux-prefix-highlight; do
         [ -d "$HOME/.tmux/plugins/$name" ] || return 1
     done
+    return 0
+}
+
+_tmux_plugins_ok() {
+    _tmux_core_plugins_ok || return 1
+    [ -d "$HOME/.tmux/plugins/tmux-mem" ] || return 1
     return 0
 }
 
@@ -93,7 +99,15 @@ _tmux_status() {
     echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
     echo "插件:"
     _tmux_status_plugins
-    echo "汇总: $(_tmux_plugins_ok && echo 核心齐全 || echo 不完整)"
+    if _tmux_core_plugins_ok; then
+        echo -n "汇总: 核心齐全"
+    else
+        echo -n "汇总: 核心缺失"
+    fi
+    echo -n " | 可选: "
+    { [ -d "$HOME/.tmux/plugins/tmux-mem" ] && echo -n "mem "; true; }
+    { [ -d "$HOME/.tmux/plugins/tmux-fzf" ] && echo -n "fzf"; true; }
+    echo
     tmux has-session -t "$SESSION_NAME" 2>/dev/null \
         && echo "会话: $SESSION_NAME 已存在" \
         || echo "会话: $SESSION_NAME 未创建"
@@ -170,7 +184,7 @@ ensure_tmux_env() {
     [ -f "$HOME/.tmux/plugins/tpm/tpm" ] || ok=0
     _tmux_conf_ok || ok=0
     [ -x "$XRK_MENU" ] || ok=0
-    _tmux_plugins_ok || ok=0
+    _tmux_core_plugins_ok || ok=0
     [ "$ok" -eq 1 ] && return 0
 
     echo "[tmux] 环境未就绪，正在安装/修复…"
@@ -178,7 +192,11 @@ ensure_tmux_env() {
         echo "[tmux] 安装失败。可手动: bash $XRK_ROOT/body/modules/tmux.sh" >&2
         return 1
     }
-    _tmux_plugins_ok || echo "[tmux] 提示: 插件可能未装全，可再运行 xrk-tmux --setup" >&2
+    _tmux_core_plugins_ok || {
+        echo "[tmux] 核心插件仍未装全，请运行 xrk-tmux --setup" >&2
+        return 1
+    }
+    _tmux_plugins_ok || echo "[tmux] 提示: mem/fzf 可选插件未装全，不影响进入桌面" >&2
     return 0
 }
 
