@@ -139,22 +139,20 @@ create_desktop_layout() {
     local s="$SESSION_NAME"
     _tmux_ensure_utf8
 
-    tmux new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}" \
-        "bash $XRK_ROOT/body/window_a.sh; exec bash" \
+    # 窗格只开 bash，不在启动时跑任何 body 脚本（避免重复加载、扫盘）
+    tmux new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}" "exec bash" \
         || { echo "[tmux] 创建会话失败" >&2; return 1; }
-    tmux split-window -v -t "$s:0" "bash $XRK_ROOT/body/window_a1.sh; exec bash"
-
-    tmux new-window -t "$s:1" -n "${XRK_TMUX_WINDOWS[1]}" \
-        "bash $XRK_ROOT/body/window_b.sh; exec bash"
-    tmux split-window -h -t "$s:1" "bash $XRK_ROOT/body/window_b.sh; exec bash"
-
-    tmux new-window -t "$s:2" -n "${XRK_TMUX_WINDOWS[2]}" \
-        "bash $XRK_ROOT/body/window_c.sh; exec bash"
-    tmux split-window -h -t "$s:2" "bash $XRK_ROOT/body/window_c.sh; exec bash"
+    tmux split-window -v -t "$s:0" "exec bash"
+    tmux new-window -t "$s:1" -n "${XRK_TMUX_WINDOWS[1]}" "exec bash"
+    tmux split-window -h -t "$s:1" "exec bash"
+    tmux new-window -t "$s:2" -n "${XRK_TMUX_WINDOWS[2]}" "exec bash"
+    tmux split-window -h -t "$s:2" "exec bash"
 
     tmux select-window -t "$s:0"
     tmux select-pane -t "$s:0.0"
     _tmux_apply_window_names "$s"
+    tmux display-message -d 4000 \
+        "向日葵 tmux | 前缀 Alt+Space ? | 主菜单 xrk | 葵崽 xyz | 葵子 xag"
     echo "[tmux] 桌面已创建: ${XRK_TMUX_WINDOWS[*]}"
 }
 
@@ -184,7 +182,6 @@ goto_desktop() {
 
     _tmux_ensure_utf8
     ensure_tmux_env || exit 1
-    _tmux_reload_conf || true
     target=$(_tmux_resolve_target)
     if [ -n "$target" ]; then
         _tmux_connect "$target"
@@ -193,7 +190,6 @@ goto_desktop() {
 
     echo "[tmux] 创建向日葵桌面…"
     create_desktop_layout || exit 1
-    _tmux_reload_conf || true
     _tmux_connect "$SESSION_NAME"
 }
 
@@ -206,10 +202,4 @@ case "${1:-}" in
         ;;
 esac
 
-for _w in window_a window_a1 window_b window_c; do
-    [ -f "$XRK_ROOT/body/${_w}.sh" ] || {
-        echo "[tmux] 缺少 $XRK_ROOT/body/${_w}.sh" >&2
-        exit 1
-    }
-done
 goto_desktop
