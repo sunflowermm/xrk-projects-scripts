@@ -1,8 +1,8 @@
 #!/bin/bash
 # 安装 xm 到 bin：换源、安装 Git、克隆脚本仓库
-# 参数：1=GitCode 2=GitHub 3=Gitee（默认 3）
+# 参数：1=GitCode 2=GitHub 3=Gitee auto=按区域自动（国内 Gitee，海外 GitHub）
 
-XRK_SOURCE="${1:-3}"
+XRK_SOURCE="${1:-auto}"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
 if [ -f "$XRK_ROOT/shell_modules/xrk_boot.sh" ]; then

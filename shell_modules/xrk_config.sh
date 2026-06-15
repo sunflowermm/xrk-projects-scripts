@@ -1,7 +1,7 @@
 #!/bin/bash
 # 集中路径与默认源，避免硬编码；供 bootstrap / .init / 各模块 使用
 # 仅定义常量，不 source 其他脚本
-# 源编号与 XRK_SOURCE 一致：1=GitCode  2=GitHub  3=Gitee
+# 源编号：1=GitCode 2=GitHub 3=Gitee；未指定时 init_repo_source 按区域自动
 
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 XRK_BIN="${XRK_BIN:-/usr/local/bin}"

@@ -1,8 +1,8 @@
 #!/bin/bash
 # 统一入口：Termux→容器安装 | Linux→xm 安装
-# 参数：1=GitCode 2=GitHub 3=Gitee（默认 3）
+# 参数：1=GitCode 2=GitHub 3=Gitee auto=按区域自动
 
-XRK_SOURCE="${1:-3}"
+XRK_SOURCE="${1:-auto}"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
 if [ -f "$XRK_ROOT/shell_modules/xrk_boot.sh" ]; then

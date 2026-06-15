@@ -1,10 +1,6 @@
 #!/bin/bash
-# GitHub 访问优化：
-# 插件菜单专用探测见 shell_modules/plugin_proxy.sh（含速度阈值）
-# - 中国大陆（detect_region=cn）：随机测试代理，命中一个可用就用（proxy/原URL）
-# - 海外（detect_region=overseas）：默认保持原样（如需强制可手动 proxy_num）
+# GitHub 访问：国内区域自动代理，海外直连（detect_region：IP → 时区回退）
 
-# 检测区域（复用 bootstrap 的 detect_region；唯一依据 countryCode==CN）
 _is_cn_region() {
     local region
     type detect_region &>/dev/null && region=$(detect_region 2>/dev/null) || region="overseas"
@@ -122,11 +118,9 @@ getgh() {
     fi
 }
 
-# git 命令包装：国内时区自动换源，国外保持原样
+# git 包装：国内区域 GitHub URL 自动加代理
 git() {
     local args=("$@") i
-    # 国内时区：自动将 GitHub URL 换为镜像
-    # 国外时区：保持原样，仅在手动指定 proxy_num 时加代理
     for ((i=0; i<${#args[@]}; i++)); do
         if [[ "${args[i]}" == https://github.com/* || "${args[i]}" == https://raw.githubusercontent.com/* ]]; then
             # 通过 URL 形式调用 getgh，避免数组元素的非法间接展开

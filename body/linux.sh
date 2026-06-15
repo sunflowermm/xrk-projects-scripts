@@ -84,6 +84,11 @@ _xrkk_menu() {
     esac
 }
 
+_xrkk_region() {
+    type xrk_region_report &>/dev/null || safe_source "shell_modules/bootstrap.sh"
+    xrk_region_report
+}
+
 _xrkk_help() {
     cat <<EOF
 xrkk $XRKK_VERSION — 向日葵命令行
@@ -94,6 +99,7 @@ xrkk $XRKK_VERSION — 向日葵命令行
   pkg list          查看常用工具
   pkg mk <目录>     创建目录
   path              刷新并显示葵崽/葵子路径
+  region            区域/时区/脚本源/GitHub 代理策略
   menu <子菜单>     kuizai plugin js advanced env error nc xrk
 
 tmux:
@@ -116,6 +122,7 @@ EOF
 case "$1" in
     -h|--help|help) _xrkk_help ;;
     sync|bin)       _xrkk_sync_bin ;;
+    region)         _xrkk_region ;;
     pkg)            shift; _xrkk_pkg "$@" ;;
     path|paths|up)  _xrkk_path ;;
     menu|m)         shift; _xrkk_menu "$@" ;;

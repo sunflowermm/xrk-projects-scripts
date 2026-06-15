@@ -3,8 +3,8 @@
 # 支持 Debian/Ubuntu/Alpine/Arch/Fedora/CentOS
 # 1=GitCode 2=GitHub 3=Gitee；仅 1/3 换国内源，2 保持不变
 
-XRK_SOURCE="${XRK_SOURCE:-3}"
-case "${XRK_SOURCE#-}" in 1|3) DO_CN_MIRROR=1 ;; *) DO_CN_MIRROR=0 ;; esac
+XRK_SOURCE="${XRK_SOURCE:-auto}"
+case "${XRK_SOURCE#-}" in 1|3|auto) DO_CN_MIRROR=1 ;; *) DO_CN_MIRROR=0 ;; esac
 [ -f /etc/os-release ] && { . /etc/os-release; os_id="${ID:-}"; codename="${VERSION_CODENAME:-noble}"; } || { os_id=""; codename="noble"; }
 
 # 1. 初始换源（仅 Gitee/GitCode）：所有系统在安装 curl 前统一走一轮

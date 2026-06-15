@@ -56,25 +56,38 @@ link_conf() {
 
 install_menu_wrapper() {
     mkdir -p "$HOME/.tmux"
-    cat > "$HOME/.tmux/xrk-menu" << 'EOF'
+    cat > "$HOME/.tmux/xrk-menu" << EOF
 #!/bin/bash
 [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
-exec bash "$XRK_ROOT/body/tmux-menu.sh" "$@"
+exec bash "\$XRK_ROOT/body/tmux-menu.sh" "\$@"
 EOF
     chmod +x "$HOME/.tmux/xrk-menu"
-    echo "[tmux] 已安装 ~/.tmux/xrk-menu"
+    echo "[tmux] 已安装 $HOME/.tmux/xrk-menu"
+}
+
+_ensure_tpm_plugin() {
+    local name="$1" repo="$2"
+    local dest="$HOME/.tmux/plugins/$name"
+    [ -d "$dest/.git" ] && return 0
+    echo "[tmux] git 克隆插件 $name…"
+    xrk_git_clone "$repo" "$dest" || {
+        echo "[tmux] 插件 $name 克隆失败: $repo" >&2
+        return 1
+    }
 }
 
 install_plugins() {
     local installer="$HOME/.tmux/plugins/tpm/bin/install_plugins"
+    _ensure_tpm_plugin tmux-mem https://github.com/tmux-plugins/tmux-mem.git || true
+    _ensure_tpm_plugin tmux-fzf https://github.com/sainnhe/tmux-fzf.git || true
     [ -x "$installer" ] || return 1
     echo "[tmux] 安装 tpm 插件…"
     if bash "$installer"; then
         echo "[tmux] 插件安装完成"
         return 0
     fi
-    echo "[tmux] 插件安装部分失败，可稍后重试: bash $installer" >&2
+    echo "[tmux] tpm 批量安装部分失败（已尝试 git 克隆 mem/fzf）" >&2
     return 1
 }
 

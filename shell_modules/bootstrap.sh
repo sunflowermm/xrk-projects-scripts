@@ -3,21 +3,88 @@
 
 [ -f "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh" ] && source "${XRK_ROOT:-/xrk}/shell_modules/xrk_config.sh"
 _XRK_DEFAULT_BASE="${_XRK_DEFAULT_RAW_BASE:-https://gitee.com/xrkseek/xrk-projects-scripts/raw/master}"
+XRK_DETECT_METHOD=""
 
-# 检测是否在国内：唯一依据 countryCode == CN（中国大陆）
-# 支持覆盖：XRK_REGION=cn|overseas（用于测试/特殊网络）
+_detect_system_timezone() {
+    local tz="${TZ:-}"
+    if [ -n "$tz" ]; then
+        echo "$tz"
+        return 0
+    fi
+    tz=$(timedatectl show -p Timezone --value 2>/dev/null) && [ -n "$tz" ] && { echo "$tz"; return 0; }
+    [ -f /etc/timezone ] && { cat /etc/timezone; return 0; }
+    readlink -f /etc/localtime 2>/dev/null | sed -n 's|.*/zoneinfo/||p'
+}
+
+_is_cn_timezone() {
+    local tz
+    tz=$(_detect_system_timezone)
+    case "$tz" in
+        Asia/Shanghai|Asia/Chongqing|Asia/Harbin|Asia/Urumqi|Asia/Kashgar|PRC) return 0 ;;
+    esac
+    return 1
+}
+
+# 区域：cn=国内（Gitee/GitCode + GitHub 走代理） overseas=海外（GitHub 直连）
+# 优先 ip-api countryCode；失败则中国大陆时区；XRK_REGION 可覆盖
 detect_region() {
     local json country
 
     case "${XRK_REGION:-}" in
-        cn|overseas) echo "$XRK_REGION"; return 0 ;;
+        cn|overseas) XRK_DETECT_METHOD="override"; echo "$XRK_REGION"; return 0 ;;
     esac
 
-    # 唯一依据：countryCode == CN
     json=$(curl -s --connect-timeout 3 --max-time 5 "http://ip-api.com/json" 2>/dev/null || true)
     country=$(printf '%s' "$json" | grep -oE '"countryCode":"[^"]*"' | cut -d'"' -f4)
-    [ "$country" = "CN" ] && { echo "cn"; return 0; }
+    if [ -n "$country" ]; then
+        XRK_DETECT_METHOD="ip"
+        [ "$country" = "CN" ] && { echo "cn"; return 0; }
+        echo "overseas"
+        return 0
+    fi
+
+    if _is_cn_timezone; then
+        XRK_DETECT_METHOD="timezone"
+        echo "cn"
+        return 0
+    fi
+
+    XRK_DETECT_METHOD="default"
     echo "overseas"
+}
+
+# 未显式指定脚本源时的默认值：国内 3=Gitee，海外 2=GitHub
+xrk_default_source() {
+    case "$(detect_region)" in
+        cn) echo "3" ;;
+        *)  echo "2" ;;
+    esac
+}
+
+xrk_source_label() {
+    case "${1:-${XRK_SOURCE:-3}}" in
+        1) echo "GitCode" ;;
+        2) echo "GitHub" ;;
+        *) echo "Gitee" ;;
+    esac
+}
+
+xrk_region_report() {
+    local region tz src gh_mode
+    region=$(detect_region 2>/dev/null || echo "?")
+    tz=$(_detect_system_timezone 2>/dev/null || echo "?")
+    src="${XRK_SOURCE:-$(xrk_default_source)}"
+    case "$region" in
+        cn) gh_mode="GitHub 自动走代理" ;;
+        *)  gh_mode="GitHub 直连" ;;
+    esac
+    cat <<EOF
+区域:     $region (依据: ${XRK_DETECT_METHOD:-?})
+时区:     ${tz:-未知}
+脚本源:   $(xrk_source_label "$src") (XRK_SOURCE=$src)
+GitHub:   $gh_mode
+覆盖:     设 XRK_REGION=cn|overseas 可强制区域
+EOF
 }
 
 get_base_from_arg() {
@@ -47,13 +114,20 @@ init_repo_source() {
         [ -f "$root/.repo_source" ] && source "$root/.repo_source"
         [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
     fi
-    # 未指定源时：统一优先 Gitee（3）
-    [ -z "$arg" ] && arg="3"
+    if [ -n "$arg" ] && [ "$arg" != "auto" ]; then
+        :
+    elif [ -n "${XRK_SOURCE:-}" ] && [ "${XRK_SOURCE}" != "auto" ]; then
+        arg="$XRK_SOURCE"
+    else
+        arg="$(xrk_default_source)"
+    fi
+    XRK_SOURCE="$arg"
     [ -z "$SCRIPT_RAW_BASE" ] && SCRIPT_RAW_BASE="$(get_base_from_arg "$arg")"
     [[ "$SCRIPT_RAW_BASE" != https://* ]] && SCRIPT_RAW_BASE="$(get_base_from_arg 3)"
     [ -z "$SCRIPT_CLONE_URL" ] && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"
     [[ "$SCRIPT_CLONE_URL" != https://* ]] && SCRIPT_CLONE_URL="$(get_clone_from_raw "$SCRIPT_RAW_BASE")"
     export SCRIPT_RAW_BASE SCRIPT_CLONE_URL
+    export XRK_SOURCE
     [ -n "${XRK_ROOT:-}" ] && export XRK_ROOT
 }
 
@@ -139,11 +213,10 @@ log_success() { echo -e "$(_log_color color_light_green '\033[1;92m')[成功] $1
 log_error()   { echo -e "$(_log_color color_red '\033[31m')[错误] $1$(_log_color reset_color '\033[0m')"; }
 
 # 统一首跳引导：加载 bootstrap 并初始化脚本源（替代各入口重复的 case/source 块）
-# 用法：xrk_bootstrap [源: 1=GitCode 2=GitHub 3=Gitee] [force: 0|1]
+# 用法：xrk_bootstrap [源: 1|2|3|auto] [force: 0|1]
 # 显式传入源时默认 force=1，避免 ~/.xrk_repo 覆盖用户选择的镜像
 xrk_bootstrap() {
-    local source_arg="${1:-${XRK_SOURCE:-3}}"
-    local force="${2:-}"
+    local source_arg="${1-}" force="${2:-}"
     local root="${XRK_ROOT:-/xrk}"
 
     if ! type get_base_from_arg &>/dev/null; then
@@ -161,8 +234,7 @@ xrk_bootstrap() {
         fi
     fi
 
-    [ -z "$force" ] && { [ -n "${1:-}" ] && force=1 || force=0; }
-    XRK_SOURCE="$source_arg"
+    [ -z "$force" ] && { [ -n "${1-}" ] && force=1 || force=0; }
     init_repo_source "$source_arg" "$force"
     export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_SOURCE
 }
@@ -171,7 +243,7 @@ xrk_bootstrap() {
 xrk_ensure_bootstrap() {
     if type load_module &>/dev/null; then
         [ -n "${SCRIPT_RAW_BASE:-}" ] && return 0
-        xrk_bootstrap "${XRK_SOURCE:-3}" 0
+        xrk_bootstrap "${XRK_SOURCE:-auto}" 0
         return 0
     fi
     local root="${XRK_ROOT:-/xrk}"
@@ -190,7 +262,7 @@ xrk_ensure_bootstrap() {
         source "$tmp"
         rm -f "$tmp"
     fi
-    xrk_bootstrap "${XRK_SOURCE:-3}" 0
+    xrk_bootstrap "${XRK_SOURCE:-auto}" 0
 }
 
 # 执行仓库内 bash 脚本：本地优先，否则 curl

@@ -1,12 +1,13 @@
 #!/bin/bash
-# tmux 中文右键菜单与快捷键帮助（由 ~/.tmux/xrk-menu 调用）
+# tmux 中文右键菜单（由 ~/.tmux/xrk-menu 调用）
 [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 
+_MENU="${HOME}/.tmux/xrk-menu"
 _R='source-file ~/.tmux.conf \; display "配置已重载"'
-_S="$HOME/.tmux/plugins/tmux-resurrect/scripts/save.sh"
-_L="$HOME/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
-_H='run-shell "$HOME/.tmux/xrk-menu" help'
+_S="${HOME}/.tmux/plugins/tmux-resurrect/scripts/save.sh"
+_L="${HOME}/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
+_H="run-shell ${_MENU} help"
 
 _xrk_tmux_help() {
     tmux display-message -d 10000 \
@@ -33,8 +34,8 @@ _xrk_menu_pane() {
         '  关闭窗口' 'q' 'kill-window' \
         '' '' '' \
         '[布局]' '' '' \
-        '  保存布局' 'S' "run-shell \"$_S\"" \
-        '  恢复布局' 'R' "run-shell \"$_L\"" \
+        '  保存布局' 'S' "run-shell ${_S}" \
+        '  恢复布局' 'R' "run-shell ${_L}" \
         '' '' '' \
         '[系统]' '' '' \
         '  快捷键帮助' '?' "$_H" \
@@ -55,8 +56,8 @@ _xrk_menu_session() {
         '  下一个会话' 'n' 'switch-client -n' \
         '' '' '' \
         '[布局]' '' '' \
-        '  保存布局' 'S' "run-shell \"$_S\"" \
-        '  恢复布局' 'R' "run-shell \"$_L\"" \
+        '  保存布局' 'S' "run-shell ${_S}" \
+        '  恢复布局' 'R' "run-shell ${_L}" \
         '' '' '' \
         '[系统]' '' '' \
         '  快捷键帮助' '?' "$_H" \
@@ -89,8 +90,8 @@ _xrk_menu_system() {
         '  分离会话' 'd' 'detach-client' \
         '' '' '' \
         '[布局]' '' '' \
-        '  保存布局' 'S' "run-shell \"$_S\"" \
-        '  恢复布局' 'R' "run-shell \"$_L\""
+        '  保存布局' 'S' "run-shell ${_S}" \
+        '  恢复布局' 'R' "run-shell ${_L}"
 }
 
 case "${1:-}" in

@@ -63,7 +63,7 @@ xrk_加载底层() {
             ;;
         xrk)
             _xrk_ensure_bootstrap
-            init_repo_source "${XRK_SOURCE:-3}" 0
+            init_repo_source "${XRK_SOURCE:-auto}" 0
             export SCRIPT_RAW_BASE SCRIPT_CLONE_URL XRK_SOURCE
             xrk_加载底层 menu
             safe_source "shell_modules/update.sh"

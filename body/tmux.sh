@@ -63,7 +63,7 @@ _tmux_plugins_ok() {
 _tmux_status() {
     echo "tmux: $(command -v tmux >/dev/null && tmux -V || echo 未安装)"
     echo "配置: $TMUX_CONF $(_tmux_conf_ok && echo OK || echo 未链接)"
-    echo "菜单: $XRK_MENU $([ -x "$XRK_MENU" ] && echo OK || echo 缺失)"
+    [ -x "$XRK_MENU" ] && echo "菜单脚本: $XRK_MENU OK" || echo "菜单脚本: 缺失（请 xrk-tmux --setup）"
     echo "tpm:  $([ -f "$HOME/.tmux/plugins/tpm/tpm" ] && echo OK || echo 缺失)"
     echo "插件: $(_tmux_plugins_ok && echo 齐全 || echo 不完整)"
     tmux has-session -t "$SESSION_NAME" 2>/dev/null \
