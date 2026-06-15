@@ -1,90 +1,91 @@
 #!/bin/bash
+# 进入或切换到向日葵 tmux 桌面（菜单 7 / xrk-tmux；内外 tmux 统一入口）
 
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 SESSION_NAME="新年快乐"
 TMUX_CONF="${HOME}/.tmux.conf"
 
-_tmux() {
-    tmux "$@"
+_tmux_latest_session() {
+    tmux list-sessions -F '#{session_activity} #{session_name}' 2>/dev/null \
+        | sort -rn | head -1 | cut -d' ' -f2-
 }
 
-# 取最近活动的会话名（有多个存活会话时用于恢复上次使用的）
-_tmux_latest_session() {
-    _tmux list-sessions -F '#{session_activity} #{session_name}' 2>/dev/null \
-        | sort -rn \
-        | head -1 \
-        | cut -d' ' -f2-
+_tmux_reload_conf() {
+    tmux source-file "$TMUX_CONF" 2>/dev/null || true
+}
+
+_tmux_resolve_target() {
+    tmux has-session -t "$SESSION_NAME" 2>/dev/null && { echo "$SESSION_NAME"; return; }
+    _tmux_latest_session
+}
+
+_tmux_connect() {
+    local target="$1" cur
+    [ -z "$target" ] && return 1
+
+    if [ -n "$TMUX" ]; then
+        cur=$(tmux display-message -p '#S' 2>/dev/null || true)
+        if [ "$cur" = "$target" ]; then
+            echo "[tmux] 已在会话: $target（配置已重载）"
+            return 0
+        fi
+        echo "[tmux] 切换到会话: $target"
+        tmux switch-client -t "$target"
+        return
+    fi
+
+    echo "[tmux] 连接到会话: $target"
+    if [ ! -t 0 ] && [ -r /dev/tty ]; then
+        tmux attach-session -t "$target" </dev/tty
+    else
+        tmux attach-session -t "$target"
+    fi
 }
 
 create_desktop_layout() {
-    _tmux new-session -d -s "$SESSION_NAME" -n "来财" "bash $XRK_ROOT/body/window_a.sh; exec bash"
-    _tmux split-window -v -t "$SESSION_NAME:来财" "bash $XRK_ROOT/body/window_a1.sh; exec bash"
-    _tmux new-window -t "$SESSION_NAME" -n "来福" "bash $XRK_ROOT/body/window_b.sh; exec bash"
-    _tmux split-window -h -t "$SESSION_NAME:来福" "bash $XRK_ROOT/body/window_b.sh; exec bash"
-    _tmux new-window -t "$SESSION_NAME" -n "来运" "bash $XRK_ROOT/body/window_c.sh; exec bash"
-    _tmux split-window -h -t "$SESSION_NAME:来运" "bash $XRK_ROOT/body/window_c.sh; exec bash"
-    _tmux select-pane -t 0
-    _tmux split-window -v "exec bash"
-    _tmux select-window -t "$SESSION_NAME:来财"
+    tmux new-session -d -s "$SESSION_NAME" -n "来财" "bash $XRK_ROOT/body/window_a.sh; exec bash"
+    tmux split-window -v -t "$SESSION_NAME:来财" "bash $XRK_ROOT/body/window_a1.sh; exec bash"
+    tmux new-window -t "$SESSION_NAME" -n "来福" "bash $XRK_ROOT/body/window_b.sh; exec bash"
+    tmux split-window -h -t "$SESSION_NAME:来福" "bash $XRK_ROOT/body/window_b.sh; exec bash"
+    tmux new-window -t "$SESSION_NAME" -n "来运" "bash $XRK_ROOT/body/window_c.sh; exec bash"
+    tmux split-window -h -t "$SESSION_NAME:来运" "bash $XRK_ROOT/body/window_c.sh; exec bash"
+    tmux select-pane -t 0
+    tmux split-window -v "exec bash"
+    tmux select-window -t "$SESSION_NAME:来财"
 }
 
-attach_existing_session() {
-    local target="$1"
-    [ -z "$target" ] && return 1
-    _tmux attach-session -t "$target"
-}
-
-# 优先恢复已有会话：最近活动会话 → 默认桌面名 → 新建布局
-attach_or_create() {
-    local latest
-
-    latest=$(_tmux_latest_session)
-    if [ -n "$latest" ]; then
-        attach_existing_session "$latest"
-        return
-    fi
-
-    if _tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-        attach_existing_session "$SESSION_NAME"
-        return
-    fi
-
-    create_desktop_layout
-    _tmux source-file "$TMUX_CONF" 2>/dev/null || true
-    attach_existing_session "$SESSION_NAME"
-}
-
-# 错误处理函数
-handle_error() {
-    echo "错误: $1" >&2
-    exit 1
-}
-
-# 依赖由 body/modules/tmux.sh 统一安装
 ensure_tmux_env() {
-    if command -v tmux &>/dev/null && [ -d "$HOME/.tmux/.git" ] && [ -e "$HOME/.tmux.conf" ]; then
-        return 0
-    fi
-    [ -f "$XRK_ROOT/body/modules/tmux.sh" ] || handle_error "未找到 tmux 安装模块"
-    bash "$XRK_ROOT/body/modules/tmux.sh" || handle_error "tmux 环境未就绪（可先 xm→3→7 配置）"
+    command -v tmux &>/dev/null \
+        && [ -d "$HOME/.tmux/.git" ] \
+        && [ -e "$TMUX_CONF" ] && return 0
+    echo "[tmux] 环境未就绪，正在安装…"
+    bash "$XRK_ROOT/body/modules/tmux.sh" || {
+        echo "错误: tmux 环境未就绪（可先 xm→3→7 配置）" >&2
+        exit 1
+    }
 }
 
-check_dependencies() {
-    ensure_tmux_env
-    [ -e "$TMUX_CONF" ] || handle_error "配置文件不存在: $TMUX_CONF"
-    [ -f "$XRK_ROOT/body/window_a.sh" ] || handle_error "window_a.sh 不存在"
-    [ -f "$XRK_ROOT/body/window_b.sh" ] || handle_error "window_b.sh 不存在"
-    [ -f "$XRK_ROOT/body/window_c.sh" ] || handle_error "window_c.sh 不存在"
-}
+goto_desktop() {
+    local target
 
-# 主函数
-main() {
-    check_dependencies
-    if [ -n "$TMUX" ]; then
-        _tmux source-file "$TMUX_CONF"
+    _tmux_reload_conf
+    target=$(_tmux_resolve_target)
+    if [ -n "$target" ]; then
+        _tmux_connect "$target"
         return
     fi
-    attach_or_create
+
+    echo "[tmux] 创建向日葵桌面布局…"
+    create_desktop_layout
+    _tmux_reload_conf
+    _tmux_connect "$SESSION_NAME"
 }
 
-main
+ensure_tmux_env
+for _w in window_a window_b window_c; do
+    [ -f "$XRK_ROOT/body/${_w}.sh" ] || {
+        echo "错误: ${_w}.sh 不存在" >&2
+        exit 1
+    }
+done
+goto_desktop

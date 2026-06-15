@@ -22,14 +22,6 @@ fi
 xrk_load_menu_head 0 0
 safe_source "shell_modules/update.sh"
 
-# 环境未就绪时跑安装模块（与 body/modules/tmux.sh 一致）
-_env_tmux_needs_setup() {
-    command -v tmux &>/dev/null || return 0
-    [ ! -d "$HOME/.tmux/.git" ] && return 0
-    [ ! -e "$HOME/.tmux.conf" ] && return 0
-    return 1
-}
-
 _env_run_action() {
     case "$1" in
         yq)       run_software "project-install/software/yq" ;;
@@ -40,9 +32,6 @@ _env_run_action() {
         python)   run_software "body/modules/python_uv.sh" ;;
         tmux)
             menu_require_repo || return 0
-            if _env_tmux_needs_setup; then
-                xrk_exec_script "body/modules/tmux.sh" || { menu_msg_err "tmux 安装/配置失败"; return 0; }
-            fi
             xrk_exec_script "body/tmux.sh" || { menu_msg_err "tmux 进入失败"; return 0; }
             ;;
         profile)

@@ -1,21 +1,15 @@
-# xrk: 无参数 tmux 时优先 attach 已有会话（由 profile 加载）
+# xrk: 无参数 tmux 时进入向日葵桌面（由 profile 加载）
 # 禁用：export XRK_TMUX_NO_WRAPPER=1
 if [ -z "${XRK_TMUX_NO_WRAPPER:-}" ] && command -v tmux &>/dev/null; then
     tmux() {
-        if [ -n "$TMUX" ]; then
+        if [ -n "$TMUX" ] || [ $# -gt 0 ]; then
             command tmux "$@"
             return $?
         fi
-        if [ $# -eq 0 ]; then
-            if [ -x "${XRK_BIN:-/usr/local/bin}/xrk-tmux" ]; then
-                "${XRK_BIN:-/usr/local/bin}/xrk-tmux"
-                return $?
-            fi
-            if [ -f "${XRK_ROOT:-/xrk}/body/tmux.sh" ]; then
-                bash "${XRK_ROOT:-/xrk}/body/tmux.sh"
-                return $?
-            fi
+        if [ -x "${XRK_BIN:-/usr/local/bin}/xrk-tmux" ]; then
+            "${XRK_BIN:-/usr/local/bin}/xrk-tmux"
+            return $?
         fi
-        command tmux "$@"
+        [ -f "${XRK_ROOT:-/xrk}/body/tmux.sh" ] && bash "${XRK_ROOT:-/xrk}/body/tmux.sh"
     }
 fi

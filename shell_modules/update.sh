@@ -27,10 +27,6 @@ _run_module() {
     [ -f "$XRK_ROOT/$1" ] && bash "$XRK_ROOT/$1"
 }
 
-tmux配置检查() {
-    _run_module "body/modules/tmux.sh" || echo "未找到 $XRK_ROOT/body/modules/tmux.sh"
-}
-
 ffmpeg配置检查() {
     if ! type xrk_run_script &>/dev/null; then
         type xrk_source_common &>/dev/null && xrk_source_common || {
