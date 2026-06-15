@@ -6,13 +6,15 @@ HOME="${HOME:-$(getent passwd "$(id -un 2>/dev/null || echo root)" | cut -d: -f6
 
 _MENU="${HOME}/.tmux/xrk-menu"
 _R='source-file ~/.tmux.conf \; display "配置已重载"'
+_S="${HOME}/.tmux/plugins/tmux-resurrect/scripts/save.sh"
+_L="${HOME}/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
 _H="run-shell ${_MENU} help"
 
 _xrk_tmux_help() {
     tmux display-message -d 10000 \
         "向日葵 tmux | 前缀 Alt+Space | 分离 d | 重载 r | 重命名 n
-窗格 Alt+hjkl | 分割 v/s | 复制: [ y（系统剪贴板）| 打开: 复制模式 o
-窗口 Alt+0~5 | 右键菜单"
+窗格 Alt+hjkl | 分割 v/s | 复制: [ y（tmux 缓冲区）| 打开: 复制模式 o
+窗口 Alt+0~5 | 右键可保存/恢复布局"
 }
 
 _xrk_menu_pane() {
@@ -32,6 +34,10 @@ _xrk_menu_pane() {
         '  重命名窗口' 'n' 'command-prompt -I "#W" "rename-window -- \"%%\""' \
         '  关闭窗口' 'q' 'kill-window' \
         '' '' '' \
+        '[布局]' '' '' \
+        '  保存布局' 'S' "run-shell ${_S}" \
+        '  恢复布局' 'R' "run-shell ${_L}" \
+        '' '' '' \
         '[系统]' '' '' \
         '  快捷键帮助' '?' "$_H" \
         '  重载配置' 'r' "$_R" \
@@ -49,6 +55,10 @@ _xrk_menu_session() {
         '[切换]' '' '' \
         '  上一个会话' 'p' 'switch-client -p' \
         '  下一个会话' 'n' 'switch-client -n' \
+        '' '' '' \
+        '[布局]' '' '' \
+        '  保存布局' 'S' "run-shell ${_S}" \
+        '  恢复布局' 'R' "run-shell ${_L}" \
         '' '' '' \
         '[系统]' '' '' \
         '  快捷键帮助' '?' "$_H" \
@@ -78,7 +88,11 @@ _xrk_menu_system() {
         '[系统]' '' '' \
         '  快捷键帮助' '?' "$_H" \
         '  重载配置' 'r' "$_R" \
-        '  分离会话' 'd' 'detach-client'
+        '  分离会话' 'd' 'detach-client' \
+        '' '' '' \
+        '[布局]' '' '' \
+        '  保存布局' 'S' "run-shell ${_S}" \
+        '  恢复布局' 'R' "run-shell ${_L}"
 }
 
 case "${1:-}" in

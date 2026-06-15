@@ -1,15 +1,17 @@
 #!/bin/bash
-# 安装 tmux + 轻量插件，写入 ~/.tmux.conf
+# 安装 tmux + 插件，写入 ~/.tmux.conf（不含 tmux-yank）
 set -e
 XRK_ROOT="${XRK_ROOT:-/xrk}"
 [ -f "$HOME/.xrk_repo" ] && source "$HOME/.xrk_repo"
 
-# 与 body/.tmux.conf 中 @plugin 一致（禁止 resurrect/continuum/cpu 等重型插件）
+# 与 body/.tmux.conf 中 @plugin 一致
 XRK_TMUX_PLUGIN_REPOS=(
     "tmux-sensible|https://github.com/tmux-plugins/tmux-sensible.git"
-    "tmux-yank|https://github.com/tmux-plugins/tmux-yank.git"
-    "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git"
+    "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect.git"
+    "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum.git"
+    "tmux-cpu|https://github.com/tmux-plugins/tmux-cpu.git"
     "tmux-open|https://github.com/tmux-plugins/tmux-open.git"
+    "tmux-prefix-highlight|https://github.com/tmux-plugins/tmux-prefix-highlight.git"
 )
 
 install_menu_wrapper() {
@@ -49,23 +51,16 @@ EOF
     echo "[tmux] 已写入 $entry"
 }
 
-cleanup_heavy_plugins() {
+cleanup_removed_plugins() {
     rm -rf \
-        "$HOME/.tmux/resurrect" \
-        "$HOME/.tmux/plugins/tmux-resurrect" \
-        "$HOME/.tmux/plugins/tmux-continuum" \
+        "$HOME/.tmux/plugins/tmux-yank" \
         "$HOME/.tmux/plugins/tmux-mem" \
         "$HOME/.tmux/plugins/tmux-fzf" \
-        "$HOME/.tmux/plugins/tmux-cpu" \
         2>/dev/null || true
-}
-
-install_clipboard_tools() {
-    command -v xclip &>/dev/null || command -v xsel &>/dev/null || command -v wl-copy &>/dev/null \
-        && return 0
-    echo "[tmux] 安装剪贴板工具 xclip（供 yank 插件）…"
-    if command -v apt-get &>/dev/null; then
-        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xclip 2>/dev/null || true
+    local dir="$HOME/.tmux/resurrect" sz
+    if [ -d "$dir" ]; then
+        sz=$(du -sm "$dir" 2>/dev/null | cut -f1)
+        [ "${sz:-0}" -gt 50 ] && rm -rf "${dir:?}"/* && echo "[tmux] 已清理过大 resurrect 缓存 (${sz}MB)"
     fi
 }
 
@@ -130,7 +125,7 @@ install_plugins() {
     local entry name repo failed=0
     _setup_github
     setup_tpm
-    echo "[tmux] 安装轻量插件（${#XRK_TMUX_PLUGIN_REPOS[@]} 个）…"
+    echo "[tmux] 安装插件（${#XRK_TMUX_PLUGIN_REPOS[@]} 个，不含 yank）…"
     for entry in "${XRK_TMUX_PLUGIN_REPOS[@]}"; do
         name="${entry%%|*}"
         repo="${entry#*|}"
@@ -148,9 +143,8 @@ case "${1:-}" in
         ;;
 esac
 
-cleanup_heavy_plugins
+cleanup_removed_plugins
 install_tmux_pkg
-install_clipboard_tools
 link_conf
 install_plugins || true
-echo "[tmux] 完成。插件: sensible/yank/样式/open | 进入: xrk-tmux"
+echo "[tmux] 完成。已装: sensible/resurrect/continuum/cpu/open/样式 | 未装: yank"
