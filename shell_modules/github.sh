@@ -55,63 +55,75 @@ _xrk_http_ok() {
     curl -s --fail --connect-timeout 2 --max-time 4 -o /dev/null "$1" 2>/dev/null
 }
 
-# git 加速探测：必须能 ls-remote 且不弹登录；带超时避免长时间挂起
+# git 加速探测：ls-remote 能拿到 ref 即视为可用
 _xrk_git_ls_remote() {
-    local url="$1" git_bin
+    local url="$1" git_bin out
     git_bin=$(command -v git) || return 1
     if command -v timeout &>/dev/null; then
-        timeout 8 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
-            "$git_bin" ls-remote --heads "$url" HEAD 2>/dev/null
+        out=$(timeout 12 env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+            "$git_bin" ls-remote -q "$url" HEAD 2>/dev/null) || return 1
     else
-        GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
+        out=$(GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= \
             "$git_bin" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=5 \
-            ls-remote --heads "$url" HEAD 2>/dev/null
+            ls-remote -q "$url" HEAD 2>/dev/null) || return 1
     fi
+    [ -n "$out" ] || return 1
+    printf '%s\n' "$out"
+}
+
+# HTTP 回退：部分代理 raw 可用但 ls-remote 偶发失败
+_xrk_proxy_http_ok() {
+    local proxy="$1"
+    local path="${2:-tmux-plugins/tpm/master/README.md}"
+    _xrk_http_ok "${proxy}/https://raw.githubusercontent.com/${path}"
 }
 
 _xrk_proxy_git_ok() {
     local proxy="$1" repo="${2:-https://github.com/tmux-plugins/tpm.git}"
-    local proxied="${proxy}/${repo}"
-    local out
+    local proxied="${proxy}/${repo}" out
 
     [ -z "$proxy" ] && return 1
-    case "$proxy" in
-        https://gitclone.com/github.com)
-            proxied="${proxy}/${repo#https://github.com/}"
-            ;;
-    esac
+    proxied="$(_xrk_proxied_url "$proxy" "$repo")"
 
-    out=$(_xrk_git_ls_remote "$proxied") || return 1
-    [ -n "$out" ] || return 1
-    return 0
+    out=$(_xrk_git_ls_remote "$proxied") && [ -n "$out" ] && return 0
+    _xrk_proxy_http_ok "$proxy" && return 0
+    return 1
 }
 
-# 随机挑选可用代理（git 实测；同进程内缓存，避免每个 clone 重复探测）
+# 挑选可用代理：优先 gh-proxy.com，其余随机；失败时逐条打日志
 _xrk_pick_github_proxy() {
-    local proxy
+    local proxy tried=0
+    local -a order=()
+
     [ -n "${_XRK_GITHUB_PROXY_CACHED:-}" ] && { echo "$_XRK_GITHUB_PROXY_CACHED"; return 0; }
 
-    echo "[git] 探测 GitHub 加速（约数秒）…" >&2
+    echo "[git] 探测 GitHub 加速（${#PROXIES[@]} 个源）…" >&2
+
+    order=("https://gh-proxy.com")
     if command -v shuf &>/dev/null; then
         while IFS= read -r proxy; do
-            if _xrk_proxy_git_ok "$proxy"; then
-                _XRK_GITHUB_PROXY_CACHED="$proxy"
-                echo "[git] 加速可用: ${proxy#https://}" >&2
-                echo "$proxy"
-                return 0
-            fi
+            [ "$proxy" = "https://gh-proxy.com" ] && continue
+            order+=("$proxy")
         done < <(printf "%s\n" "${PROXIES[@]}" | shuf)
     else
         for proxy in "${PROXIES[@]}"; do
-            if _xrk_proxy_git_ok "$proxy"; then
-                _XRK_GITHUB_PROXY_CACHED="$proxy"
-                echo "[git] 加速可用: ${proxy#https://}" >&2
-                echo "$proxy"
-                return 0
-            fi
+            [ "$proxy" = "https://gh-proxy.com" ] && continue
+            order+=("$proxy")
         done
     fi
-    echo "[git] 探测无可用加速，clone 时将依次尝试直连与各代理" >&2
+
+    for proxy in "${order[@]}"; do
+        tried=$((tried + 1))
+        if _xrk_proxy_git_ok "$proxy"; then
+            _XRK_GITHUB_PROXY_CACHED="$proxy"
+            echo "[git] 加速可用: ${proxy#https://}（第 ${tried} 个）" >&2
+            echo "$proxy"
+            return 0
+        fi
+        echo "[git]   不可用: ${proxy#https://}" >&2
+    done
+
+    echo "[git] 探测无可用加速（已试 ${tried} 个），clone 时将依次尝试直连与各代理" >&2
     echo ""
 }
 
