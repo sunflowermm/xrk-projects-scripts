@@ -6,10 +6,6 @@ if [ -z "${XRK_TMUX_NO_WRAPPER:-}" ] && command -v tmux &>/dev/null; then
             command tmux "$@"
             return $?
         fi
-        if [ -x "${XRK_BIN:-/usr/local/bin}/xrk-tmux" ]; then
-            "${XRK_BIN:-/usr/local/bin}/xrk-tmux"
-            return $?
-        fi
-        [ -f "${XRK_ROOT:-/xrk}/body/tmux.sh" ] && bash "${XRK_ROOT:-/xrk}/body/tmux.sh"
+        "${XRK_BIN:-/usr/local/bin}/xrk-tmux"
     }
 fi
