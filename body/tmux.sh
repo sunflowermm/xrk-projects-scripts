@@ -50,18 +50,20 @@ _tmux_apply_window_names() {
     done
 }
 
-_tmux_session_usable() {
-    local s="$1" n
-    tmux has-session -t "$s" 2>/dev/null || return 1
-    n=$(tmux list-windows -t "$s" 2>/dev/null | wc -l)
-    [ "${n:-0}" -ge 3 ]
+_tmux_session_window_count() {
+    local s="$1"
+    tmux has-session -t "$s" 2>/dev/null || return 0
+    tmux list-windows -t "$s" 2>/dev/null | wc -l
 }
 
 _tmux_status() {
     echo "tmux: $(command -v tmux >/dev/null && tmux -V || echo 未安装)"
     echo "配置: $TMUX_CONF $(_tmux_conf_ok && echo OK || echo 未就绪)"
-    tmux has-session -t "$SESSION_NAME" 2>/dev/null \
-        && echo "会话: $SESSION_NAME 已存在" || echo "会话: 未创建"
+    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        echo "会话: $SESSION_NAME 已存在（$(_tmux_session_window_count "$SESSION_NAME") 个窗口）"
+    else
+        echo "会话: 未创建"
+    fi
 }
 
 _tmux_ensure_env() {
@@ -77,11 +79,10 @@ _tmux_ensure_env() {
 
 _tmux_create_layout() {
     local s="$SESSION_NAME"
-    if _tmux_session_usable "$s"; then
+    if tmux has-session -t "$s" 2>/dev/null; then
         _tmux_apply_window_names "$s"
         return 0
     fi
-    tmux has-session -t "$s" 2>/dev/null && tmux kill-session -t "$s" 2>/dev/null || true
     tmux new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}" "exec bash"
     tmux split-window -v -t "$s:0" "exec bash"
     tmux new-window -t "$s:1" -n "${XRK_TMUX_WINDOWS[1]}" "exec bash"
