@@ -19,7 +19,10 @@ link_conf() {
     }
 
     mkdir -p "$HOME/.tmux"
-    sed "s|@XRK_MENU@|${menu_cmd}|g" "$menus_tpl" > "$menus_out"
+    {
+        sed "s|@XRK_MENU@|${menu_cmd}|g" "$menus_tpl"
+        XRK_MENU_CMD="$menu_cmd" bash "${root_abs}/body/tmux-menu.sh" --emit-mouse-binds
+    } > "$menus_out"
     {
         echo "# 向日葵 tmux（xrk-tmux --setup 生成）"
         cat "$main"
