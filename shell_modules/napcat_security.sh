@@ -92,7 +92,7 @@ napcat_load_prefs() {
                  .frameworks = (
                    reduce $scanned[] as $item ($saved;
                      if any(.[]; .root == $item.root) then
-                       map(if .root == $item.root then $item + {default_port: .default_port} else . end)
+                       map(if .root == $item.root then $item else . end)
                      else
                        . + [$item]
                      end)

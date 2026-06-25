@@ -167,7 +167,8 @@ nt_links_from_checklist() {
 }
 
 nt_sync_onebot_cli() {
-    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json"
+    local qq="$1" qf
+    qf="${QQ_DIR}/qq_${qq}.json"
     [[ -n "$qq" ]] || { echo "用法: nt --sync-onebot <QQ>"; return 1; }
     [ -f "$qf" ] || { echo "无 $qf"; return 1; }
     if nt_napcat_running; then
@@ -417,7 +418,8 @@ nt_show_status() {
 }
 
 nt_start_qq() {
-    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" url line bind planned
+    local qq="$1" qf url line bind planned
+    qf="${QQ_DIR}/qq_${qq}.json"
     [[ -n "$qq" ]] || { nt_err "QQ 号为空，请重新配置"; return 1; }
     [ -f "$qf" ] || { nt_err "无配置 $qf"; return 1; }
     bind="$(napcat_format_connection_lines "$qf" | tr '\n' ';')"
