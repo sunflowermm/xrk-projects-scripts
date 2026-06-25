@@ -18,7 +18,7 @@ nt_deps() {
     done
 }
 
-# 菜单/表单：必须在当前 shell 直接调用，禁止 $(nt_dialog_run ...)
+# 菜单/表单：当前 shell 直接调用（禁止 $(nt_dialog_run ...)）
 nt_dialog_run() {
     local __var=$1; shift
     exec 3>&1
@@ -49,7 +49,6 @@ nt_yesno() {
     nt_dialog_run _nt_yesno_dummy --yesno "$1" "${2:-7}" "${3:-40}"
 }
 
-# ── 框架 ─────────────────────────────────────────
 nt_framework_items() {
     napcat_load_prefs | jq -r '.frameworks[]? | "\(.id)|\(.label)|\(.default_port)"'
 }
@@ -70,7 +69,7 @@ nt_pick_frameworks() {
 }
 
 nt_links_from_checklist() {
-    local qq="$1" checklist="$2" old links='[]' id checked fw port
+    local qq="$1" checklist="$2" old links='[]' id checked fw port token
     old="$(napcat_load_qq_config "${QQ_DIR}/qq_${qq}.json" 2>/dev/null | jq -c '.links // []')"
     while read -r id checked; do
         [ -z "$id" ] || [ "$checked" != "on" ] && continue
@@ -135,7 +134,7 @@ nt_qq_wizard() {
 
 nt_show_framework_menu() {
     napcat_refresh_frameworks >/dev/null
-    local items=() sel id label port
+    local items=() sel
     while IFS='|' read -r id label port; do
         [ -z "$id" ] && continue
         items+=("$id" "$label :$port")
@@ -183,8 +182,8 @@ nt_add_framework() {
 }
 
 nt_edit_framework_port() {
-    local items=() id sel port prefs
-    while IFS='|' read -r id label p; do items+=("$id" "$label"); done < <(nt_framework_items)
+    local items=() id port prefs
+    while IFS='|' read -r id label _; do items+=("$id" "$label"); done < <(nt_framework_items)
     nt_dialog_run id --title "改端口" --menu "选择框架" 12 50 6 "${items[@]}" || return
     nt_dialog_input_run port --inputbox "新默认端口" 8 42 \
         "$(napcat_get_framework "$id" | jq -r '.default_port')" || return
@@ -195,7 +194,7 @@ nt_edit_framework_port() {
 }
 
 nt_del_framework() {
-    local items=() id sel prefs
+    local items=() id prefs
     while IFS='|' read -r id label _; do items+=("$id" "$label"); done < <(nt_framework_items)
     nt_dialog_run id --title "移除" --menu "选择框架" 12 50 6 "${items[@]}" || return
     nt_yesno "确认移除？" 6 30 || return
@@ -204,16 +203,14 @@ nt_del_framework() {
     nt_show_framework_menu
 }
 
-# ── WebUI ─────────────────────────────────────────
 nt_show_webui_menu() {
-    local prefs webui values h p t r dp show_token
+    local prefs values h p t r dp show_token
     prefs="$(napcat_load_prefs)"
-    webui="$(napcat_read_webui_file)"
     show_token="$(echo "$prefs" | jq -r '.webui_token // ""')"
-    [ -z "$show_token" ] && show_token="$(echo "$webui" | jq -r '.token // ""')"
+    [ -z "$show_token" ] && show_token="$(napcat_read_webui | jq -r '.token // ""')"
 
-    nt_dialog_run values --title "WebUI" --form \
-        "端口 0=关闭 · Token 留空则由 NapCat 启动时生成" 18 68 5 \
+    nt_dialog_run values --title "WebUI（全局）" --form \
+        "所有 QQ 共用 · 端口 0=关闭 · Token 留空则启动时生成" 18 68 5 \
         "监听地址:" 1 1 "$(echo "$prefs" | jq -r '.webui_host')" 1 14 44 0 \
         "端口:"     2 1 "$(echo "$prefs" | jq -r '.webui_port')" 2 14 44 0 \
         "Token:"    3 1 "$show_token" 3 14 44 0 \
@@ -235,36 +232,26 @@ nt_show_webui_menu() {
         --argjson dp "$(nt_yes "$dp" && echo true || echo false)" \
         '.webui_host=$h|.webui_port=$p|.webui_token=$t|.login_rate=$r|.disable_pty=$dp')"
     napcat_apply_webui
-    nt_msg "WebUI 已写入 webui.json\nhttp://${h}:${p}/webui" 8
+    if url="$(napcat_webui_url 2>/dev/null)"; then
+        nt_msg "WebUI 已写入（全局）\n${url}" 8
+    else
+        nt_msg "WebUI 已关闭（port=0）" 6
+    fi
 }
 
-# ── 状态总览 ─────────────────────────────────────
 nt_show_status() {
-    local text prefs wf qq
-    prefs="$(napcat_load_prefs)"
-    text="══ NapCat 状态 ══\n\n[ WebUI ]\n"
-    text+="  $(echo "$prefs" | jq -r '.webui_host'):$(echo "$prefs" | jq -r '.webui_port')"
-    text+="$(echo "$prefs" | jq -r 'if .webui_token!="" then " token=已设" else " token=自动" end')\n"
-    text+="\n[ 框架 $(echo "$prefs" | jq '.frameworks|length') 个 ]\n"
-    while IFS= read -r fw; do
-        text+="  · $(echo "$fw" | jq -r '.label') :$(echo "$fw" | jq -r '.default_port')\n"
-        text+="    $(echo "$fw" | jq -r '.root')\n"
-    done < <(echo "$prefs" | jq -c '.frameworks[]?')
-    text+="\n[ QQ 账号 ]\n"
-    for qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
-        text+="  $qq → "
-        text+="$(jq -r '.links[]|select(.enabled)|.framework_id' "${QQ_DIR}/qq_${qq}.json" | tr '\n' ',' | sed 's/,$//')\n"
-    done
-    dialog --backtitle "$NT_BACK" --title "状态" --textbox - 22 68 <<< "$(printf '%b' "$text")"
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/nt_status.XXXXXX")"
+    napcat_status_text > "$tmp"
+    dialog --backtitle "$NT_BACK" --title "状态" --textbox "$tmp" 22 68
+    rm -f "$tmp"
 }
 
-# ── 启动 ─────────────────────────────────────────
 nt_start_qq() {
-    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" cfg prefs
+    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" cfg url
     [ -f "$qf" ] || { echo "无配置 $qf"; exit 1; }
     napcat_prepare_runtime "$qq" "$qf"
     cfg="$(napcat_load_qq_config "$qf")"
-    prefs="$(napcat_load_prefs)"
     clear; killall dialog 2>/dev/null
     echo "┌─ NapCat 启动 ─────────────────"
     echo "│ QQ: $qq"
@@ -279,29 +266,27 @@ nt_start_qq() {
         path="$(echo "$fw" | jq -r '.ws_path' | sed 's#^/##')"
         echo "│ → $lbl  ws://${h}:${p}/${path}"
     done < <(echo "$cfg" | jq -c '.links[]|select(.enabled==true)')
-    if [ "$(echo "$prefs" | jq -r '.webui_port')" = "0" ]; then
-        echo "│ WebUI: 关闭"
+    if url="$(napcat_webui_url 2>/dev/null)"; then
+        echo "│ WebUI（全局）: $url"
     else
-        echo "│ WebUI: http://$(echo "$prefs" | jq -r '.webui_host'):$(echo "$prefs" | jq -r '.webui_port')/webui"
+        echo "│ WebUI: 关闭"
     fi
     echo "└──────────────────────────────"
     xvfb-run -a qq --no-sandbox -q "$qq"
     exit 0
 }
 
-# ── 主菜单 ───────────────────────────────────────
 nt_main_menu() {
     local sel st qq
     while true; do
         nt_dialog_run sel --clear --title "主菜单" --menu \
-            "多 QQ · 多框架 · 安全加固" 18 58 10 \
+            "多 QQ · 多框架" 18 58 8 \
             "add"    "新增 QQ（可多选框架）" \
             "edit"   "修改 / 删除 QQ" \
             "start"  "启动 QQ" \
             "fw"     "框架管理" \
-            "webui"  "WebUI（地址/端口/Token）" \
+            "webui"  "WebUI（全局 · 地址/Token）" \
             "status" "查看当前配置" \
-            "audit"  "安全审计" \
             "quit"   "退出"
         st=$?
         case "$st" in
@@ -309,7 +294,6 @@ nt_main_menu() {
             1|255) exit 0 ;;
             *) echo "[nt] dialog 失败 (exit=$st TERM=${TERM:-?})" >&2; exit 1 ;;
         esac
-        clear
         case "$sel" in
             add)
                 nt_qq_wizard qq "新增 QQ" || continue
@@ -320,7 +304,6 @@ nt_main_menu() {
             fw) nt_show_framework_menu ;;
             webui) nt_show_webui_menu ;;
             status) nt_show_status ;;
-            audit) napcat_security_audit; read -r -p "回车继续…" _ ;;
             quit) exit 0 ;;
         esac
     done
@@ -363,11 +346,9 @@ nt_pick_start() {
 main() {
     nt_deps
     case "${1:-}" in
-        --audit|-a) napcat_security_audit; exit $? ;;
         -h|--help)
-            echo "  nt           管理菜单"
-            echo "  nt <QQ>      启动已配置账号"
-            echo "  nt --audit   安全审计"
+            echo "  nt         管理菜单"
+            echo "  nt <QQ>    启动已配置账号"
             exit 0 ;;
     esac
     if [ -n "${1:-}" ]; then

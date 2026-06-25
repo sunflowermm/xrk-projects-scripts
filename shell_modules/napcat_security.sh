@@ -77,7 +77,7 @@ napcat_load_prefs() {
     f="$(napcat_prefs_path)"
     defaults="$(jq -n '{
         webui_host:"127.0.0.1",webui_port:6099,webui_token:"",
-        login_rate:3,disable_pty:true,warn_public_webui:true,frameworks:[]
+        login_rate:3,disable_pty:true,frameworks:[]
     }')"
     if [ -f "$f" ]; then
         jq -s '.[0] * .[1]' <(cat "$f") <(echo "$defaults") \
@@ -133,7 +133,7 @@ napcat_harden_api_key() {
 # 单条连接 token：连接.token > QQ.ob_token > 指定框架 api_key
 napcat_resolve_link_token() {
     local link_json="$1" global_token="${2:-}"
-    local link_token root legacy_root
+    local link_token root id
     link_token="$(echo "$link_json" | jq -r '.token // ""' | tr -d '\r\n')"
     [ -n "$link_token" ] && { printf '%s' "$link_token"; return 0; }
     global_token="$(printf '%s' "$global_token" | tr -d '\r\n')"
@@ -178,26 +178,39 @@ napcat_load_qq_config() {
     }'
 }
 
-napcat_read_webui_file() {
-    local wf="${NAPCAT_CONFIG_DIR}/webui.json"
-    [ -f "$wf" ] && cat "$wf" || jq -n '{host:"127.0.0.1",port:6099,token:"",loginRate:3}'
+# WebUI 全局唯一：napcat/config/webui.json，所有 QQ 进程共用（非 per-qq）
+napcat_webui_file() {
+    printf '%s/webui.json' "$NAPCAT_CONFIG_DIR"
+}
+
+napcat_read_webui() {
+    local wf; wf="$(napcat_webui_file)"
+    [ -f "$wf" ] && jq -c . "$wf" || jq -n '{host:"127.0.0.1",port:6099,token:"",loginRate:3}'
+}
+
+napcat_webui_url() {
+    local w host port
+    w="$(napcat_read_webui)"
+    host="$(echo "$w" | jq -r '.host')"
+    port="$(echo "$w" | jq -r '.port')"
+    [ "$port" = "0" ] && return 1
+    printf 'http://%s:%s/webui' "$host" "$port"
 }
 
 napcat_apply_webui() {
-    local prefs host port rate token disable_pty webui_file existing
+    local prefs host port rate token disable_pty wf
     prefs="$(napcat_load_prefs)"
-    existing="$(napcat_read_webui_file)"
-    host=$(echo "$prefs" | jq -r '.webui_host')
-    port=$(echo "$prefs" | jq -r '.webui_port')
-    rate=$(echo "$prefs" | jq -r '.login_rate')
-    disable_pty=$(echo "$prefs" | jq -r '.disable_pty')
-    token=$(echo "$prefs" | jq -r '.webui_token // ""')
-    [ -z "$token" ] && token="$(echo "$existing" | jq -r '.token // ""')"
+    host="$(echo "$prefs" | jq -r '.webui_host')"
+    port="$(echo "$prefs" | jq -r '.webui_port')"
+    rate="$(echo "$prefs" | jq -r '.login_rate')"
+    disable_pty="$(echo "$prefs" | jq -r '.disable_pty')"
+    token="$(echo "$prefs" | jq -r '.webui_token // ""')"
+    [ -z "$token" ] && token="$(napcat_read_webui | jq -r '.token // ""')"
 
-    webui_file="${NAPCAT_CONFIG_DIR}/webui.json"
+    wf="$(napcat_webui_file)"
     mkdir -p "$NAPCAT_CONFIG_DIR"
     jq -n --arg host "$host" --argjson port "$port" --arg token "$token" --argjson rate "$rate" \
-        '{host:$host,port:$port,token:$token,loginRate:$rate}' > "$webui_file"
+        '{host:$host,port:$port,token:$token,loginRate:$rate}' > "$wf"
 
     [ "$disable_pty" = "true" ] && [ -d "${NAPCAT_CONFIG_DIR%/config}/pty" ] \
         && rm -rf "${NAPCAT_CONFIG_DIR%/config}/pty"
@@ -259,9 +272,8 @@ napcat_write_napcat_config() {
 }
 
 napcat_prepare_runtime() {
-    local qq_num="$1" qq_file="$2" cfg prefs links global_token n=0
+    local qq_num="$1" qq_file="$2" cfg links global_token n host
     cfg="$(napcat_load_qq_config "$qq_file")"
-    prefs="$(napcat_load_prefs)"
     links="$(echo "$cfg" | jq -c '.links // []')"
     global_token="$(echo "$cfg" | jq -r '.ob_token // ""')"
 
@@ -270,93 +282,36 @@ napcat_prepare_runtime() {
     napcat_write_napcat_config "$qq_num" "$cfg"
 
     n="$(echo "$links" | jq '[.[]|select(.enabled==true)]|length')"
-    if [ "$n" -eq 0 ]; then
-        echo "[安全] 未启用任何框架连接，请在 nt 中为该 QQ 勾选框架"
-    fi
+    [ "$n" -eq 0 ] && echo "[nt] 未启用框架连接，请在 nt 中勾选框架"
 
-    while IFS= read -r link; do
-        [ -z "$link" ] && continue
-        [ "$(echo "$link" | jq -r '.enabled')" != "true" ] && continue
-        local id label token fw
-        id="$(echo "$link" | jq -r '.framework_id')"
-        fw="$(napcat_get_framework "$id")"
-        label="$( [ -n "$fw" ] && echo "$fw" | jq -r '.label' || echo "$id")"
-        token="$(napcat_resolve_link_token "$link" "$global_token" 2>/dev/null || true)"
-        if [ -z "$token" ]; then
-            echo "[安全] $label: token 空（先启动该框架或填写 token）"
-        else
-            echo "[安全] $label: 已用 api_key / 手动 token"
-        fi
-    done < <(echo "$links" | jq -c '.[]')
-
-    if [ "$(echo "$prefs" | jq -r '.warn_public_webui')" = "true" ] \
-        && [ "$(echo "$prefs" | jq -r '.webui_host')" = "0.0.0.0" ]; then
-        echo "[安全] WebUI 监听 0.0.0.0，请确保强 token + 防火墙"
-    fi
+    host="$(napcat_read_webui | jq -r '.host')"
+    case "$host" in 0.0.0.0|::) echo "[nt] WebUI 公网监听，请设强 token 并限制防火墙" ;; esac
 }
 
-napcat_security_audit() {
-    local issues=0 warns=0 ok=0 prefs
-    _f() { echo "  [FAIL] $*"; issues=$((issues+1)); }
-    _w() { echo "  [WARN] $*"; warns=$((issues+1)); }
-    _o() { echo "  [ OK ] $*"; ok=$((ok+1)); }
-
-    napcat_refresh_frameworks >/dev/null
+# 供 nt 状态页展示
+napcat_status_text() {
+    local qq_dir="${XRK_ROOT:-/xrk}/body" prefs text w qq qf
     prefs="$(napcat_load_prefs)"
-    echo "========== NapCat 安全审计 =========="
-    echo ""
-
-    echo "[ 已注册框架 ]"
-    local fw_count
-    fw_count="$(echo "$prefs" | jq '.frameworks|length')"
-    [ "$fw_count" -eq 0 ] && _w "无框架，请 nt → 框架管理 → 扫描"
+    w="$(napcat_read_webui)"
+    text="══ NapCat 状态 ═=\n\n[ WebUI · 全局共用 ]\n"
+    text+="  $(echo "$w" | jq -r '.host'):$(echo "$w" | jq -r '.port')"
+    text+="$(echo "$w" | jq -r 'if .token!="" then " token=已设" else " token=自动" end')\n"
+    text+="  $(napcat_webui_file)\n"
+    text+="\n[ 框架 $(echo "$prefs" | jq '.frameworks|length') 个 ]\n"
     while IFS= read -r fw; do
-        local label root mode key_file
-        label="$(echo "$fw" | jq -r '.label')"
-        root="$(echo "$fw" | jq -r '.root')"
-        echo "  · $label ($root) 默认端口 $(echo "$fw" | jq -r '.default_port')"
-        key_file="${root}/config/server_config/api_key.json"
-        [ ! -f "$key_file" ] && key_file="${root}/data/server_config/api_key.json"
-        if [ ! -f "$key_file" ]; then _w "$label 无 api_key.json"; else
-            mode=$(stat -c '%a' "$key_file" 2>/dev/null || stat -f '%OLp' "$key_file" 2>/dev/null)
-            case "$mode" in 600|400) _o "$label api_key 权限 $mode" ;; *) _w "$label api_key 权限 $mode" ;; esac
-        fi
+        text+="  · $(echo "$fw" | jq -r '.label') :$(echo "$fw" | jq -r '.default_port')\n"
+        text+="    $(echo "$fw" | jq -r '.root')\n"
     done < <(echo "$prefs" | jq -c '.frameworks[]?')
-    echo ""
-
-    echo "[ QQ 连接 ]"
-    local qq_dir="${XRK_ROOT:-/xrk}/body"
+    text+="\n[ QQ 账号 ]\n"
     shopt -s nullglob
-    local qf
+    local found=0
     for qf in "${qq_dir}"/qq_*.json; do
-        local qq links
+        found=1
         qq="$(basename "$qf" | sed 's/^qq_//;s/.json$//')"
-        links="$(napcat_load_qq_config "$qf" | jq -c '.links[]?|select(.enabled==true)')"
-        [ -z "$links" ] && _w "QQ $qq 无启用连接" && continue
-        while IFS= read -r link; do
-            local id lbl
-            id="$(echo "$link" | jq -r '.framework_id')"
-            lbl="$(napcat_get_framework "$id" | jq -r '.label // .id // empty')"
-            [ -z "$lbl" ] && lbl="$id"
-            _o "QQ $qq → $lbl :$(echo "$link" | jq -r '.port // empty')"
-        done <<< "$links"
+        text+="  $qq → "
+        text+="$(jq -r '.links[]|select(.enabled)|.framework_id' "$qf" 2>/dev/null | paste -sd, -)\n"
     done
-    echo ""
-
-    echo "[ WebUI ]"
-    local wf="${NAPCAT_CONFIG_DIR}/webui.json"
-    if [ ! -f "$wf" ]; then _w "webui.json 未生成"; else
-        case "$(jq -r '.host' "$wf")" in 0.0.0.0|::) _f "WebUI 公网监听" ;; *) _o "WebUI host=$(jq -r '.host' "$wf") port=$(jq -r '.port' "$wf")" ;; esac
-        case "$(jq -r '.token' "$wf")" in ""|napcat) _w "WebUI token 弱或空" ;; *) _o "WebUI token 已设" ;; esac
-    fi
-    [ -d "${NAPCAT_CONFIG_DIR%/config}/pty" ] && _w "pty/ 存在"
-    echo ""
-    echo "汇总: $issues 失败, $warns 警告, $ok 通过"
-    [ "$issues" -gt 0 ] && return 1
-    return 0
-}
-
-# 供 dialog 展示：id label port root
-napcat_framework_menu_lines() {
-    napcat_load_prefs | jq -r '.frameworks[] | "\(.id)|\(.label)|\(.default_port)|\(.root)"'
+    shopt -u nullglob
+    [ "$found" -eq 0 ] && text+="  （无）\n"
+    printf '%b' "$text"
 }
