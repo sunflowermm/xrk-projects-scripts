@@ -60,9 +60,7 @@ nt_err() {
 }
 
 nt_napcat_running() {
-    pgrep -f '[q]q --no-sandbox' >/dev/null 2>&1 \
-        || pgrep -f '[N]apCat' >/dev/null 2>&1 \
-        || pgrep -f '/opt/QQ/' >/dev/null 2>&1
+    pgrep -f '[q]q --no-sandbox' >/dev/null 2>&1
 }
 
 # dialog --form 默认值不能含换行/双引号，否则对话框直接失败且 stderr 被吞

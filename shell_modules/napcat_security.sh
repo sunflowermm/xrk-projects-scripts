@@ -92,7 +92,7 @@ napcat_load_prefs() {
                     (.frameworks // []) as $saved |
                     reduce $scanned[] as $item ($saved;
                         if any($saved[]; .root == $item.root) then . else . + [$item] end)
-                )' 2>&1)" || {
+                ) | del(.warn_public_webui)' 2>&1)" || {
             NAPCAT_LAST_ERR="读取 napcat_prefs 失败: ${err:-未知错误}"
             echo "$defaults" | jq --argjson fw "$(napcat_scan_frameworks_json)" '.frameworks = $fw'
             return 1
@@ -217,10 +217,10 @@ napcat_webui_effective() {
 }
 
 napcat_webui_url() {
-    local w host port
-    w="$(napcat_read_webui)"
-    host="$(echo "$w" | jq -r '.host')"
-    port="$(echo "$w" | jq -r '.port')"
+    local eff host port
+    eff="$(napcat_webui_effective)"
+    host="$(echo "$eff" | jq -r '.host')"
+    port="$(echo "$eff" | jq -r '.port')"
     [ "$port" = "0" ] && return 1
     printf 'http://%s:%s/webui' "$host" "$port"
 }
@@ -352,18 +352,19 @@ napcat_prepare_runtime() {
     n="$(echo "$links" | jq '[.[]|select(.enabled==true)]|length')"
     [ "$n" -eq 0 ] && echo "[nt] 未启用框架连接，请在 nt 中勾选框架"
 
-    host="$(napcat_read_webui | jq -r '.host')"
+    host="$(napcat_webui_effective | jq -r '.host')"
     case "$host" in 0.0.0.0|::) echo "[nt] WebUI 公网监听，请设强 token 并限制防火墙" ;; esac
 }
 
 # 供 nt 状态页展示
 napcat_status_text() {
-    local qq_dir="${XRK_ROOT:-/xrk}/body" prefs text w qq qf
+    local qq_dir="${XRK_ROOT:-/xrk}/body" prefs text eff qq qf
     prefs="$(napcat_load_prefs)"
-    w="$(napcat_read_webui)"
+    eff="$(napcat_webui_effective)"
     text="══ NapCat 状态 ═=\n\n[ WebUI · 全局共用 ]\n"
-    text+="  $(echo "$w" | jq -r '.host'):$(echo "$w" | jq -r '.port')"
-    text+="$(echo "$w" | jq -r 'if .token!="" then " token=已设" else " token=自动" end')\n"
+    text+="  $(echo "$eff" | jq -r '.host'):$(echo "$eff" | jq -r '.port')"
+    text+="$(echo "$eff" | jq -r 'if .token!="" then " token=已设" else " token=自动" end')\n"
+    text+="  loginRate=$(echo "$eff" | jq -r '.loginRate')\n"
     text+="  $(napcat_webui_file)\n"
     text+="\n[ 已注册框架 $(echo "$prefs" | jq '.frameworks|length') 个 ]\n"
     while IFS= read -r fw; do
