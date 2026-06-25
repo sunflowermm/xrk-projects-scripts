@@ -174,18 +174,131 @@ napcat_resolve_link_token() {
     return 1
 }
 
+napcat_onebot_file() {
+    printf '%s/onebot11_%s.json' "$NAPCAT_CONFIG_DIR" "$1"
+}
+
+napcat_link_enabled() {
+    echo "$1" | jq -e '.enabled == true' >/dev/null 2>&1
+}
+
+# 由 qq links[] 解析连接端点（与 write_onebot 同一套规则）
+napcat_resolve_link_endpoint() {
+    local link="$1" fw="${2:-}" id label ws_host port ws_path
+    id="$(echo "$link" | jq -r '.framework_id')"
+    [ -n "$id" ] || return 1
+    [ -z "$fw" ] && fw="$(napcat_get_framework "$id")"
+    [ -n "$fw" ] || return 1
+    label="$(echo "$fw" | jq -r '.label')"
+    ws_host="$(echo "$link" | jq -r '.ws_host // empty')"
+    [ -z "$ws_host" ] && ws_host="$(echo "$fw" | jq -r '.ws_host')"
+    port="$(echo "$link" | jq -r '.port // empty')"
+    [ -z "$port" ] && port="$(echo "$fw" | jq -r '.default_port')"
+    ws_path="$(echo "$link" | jq -r '.ws_path // empty')"
+    [ -z "$ws_path" ] && ws_path="$(echo "$fw" | jq -r '.ws_path')"
+    ws_path="${ws_path#/}"
+    printf '%s\tws://%s:%s/%s\n' "$label" "$ws_host" "$port" "$ws_path"
+}
+
+napcat_links_expected_urls() {
+    local links_json="$1" link urls='[]' row label url
+    while IFS= read -r link; do
+        [ -z "$link" ] && continue
+        napcat_link_enabled "$link" || continue
+        row="$(napcat_resolve_link_endpoint "$link")" || continue
+        url="${row#*$'\t'}"
+        url="${url//$'\n'/}"
+        urls="$(jq -n --argjson arr "$urls" --arg u "$url" '$arr + [$u]')"
+    done < <(echo "$links_json" | jq -c '.[]')
+    echo "$urls" | jq -c 'sort'
+}
+
+napcat_onebot_actual_urls() {
+    local qq_num="$1" ob
+    ob="$(napcat_onebot_file "$qq_num")"
+    [ -f "$ob" ] || { echo '[]'; return 1; }
+    jq -c '[.network.websocketClients[]?|select(.enable==true)|.url]|sort' "$ob" 2>/dev/null || echo '[]'
+}
+
+napcat_verify_onebot_config() {
+    local qq_num="$1" links_json="$2" expected actual
+    expected="$(napcat_links_expected_urls "$links_json")"
+    actual="$(napcat_onebot_actual_urls "$qq_num")"
+    [ "$actual" != "[]" ] || {
+        NAPCAT_LAST_ERR="onebot 未生成或为空: $(napcat_onebot_file "$qq_num")"
+        return 1
+    }
+    if [ "$expected" != "$actual" ]; then
+        NAPCAT_LAST_ERR="onebot 与 QQ 绑定不一致\n期望: ${expected}\n实际: ${actual}\n文件: $(napcat_onebot_file "$qq_num")"
+        return 1
+    fi
+    return 0
+}
+
+napcat_format_connection_lines() {
+    local qq_file="$1" cfg links link row label url
+    [ -f "$qq_file" ] || return 1
+    cfg="$(jq '. + {links:(.links//[])}' "$qq_file")"
+    links="$(echo "$cfg" | jq -c '.links // []')"
+    while IFS= read -r link; do
+        [ -z "$link" ] && continue
+        napcat_link_enabled "$link" || continue
+        row="$(napcat_resolve_link_endpoint "$link")" || continue
+        label="${row%%$'\t'*}"
+        url="${row#*$'\t'}"
+        url="${url//$'\n'/}"
+        printf '%s  %s\n' "$label" "$url"
+    done < <(echo "$links" | jq -c '.[]')
+}
+
+napcat_onebot_effective_summary() {
+    local qq_num="$1" ob parts="" url
+    ob="$(napcat_onebot_file "$qq_num")"
+    [ -f "$ob" ] || { printf '（未生成）'; return; }
+    while IFS= read -r url; do
+        [ -z "$url" ] && continue
+        parts="${parts:+$parts, }${url#ws://}"
+    done < <(jq -r '.network.websocketClients[]?|select(.enable==true)|.url' "$ob" 2>/dev/null)
+    [ -n "$parts" ] && printf '%s' "$parts" || printf '（无连接）'
+}
+
+napcat_qq_onebot_mismatch() {
+    local qq_file="$1" qq links expected actual
+    [ -f "$qq_file" ] || return 1
+    qq="$(basename "$qq_file" | sed 's/^qq_//;s/.json$//')"
+    links="$(jq -c '.links // []' "$qq_file")"
+    expected="$(napcat_links_expected_urls "$links")"
+    actual="$(napcat_onebot_actual_urls "$qq")"
+    [ "$expected" = "$actual" ] && return 1
+    return 0
+}
+
+napcat_sync_qq_link_ports() {
+    local fw_id="$1" new_port="$2" qq_dir="${XRK_ROOT:-/xrk}/body" qf tmp
+    [[ "$new_port" =~ ^[0-9]+$ ]] || return 1
+    for qf in "${qq_dir}"/qq_*.json; do
+        [ -f "$qf" ] || continue
+        jq -e --arg id "$fw_id" 'any(.links[]?; .framework_id==$id and .enabled==true)' "$qf" >/dev/null 2>&1 || continue
+        tmp="$(mktemp "${qq_dir}/.qq_sync.XXXXXX")"
+        jq --arg id "$fw_id" --argjson port "$new_port" \
+            '.links = [.links[]|if .framework_id==$id then .port=$port else . end]' "$qf" > "$tmp" \
+            && mv "$tmp" "$qf"
+    done
+}
+
 napcat_qq_links_summary() {
     local qq_file="$1" parts="" link id fw label port
     [ -f "$qq_file" ] || { printf '未绑定框架'; return; }
     while IFS= read -r link; do
         [ -z "$link" ] && continue
+        napcat_link_enabled "$link" || continue
         id="$(echo "$link" | jq -r '.framework_id')"
         fw="$(napcat_get_framework "$id")"
         [ -z "$fw" ] && continue
         label="$(echo "$fw" | jq -r '.label')"
         port="$(echo "$link" | jq -r '.port')"
         parts="${parts:+$parts, }${label}:${port}"
-    done < <(jq -c '.links[]?|select(.enabled==true)' "$qq_file")
+    done < <(jq -c '.links[]?' "$qq_file")
     [ -n "$parts" ] && printf '%s' "$parts" || printf '未绑定框架'
 }
 
@@ -295,24 +408,18 @@ napcat_apply_webui() {
 # 由 links[] 生成 onebot11（支持多框架多连接）
 napcat_write_onebot_config() {
     local qq_num="$1" links_json="$2" global_token="$3"
-    local clients='[]' link token url name id fw ws_host port ws_path label
+    local clients='[]' link token url name id fw label root row ob tmp err
     while IFS= read -r link; do
         [ -z "$link" ] && continue
-        [ "$(echo "$link" | jq -r '.enabled')" != "true" ] && continue
+        napcat_link_enabled "$link" || continue
         id="$(echo "$link" | jq -r '.framework_id')"
         fw="$(napcat_get_framework "$id")"
         [ -z "$fw" ] && continue
         label="$(echo "$fw" | jq -r '.label')"
-        ws_host="$(echo "$link" | jq -r '.ws_host // empty')"
-        [ -z "$ws_host" ] && ws_host="$(echo "$fw" | jq -r '.ws_host')"
-        port="$(echo "$link" | jq -r '.port // empty')"
-        [ -z "$port" ] && port="$(echo "$fw" | jq -r '.default_port')"
-        ws_path="$(echo "$link" | jq -r '.ws_path // empty')"
-        [ -z "$ws_path" ] && ws_path="$(echo "$fw" | jq -r '.ws_path')"
         root="$(echo "$fw" | jq -r '.root')"
+        row="$(napcat_resolve_link_endpoint "$link" "$fw")" || continue
+        url="${row#*$'\t'}"
         napcat_harden_api_key "$root" "$label" 2>/dev/null || true
-        ws_path="${ws_path#/}"
-        url="ws://${ws_host}:${port}/${ws_path}"
         token="$(napcat_resolve_link_token "$link" "$global_token" 2>/dev/null || true)"
         name="$(echo "$label" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')"
         clients="$(jq -n --argjson arr "$clients" --arg name "$name" --arg url "$url" --arg token "$token" \
@@ -323,10 +430,26 @@ napcat_write_onebot_config() {
             }]')"
     done < <(echo "$links_json" | jq -c '.[]')
 
-    jq -n --argjson clients "$clients" \
+    ob="$(napcat_onebot_file "$qq_num")"
+    mkdir -p "$NAPCAT_CONFIG_DIR" 2>/dev/null || {
+        NAPCAT_LAST_ERR="无法创建目录: $NAPCAT_CONFIG_DIR"
+        return 1
+    }
+    tmp="$(mktemp "${TMPDIR:-/tmp}/onebot11.XXXXXX")"
+    if ! jq -n --argjson clients "$clients" \
         '{network:{httpServers:[],httpClients:[],websocketServers:[],websocketClients:$clients},
-          musicSignUrl:"",enableLocalFile2Url:false}' \
-        > "${NAPCAT_CONFIG_DIR}/onebot11_${qq_num}.json"
+          musicSignUrl:"",enableLocalFile2Url:false}' > "$tmp" 2>"${tmp}.err"; then
+        NAPCAT_LAST_ERR="生成 onebot 配置失败: $(tr -d '\n' < "${tmp}.err" 2>/dev/null)"
+        rm -f "$tmp" "${tmp}.err"
+        return 1
+    fi
+    rm -f "${tmp}.err"
+    if ! err="$(mv "$tmp" "$ob" 2>&1)"; then
+        NAPCAT_LAST_ERR="写入 $ob 失败: ${err:-权限不足}"
+        rm -f "$tmp"
+        return 1
+    fi
+    return 0
 }
 
 napcat_write_napcat_config() {
@@ -340,17 +463,28 @@ napcat_write_napcat_config() {
 }
 
 napcat_prepare_runtime() {
-    local qq_num="$1" qq_file="$2" cfg links global_token n host
+    local qq_num="$1" qq_file="$2" cfg links global_token n webui_warn=0
     cfg="$(jq '. + {ob_token:(.ob_token//""),links:(.links//[])}' "$qq_file")"
     links="$(echo "$cfg" | jq -c '.links // []')"
     global_token="$(echo "$cfg" | jq -r '.ob_token // ""')"
 
-    napcat_apply_webui
-    napcat_write_onebot_config "$qq_num" "$links" "$global_token"
-    napcat_write_napcat_config "$qq_num" "$cfg"
-
     n="$(echo "$links" | jq '[.[]|select(.enabled==true)]|length')"
-    [ "$n" -eq 0 ] && echo "[nt] 未启用框架连接，请在 nt 中勾选框架"
+    [ "$n" -eq 0 ] && {
+        NAPCAT_LAST_ERR="未启用框架连接，请在 nt 中勾选框架"
+        return 1
+    }
+
+    napcat_apply_webui || webui_warn=1
+
+    napcat_write_onebot_config "$qq_num" "$links" "$global_token" || return 1
+    napcat_write_napcat_config "$qq_num" "$cfg" || {
+        NAPCAT_LAST_ERR="写入 napcat_${qq_num}.json 失败"
+        return 1
+    }
+    napcat_verify_onebot_config "$qq_num" "$links" "$global_token" || return 1
+
+    [ "$webui_warn" -eq 1 ] && echo "[nt] WebUI 未写入（OneBot 已按 QQ 绑定同步）"
+    return 0
 }
 
 # 供 nt 状态页展示
@@ -368,7 +502,7 @@ napcat_status_text() {
         text+="  · $(echo "$fw" | jq -r '.label') :$(echo "$fw" | jq -r '.default_port')\n"
         text+="    $(echo "$fw" | jq -r '.root')\n"
     done < <(echo "$prefs" | jq -c '.frameworks[]?')
-    text+="\n[ QQ 绑定 ]\n"
+    text+="\n[ QQ 绑定 · nt 配置 ]\n"
     shopt -s nullglob
     local found=0
     for qf in "${qq_dir}"/qq_*.json; do
@@ -378,5 +512,19 @@ napcat_status_text() {
     done
     shopt -u nullglob
     [ "$found" -eq 0 ] && text+="  （无）\n"
+    text+="\n[ QQ 实际连接 · onebot11 ]\n"
+    found=0
+    shopt -s nullglob
+    for qf in "${qq_dir}"/qq_*.json; do
+        found=1
+        qq="$(basename "$qf" | sed 's/^qq_//;s/.json$//')"
+        text+="  $qq → $(napcat_onebot_effective_summary "$qq")\n"
+        if napcat_qq_onebot_mismatch "$qf"; then
+            text+="    ⚠ 与绑定不一致，请重新启动该 QQ\n"
+        fi
+    done
+    shopt -u nullglob
+    [ "$found" -eq 0 ] && text+="  （无）\n"
+    text+="\n  框架 default_port 仅作默认值；生效以 QQ 绑定 + onebot11 为准\n"
     printf '%b' "$text"
 }

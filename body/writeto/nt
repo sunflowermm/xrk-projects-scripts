@@ -208,6 +208,12 @@ nt_qq_wizard() {
     fi
 
     nt_save_qq "$wqq" "$links" "$ob" "$old_qq"
+    if ! nt_napcat_running; then
+        napcat_prepare_runtime "$wqq" "${QQ_DIR}/qq_${wqq}.json" || {
+            nt_err "QQ 已保存，但 onebot 同步失败\n${NAPCAT_LAST_ERR:-}\n请先 killall qq 后重试" 12
+            return 1
+        }
+    fi
     printf -v "$__ret" '%s' "$wqq"
 }
 
@@ -269,6 +275,10 @@ nt_edit_framework_port() {
     prefs="$(napcat_load_prefs)"
     napcat_save_prefs "$(echo "$prefs" | jq --arg id "$id" --argjson port "$port" \
         '.frameworks = [.frameworks[]|if .id==$id then .default_port=$port else . end]')"
+    if nt_yesno "同步已有 QQ 绑定中该框架的端口？" 7 44; then
+        napcat_sync_qq_link_ports "$id" "$port"
+        nt_msg "已更新框架默认端口，并同步 QQ 绑定" 7
+    fi
     nt_show_framework_menu
 }
 
@@ -381,30 +391,25 @@ nt_show_status() {
     local tmp
     tmp="$(mktemp "${TMPDIR:-/tmp}/nt_status.XXXXXX")"
     napcat_status_text > "$tmp"
-    dialog --backtitle "$NT_BACK" --title "状态" --textbox "$tmp" 22 68
+    dialog --backtitle "$NT_BACK" --title "状态" --textbox "$tmp" 26 68
     rm -f "$tmp"
 }
 
 nt_start_qq() {
-    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" cfg url
+    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" url line
     [[ -n "$qq" ]] || { nt_err "QQ 号为空，请重新配置"; return 1; }
     [ -f "$qf" ] || { nt_err "无配置 $qf"; return 1; }
-    napcat_prepare_runtime "$qq" "$qf"
-    cfg="$(jq -c . "$qf")"
+    napcat_prepare_runtime "$qq" "$qf" || {
+        nt_err "启动前同步失败\n${NAPCAT_LAST_ERR:-未知错误}\n\n请先 killall qq 后重试，或用 nt → 修改 QQ 重新保存绑定"
+        return 1
+    }
     clear; killall dialog 2>/dev/null
     echo "┌─ NapCat 启动 ─────────────────"
     echo "│ QQ: $qq"
-    while IFS= read -r link; do
-        [ -z "$link" ] && continue
-        local id fw lbl h p path
-        id="$(echo "$link" | jq -r '.framework_id')"
-        fw="$(napcat_get_framework "$id")"
-        lbl="$(echo "$fw" | jq -r '.label // .id')"
-        h="$(echo "$fw" | jq -r '.ws_host')"
-        p="$(echo "$link" | jq -r '.port')"
-        path="$(echo "$fw" | jq -r '.ws_path' | sed 's#^/##')"
-        echo "│ → $lbl  ws://${h}:${p}/${path}"
-    done < <(echo "$cfg" | jq -c '.links[]|select(.enabled==true)')
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        echo "│ → $line"
+    done < <(napcat_format_connection_lines "$qf")
     if url="$(napcat_webui_url 2>/dev/null)"; then
         echo "│ WebUI（全局）: $url"
     else
