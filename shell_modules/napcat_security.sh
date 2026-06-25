@@ -88,11 +88,15 @@ napcat_load_prefs() {
         fi
         err="$(jq -s '.[1] * .[0]' <(cat "$f") <(echo "$defaults") \
             | jq --argjson scanned "$(napcat_scan_frameworks_json)" \
-                '.frameworks = (
-                    (.frameworks // []) as $saved |
-                    reduce $scanned[] as $item ($saved;
-                        if any($saved[]; .root == $item.root) then . else . + [$item] end)
-                ) | del(.warn_public_webui)' 2>&1)" || {
+                '(.frameworks // []) as $saved |
+                 .frameworks = (
+                   reduce $scanned[] as $item ($saved;
+                     if any(.[]; .root == $item.root) then
+                       map(if .root == $item.root then $item + {default_port: .default_port} else . end)
+                     else
+                       . + [$item]
+                     end)
+                 ) | del(.warn_public_webui)' 2>&1)" || {
             NAPCAT_LAST_ERR="读取 napcat_prefs 失败: ${err:-未知错误}"
             echo "$defaults" | jq --argjson fw "$(napcat_scan_frameworks_json)" '.frameworks = $fw'
             return 1
@@ -130,9 +134,17 @@ napcat_refresh_frameworks() {
 }
 
 napcat_get_framework() {
-    local id="$1" prefs
+    local id="$1" prefs fw root derived
     prefs="$(napcat_load_prefs)"
-    echo "$prefs" | jq -c --arg id "$id" '.frameworks[] | select(.id == $id)' | head -n1
+    fw="$(echo "$prefs" | jq -c --arg id "$id" '.frameworks[]? | select(.id == $id)' | head -n1)"
+    [ -n "$fw" ] || return 1
+    root="$(echo "$fw" | jq -r '.root // ""')"
+    derived="$(napcat_framework_id_from_root "$root")"
+    [ "$derived" = "$id" ] || {
+        NAPCAT_LAST_ERR="napcat_prefs 框架 id=${id} 与目录 ${root} 不一致（应为 ${derived}）\n请 nt → 框架管理 → 重新扫描，再修改 QQ 绑定"
+        return 1
+    }
+    printf '%s' "$fw"
 }
 
 napcat_read_api_key() {
@@ -209,18 +221,20 @@ napcat_ws_client_display_name() {
 
 # 由 qq links[] 解析连接端点（与 write_onebot 同一套规则）
 napcat_resolve_link_endpoint() {
-    local link="$1" fw="${2:-}" id label ws_host port ws_path
-    id="$(echo "$link" | jq -r '.framework_id')"
+    local link="$1" fw="${2:-}" id label ws_host port ws_path root
+    id="$(echo "$link" | jq -r '.framework_id // ""')"
     [ -n "$id" ] || return 1
-    [ -z "$fw" ] && fw="$(napcat_get_framework "$id")"
+    [ -z "$fw" ] && fw="$(napcat_get_framework "$id")" || true
     [ -n "$fw" ] || return 1
-    label="$(echo "$fw" | jq -r '.label')"
+    root="$(echo "$fw" | jq -r '.root // ""')"
+    label="$(napcat_framework_label "$root")"
     ws_host="$(echo "$link" | jq -r '.ws_host // empty')"
-    [ -z "$ws_host" ] && ws_host="$(echo "$fw" | jq -r '.ws_host')"
+    [ -z "$ws_host" ] && ws_host="$(echo "$fw" | jq -r '.ws_host // "127.0.0.1"')"
     port="$(echo "$link" | jq -r '.port // empty')"
-    [ -z "$port" ] && port="$(echo "$fw" | jq -r '.default_port')"
+    [ -z "$port" ] && port="$(echo "$fw" | jq -r '.default_port // empty')"
+    [[ "$port" =~ ^[0-9]+$ ]] || port="$(napcat_guess_framework_port "$root")"
     ws_path="$(echo "$link" | jq -r '.ws_path // empty')"
-    [ -z "$ws_path" ] && ws_path="$(echo "$fw" | jq -r '.ws_path')"
+    [ -z "$ws_path" ] && ws_path="$(echo "$fw" | jq -r '.ws_path // "OneBotv11"')"
     ws_path="${ws_path#/}"
     printf '%s\tws://%s:%s/%s\n' "$label" "$ws_host" "$port" "$ws_path"
 }
@@ -455,9 +469,8 @@ napcat_write_onebot_config() {
             NAPCAT_LAST_ERR="QQ 绑定缺少 framework_id"
             return 1
         }
-        fw="$(napcat_get_framework "$id")"
-        [ -n "$fw" ] || {
-            NAPCAT_LAST_ERR="未注册框架: ${id}（nt → 框架管理 → 扫描）"
+        fw="$(napcat_get_framework "$id")" || {
+            [ -n "${NAPCAT_LAST_ERR:-}" ] || NAPCAT_LAST_ERR="未注册框架: ${id}（nt → 框架管理 → 扫描）"
             return 1
         }
         label="$(echo "$fw" | jq -r '.label')"
@@ -519,6 +532,7 @@ napcat_write_napcat_config() {
 
 napcat_prepare_runtime() {
     local qq_num="$1" qq_file="$2" cfg links global_token n webui_warn=0
+    napcat_refresh_frameworks >/dev/null
     cfg="$(jq '. + {ob_token:(.ob_token//""),links:(.links//[])}' "$qq_file")"
     links="$(echo "$cfg" | jq -c '.links // []')"
     global_token="$(echo "$cfg" | jq -r '.ob_token // ""')"

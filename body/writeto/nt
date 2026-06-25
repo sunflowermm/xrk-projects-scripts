@@ -1,6 +1,11 @@
 #!/bin/bash
 # NapCat 管理：多 QQ · 多框架 · WebUI
 root="${XRK_ROOT:-/xrk}"
+_self="${BASH_SOURCE[0]}"
+_canon="${root}/body/writeto/nt"
+if [ -f "$_canon" ] && [ "$_self" != "$_canon" ] && ! cmp -s "$_canon" "$_self" 2>/dev/null; then
+    exec env XRK_ROOT="$root" bash "$_canon" "$@"
+fi
 # shellcheck source=/dev/null
 source "${root}/shell_modules/xrk_base.sh"
 xrk_加载底层 install
@@ -516,7 +521,6 @@ main() {
             echo "  nt <QQ>         启动已配置账号"
             echo "  nt --sync-onebot <QQ>  仅同步 onebot11（需先停 QQ）"
             echo "  nt --webui-apply  将 napcat_prefs 合并写入 webui.json（需先停 NapCat）"
-            echo "  更新脚本后请执行: source /xrk/shell_modules/update.sh && xrk_bin同步"
             echo "  日志: ${NT_LOG}"
             exit 0 ;;
         --sync-onebot)
