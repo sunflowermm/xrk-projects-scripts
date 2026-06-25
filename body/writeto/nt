@@ -54,9 +54,9 @@ nt_framework_items() {
 }
 
 nt_pick_frameworks() {
-    local qq="$1" items=() id label port state old checklist
-    old="$(napcat_load_qq_config "${QQ_DIR}/qq_${qq}.json" 2>/dev/null \
-        | jq -r '.links[]?|select(.enabled)|.framework_id' 2>/dev/null || true)"
+    local __var=$1 qq="$2" items=() id label port state old="" checklist
+    [ -f "${QQ_DIR}/qq_${qq}.json" ] && \
+        old="$(jq -r '.links[]?|select(.enabled)|.framework_id' "${QQ_DIR}/qq_${qq}.json" 2>/dev/null || true)"
     while IFS='|' read -r id label port; do
         [ -z "$id" ] && continue
         state=off; echo "$old" | grep -qxF "$id" && state=on
@@ -64,13 +64,14 @@ nt_pick_frameworks() {
     done < <(nt_framework_items)
     [ ${#items[@]} -eq 0 ] && { nt_msg "请先在「框架管理」扫描或添加框架" 7; return 1; }
     nt_dialog_input_run checklist --title "连接框架" --checklist \
-        "空格切换 · 同一 QQ 可同时连接多个框架" 16 68 8 "${items[@]}" || return 1
-    printf '%s' "$checklist"
+        "空格切换 · 回车确认 · 可同时选多个框架" 16 68 8 "${items[@]}" || return 1
+    printf -v "$__var" '%s' "$checklist"
 }
 
 nt_links_from_checklist() {
     local qq="$1" checklist="$2" old links='[]' id checked fw port token
-    old="$(napcat_load_qq_config "${QQ_DIR}/qq_${qq}.json" 2>/dev/null | jq -c '.links // []')"
+    old='[]'
+    [ -f "${QQ_DIR}/qq_${qq}.json" ] && old="$(jq -c '.links // []' "${QQ_DIR}/qq_${qq}.json")"
     while read -r id checked; do
         [ -z "$id" ] || [ "$checked" != "on" ] && continue
         fw="$(napcat_get_framework "$id")"; [ -z "$fw" ] && continue
@@ -112,7 +113,8 @@ nt_qq_wizard() {
     cf="${QQ_DIR}/qq_${old_qq}.json"
     [ -n "$old_qq" ] && [ -f "$cf" ] || cf=""
 
-    nt_dialog_run values --title "$title" --form "全局 Token 留空则各框架用各自 api_key" 11 58 2 \
+    nt_dialog_run values --title "$title" --form \
+        "第1步：填写 QQ · 点 OK 进入第2步勾选框架" 11 58 2 \
         "QQ 账号:" 1 1 "${old_qq:-}" 1 12 36 0 \
         "全局Token:" 2 1 "$([ -f "$cf" ] && jq -r '.ob_token' "$cf" || echo '')" 2 12 36 0 \
         || return 1
@@ -120,7 +122,7 @@ nt_qq_wizard() {
     ob=$(echo "$values" | sed -n2p)
     [[ -z "$qq" ]] && return 1
 
-    checklist="$(nt_pick_frameworks "$qq")" || return 1
+    nt_pick_frameworks checklist "$qq" || return 1
     links="$(nt_links_from_checklist "$qq" "$checklist")"
     [ "$(echo "$links" | jq 'length')" -eq 0 ] && { nt_msg "请至少选择一个框架"; return 1; }
 
@@ -251,7 +253,7 @@ nt_start_qq() {
     local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" cfg url
     [ -f "$qf" ] || { echo "无配置 $qf"; exit 1; }
     napcat_prepare_runtime "$qq" "$qf"
-    cfg="$(napcat_load_qq_config "$qf")"
+    cfg="$(jq -c . "$qf")"
     clear; killall dialog 2>/dev/null
     echo "┌─ NapCat 启动 ─────────────────"
     echo "│ QQ: $qq"
@@ -312,7 +314,7 @@ nt_main_menu() {
 nt_edit_qq() {
     local items=() qq sel
     for qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
-        items+=("$qq" "$(jq -r '.links[]|select(.enabled)|.framework_id' "${QQ_DIR}/qq_${qq}.json" | paste -sd, -)")
+        items+=("$qq" "$(napcat_qq_links_summary "${QQ_DIR}/qq_${qq}.json")")
     done
     [ ${#items[@]} -eq 0 ] && { nt_msg "暂无 QQ 配置"; return; }
 

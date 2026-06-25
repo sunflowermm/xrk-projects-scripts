@@ -139,43 +139,25 @@ napcat_resolve_link_token() {
     global_token="$(printf '%s' "$global_token" | tr -d '\r\n')"
     [ -n "$global_token" ] && { printf '%s' "$global_token"; return 0; }
 
-    root="$(echo "$link_json" | jq -r '.framework_root // ""')"
-    [ -z "$root" ] && id="$(echo "$link_json" | jq -r '.framework_id // ""')" \
-        && [ -n "$id" ] && root="$(napcat_get_framework "$id" | jq -r '.root // ""')"
+    id="$(echo "$link_json" | jq -r '.framework_id // ""')"
+    [ -n "$id" ] && root="$(napcat_get_framework "$id" | jq -r '.root // ""')"
     [ -n "$root" ] && napcat_read_api_key "$root" && return 0
     return 1
 }
 
-# 加载 QQ 配置并迁移旧版单框架字段
-napcat_load_qq_config() {
-    local qq_file="$1" raw
-    if [ ! -f "$qq_file" ]; then
-        jq -n '{qq:"",ob_token:"",console_log:true,file_log:false,links:[]}'
-        return
-    fi
-    raw="$(cat "$qq_file")"
-    if echo "$raw" | jq -e '.links | type == "array"' >/dev/null 2>&1; then
-        echo "$raw" | jq '. + {
-            ob_token:(.ob_token//""),console_log:(.console_log//true),file_log:(.file_log//false)
-        }'
-        return
-    fi
-    # 旧版 port / framework_root → 单条 link
-    echo "$raw" | jq '{
-        qq:(.qq//""),
-        ob_token:(.ob_token//""),
-        console_log:(.console_log//true),
-        file_log:(.file_log//false),
-        links:[{
-            framework_id:"legacy",
-            enabled:true,
-            port:(.port//2537),
-            ws_host:(.ws_host//"127.0.0.1"),
-            ws_path:(.ws_path//"OneBotv11"),
-            token:(.ob_token//""),
-            framework_root:(.framework_root//"")
-        }]
-    }'
+napcat_qq_links_summary() {
+    local qq_file="$1" parts="" link id fw label port
+    [ -f "$qq_file" ] || { printf '未绑定框架'; return; }
+    while IFS= read -r link; do
+        [ -z "$link" ] && continue
+        id="$(echo "$link" | jq -r '.framework_id')"
+        fw="$(napcat_get_framework "$id")"
+        [ -z "$fw" ] && continue
+        label="$(echo "$fw" | jq -r '.label')"
+        port="$(echo "$link" | jq -r '.port')"
+        parts="${parts:+$parts, }${label}:${port}"
+    done < <(jq -c '.links[]?|select(.enabled==true)' "$qq_file")
+    [ -n "$parts" ] && printf '%s' "$parts" || printf '未绑定框架'
 }
 
 # WebUI 全局唯一：napcat/config/webui.json，所有 QQ 进程共用（非 per-qq）
@@ -225,24 +207,16 @@ napcat_write_onebot_config() {
         [ "$(echo "$link" | jq -r '.enabled')" != "true" ] && continue
         id="$(echo "$link" | jq -r '.framework_id')"
         fw="$(napcat_get_framework "$id")"
-        if [ -n "$fw" ]; then
-            label="$(echo "$fw" | jq -r '.label')"
-            ws_host="$(echo "$link" | jq -r '.ws_host // empty')"
-            [ -z "$ws_host" ] && ws_host="$(echo "$fw" | jq -r '.ws_host')"
-            port="$(echo "$link" | jq -r '.port // empty')"
-            [ -z "$port" ] && port="$(echo "$fw" | jq -r '.default_port')"
-            ws_path="$(echo "$link" | jq -r '.ws_path // empty')"
-            [ -z "$ws_path" ] && ws_path="$(echo "$fw" | jq -r '.ws_path')"
-            root="$(echo "$fw" | jq -r '.root')"
-            napcat_harden_api_key "$root" "$label" 2>/dev/null || true
-        else
-            label="$id"
-            ws_host="$(echo "$link" | jq -r '.ws_host // "127.0.0.1"')"
-            port="$(echo "$link" | jq -r '.port // 2537')"
-            ws_path="$(echo "$link" | jq -r '.ws_path // "OneBotv11"')"
-            root="$(echo "$link" | jq -r '.framework_root // ""')"
-            [ -n "$root" ] && napcat_harden_api_key "$root" "$label" 2>/dev/null || true
-        fi
+        [ -z "$fw" ] && continue
+        label="$(echo "$fw" | jq -r '.label')"
+        ws_host="$(echo "$link" | jq -r '.ws_host // empty')"
+        [ -z "$ws_host" ] && ws_host="$(echo "$fw" | jq -r '.ws_host')"
+        port="$(echo "$link" | jq -r '.port // empty')"
+        [ -z "$port" ] && port="$(echo "$fw" | jq -r '.default_port')"
+        ws_path="$(echo "$link" | jq -r '.ws_path // empty')"
+        [ -z "$ws_path" ] && ws_path="$(echo "$fw" | jq -r '.ws_path')"
+        root="$(echo "$fw" | jq -r '.root')"
+        napcat_harden_api_key "$root" "$label" 2>/dev/null || true
         ws_path="${ws_path#/}"
         url="ws://${ws_host}:${port}/${ws_path}"
         token="$(napcat_resolve_link_token "$link" "$global_token" 2>/dev/null || true)"
@@ -273,7 +247,7 @@ napcat_write_napcat_config() {
 
 napcat_prepare_runtime() {
     local qq_num="$1" qq_file="$2" cfg links global_token n host
-    cfg="$(napcat_load_qq_config "$qq_file")"
+    cfg="$(jq '. + {ob_token:(.ob_token//""),links:(.links//[])}' "$qq_file")"
     links="$(echo "$cfg" | jq -c '.links // []')"
     global_token="$(echo "$cfg" | jq -r '.ob_token // ""')"
 
@@ -297,19 +271,18 @@ napcat_status_text() {
     text+="  $(echo "$w" | jq -r '.host'):$(echo "$w" | jq -r '.port')"
     text+="$(echo "$w" | jq -r 'if .token!="" then " token=已设" else " token=自动" end')\n"
     text+="  $(napcat_webui_file)\n"
-    text+="\n[ 框架 $(echo "$prefs" | jq '.frameworks|length') 个 ]\n"
+    text+="\n[ 已注册框架 $(echo "$prefs" | jq '.frameworks|length') 个 ]\n"
     while IFS= read -r fw; do
         text+="  · $(echo "$fw" | jq -r '.label') :$(echo "$fw" | jq -r '.default_port')\n"
         text+="    $(echo "$fw" | jq -r '.root')\n"
     done < <(echo "$prefs" | jq -c '.frameworks[]?')
-    text+="\n[ QQ 账号 ]\n"
+    text+="\n[ QQ 绑定 ]\n"
     shopt -s nullglob
     local found=0
     for qf in "${qq_dir}"/qq_*.json; do
         found=1
         qq="$(basename "$qf" | sed 's/^qq_//;s/.json$//')"
-        text+="  $qq → "
-        text+="$(jq -r '.links[]|select(.enabled)|.framework_id' "$qf" 2>/dev/null | paste -sd, -)\n"
+        text+="  $qq → $(napcat_qq_links_summary "$qf")\n"
     done
     shopt -u nullglob
     [ "$found" -eq 0 ] && text+="  （无）\n"
