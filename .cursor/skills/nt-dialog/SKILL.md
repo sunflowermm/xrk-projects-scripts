@@ -30,6 +30,7 @@ rm -f "$tmp"
 ## 解析 `--form`
 
 - 每个可编辑字段占 **一行**，顺序与 `--form` 声明一致
+- **尾部空字段**可能无换行（如 QQ 表单只回 `3606287955`），`nt_parse_form` 会自动补齐空字符串
 - 用 `nt_parse_form "$values" N name1 name2 ...` 拆字段
 - **host 只用 `nt_field_trim`**（去首尾空白），禁止 `tr -d '[:space:]'`（会把 `::` 等地址破坏或丢字段）
 - 端口/限速可 trim 后校验数字
@@ -81,7 +82,7 @@ tail -5 /tmp/nt.log
 
 | 现象 | 原因 | 处理 |
 |------|------|------|
-| 改任何值保存后仍是 127.0.0.1/6099/3 | form 返回值丢失 + 代码填默认 | 用 `nt_dialog_capture` |
+| 新增 QQ 报「表单字段不足 实际1」 | Token 留空时 dialog 不输出第二行 | `nt_parse_form` 补齐尾部空字段 |
 | 监听地址改为 `::` 报「为空」 | form 首行在 `$()`+`exec 3>&1` 捕获时丢失 | `nt_dialog_capture` + `nt_parse_form` + `nt_field_trim`（勿对 host 用 `tr -d`） |
 | webui.json 变回 `host:"::"` 大文件 | NapCat 运行中覆盖 | 先停 qq 再改 |
 | 无报错回菜单 | dialog 失败被 `\|\| return` 吞掉 | `nt_err` + `/tmp/nt.log` |

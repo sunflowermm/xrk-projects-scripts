@@ -37,7 +37,6 @@ nt_dialog_capture() {
 }
 
 nt_dialog_run() { nt_dialog_capture "$@"; }
-nt_dialog_input_run() { nt_dialog_capture "$@"; }
 
 # 去首尾空白，保留 IPv6（::）与地址内部的空格
 nt_field_trim() {
@@ -48,22 +47,32 @@ nt_field_trim() {
     printf '%s' "$s"
 }
 
-# 解析 dialog --form 输出：每行一字段，跳过空行
+# 解析 dialog --form 输出：每行一字段；尾部空字段可能无换行，需补齐
 nt_parse_form() {
     local values="$1" expect="$2"
     shift 2
-    local -a names=("$@") fields=() line i=0 n=0
+    local -a names=("$@") fields=() line i n
     mapfile -t fields <<< "$values"
     local -a out=()
     for line in "${fields[@]}"; do
-        line="$(nt_field_trim "$line")"
-        out+=("$line")
+        out+=("$(nt_field_trim "$line")")
+    done
+    # values 以单个 \n 结尾时 mapfile 会多一个空元素
+    if [ "${#out[@]}" -eq $((expect + 1)) ] && [ -z "${out[$expect]}" ]; then
+        unset "out[$expect]"
+    fi
+    while [ "${#out[@]}" -lt "$expect" ]; do
+        out+=("")
     done
     n="${#out[@]}"
-    if [ "$n" -lt "$expect" ]; then
-        NAPCAT_LAST_ERR="表单字段不足(期望${expect}行,实际${n}): $(printf '%s|' "${out[@]}")"
+    if [ "$n" -gt "$expect" ]; then
+        NAPCAT_LAST_ERR="表单字段过多(期望${expect}行,实际${n}): $(printf '%s|' "${out[@]}")"
         return 1
     fi
+    for i in $(seq 0 $((expect - 1)) 2>/dev/null || awk "BEGIN{for(i=0;i<$expect;i++)print i}"); do
+        [ -n "${out[$i]}" ] && break
+        [ "$i" -eq $((expect - 1)) ] && { NAPCAT_LAST_ERR="表单为空"; return 1; }
+    done
     for i in $(seq 0 $((expect - 1)) 2>/dev/null || awk "BEGIN{for(i=0;i<$expect;i++)print i}"); do
         printf -v "${names[$i]}" '%s' "${out[$i]}"
     done
@@ -115,9 +124,8 @@ nt_pick_frameworks() {
         items+=("$id" "$label · :$port" "$state")
     done < <(nt_framework_items)
     [ ${#items[@]} -eq 0 ] && { nt_msg "请先在「框架管理」扫描或添加框架" 7; return 1; }
-    nt_dialog_input_run checklist --title "连接框架" --checklist \
+    nt_dialog_run "$__var" --title "连接框架" --checklist \
         "空格切换 · 回车确认 · 可同时选多个框架" 16 68 8 "${items[@]}" || return 1
-    printf -v "$__var" '%s' "$checklist"
 }
 
 nt_links_from_checklist() {
@@ -144,7 +152,7 @@ nt_tune_link_ports() {
         fw="$(napcat_get_framework "$id")"
         label="$(echo "$fw" | jq -r '.label // .id')"
         port="$(echo "$link" | jq -r '.port')"
-        nt_dialog_input_run new_port --inputbox "$label 监听端口" 8 50 "$port" || return 1
+        nt_dialog_run new_port --inputbox "$label 监听端口" 8 50 "$port" || return 1
         [[ -z "$new_port" ]] && new_port="$port"
         link="$(echo "$link" | jq --argjson port "$new_port" '.port=$port')"
         out="$(jq -n --argjson a "$out" --argjson l "$link" '$a + [$l]')"
@@ -172,7 +180,8 @@ nt_qq_wizard() {
         || return 1
     nt_parse_form "$values" 2 qq ob || { nt_err "QQ 表单解析失败\n${NAPCAT_LAST_ERR:-}" 10; return 1; }
     qq="$(nt_field_trim "$qq")"
-    [[ -z "$qq" ]] && return 1
+    [[ -z "$qq" ]] && { nt_err "QQ 账号不能为空"; return 1; }
+    nt_log "QQ wizard: qq=$qq token_len=${#ob}"
 
     nt_pick_frameworks checklist "$qq" || return 1
     links="$(nt_links_from_checklist "$qq" "$checklist")"
@@ -221,9 +230,9 @@ nt_show_framework_menu() {
 
 nt_add_framework() {
     local path port label id prefs fw
-    nt_dialog_input_run path --inputbox "框架根目录" 10 58 "$HOME" || return
+    nt_dialog_run path --inputbox "框架根目录" 10 58 "$HOME" || return
     [ -d "$path" ] || return
-    nt_dialog_input_run port --inputbox "默认端口" 8 42 "$(napcat_guess_framework_port "$path")" || return
+    nt_dialog_run port --inputbox "默认端口" 8 42 "$(napcat_guess_framework_port "$path")" || return
     label="$(napcat_framework_label "$path")"
     id="$(napcat_framework_id_from_root "$path")"
     fw="$(jq -n --arg id "$id" --arg label "$label" --arg root "$path" --argjson port "$port" \
@@ -239,7 +248,7 @@ nt_edit_framework_port() {
     local items=() id port prefs
     while IFS='|' read -r id label _; do items+=("$id" "$label"); done < <(nt_framework_items)
     nt_dialog_run id --title "改端口" --menu "选择框架" 12 50 6 "${items[@]}" || return
-    nt_dialog_input_run port --inputbox "新默认端口" 8 42 \
+    nt_dialog_run port --inputbox "新默认端口" 8 42 \
         "$(napcat_get_framework "$id" | jq -r '.default_port')" || return
     prefs="$(napcat_load_prefs)"
     napcat_save_prefs "$(echo "$prefs" | jq --arg id "$id" --argjson port "$port" \
