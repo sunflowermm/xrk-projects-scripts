@@ -179,7 +179,32 @@ napcat_onebot_file() {
 }
 
 napcat_link_enabled() {
-    echo "$1" | jq -e '.enabled == true' >/dev/null 2>&1
+    echo "$1" | jq -e '
+        if .enabled == false or .enabled == "false" then false
+        else true end
+    ' >/dev/null 2>&1
+}
+
+napcat_count_enabled_links() {
+    local links_json="$1" link n=0
+    while IFS= read -r link; do
+        [ -z "$link" ] && continue
+        napcat_link_enabled "$link" && n=$((n + 1))
+    done < <(echo "$links_json" | jq -c '.[]?')
+    printf '%s' "$n"
+}
+
+napcat_ws_client_display_name() {
+    case "$1" in
+        ws-xrk-agt|xrk-agt) printf 'XRK-AGT' ;;
+        ws-xrk-yunzai|xrk-yunzai) printf 'XRK-Yunzai' ;;
+        ws-*)
+            local n="${1#ws-}"
+            n="$(printf '%s' "$n" | sed 's/-/ /g')"
+            printf '%s' "$n"
+            ;;
+        *) printf '%s' "$1" ;;
+    esac
 }
 
 # 由 qq links[] 解析连接端点（与 write_onebot 同一套规则）
@@ -251,6 +276,19 @@ napcat_format_connection_lines() {
     done < <(echo "$links" | jq -c '.[]')
 }
 
+# 启动横幅：以已写入的 onebot11 为准（与 NapCat 实际加载一致）
+napcat_onebot_banner_lines() {
+    local qq_num="$1" f name url
+    f="$(napcat_onebot_file "$qq_num")"
+    [ -f "$f" ] || return 1
+    while IFS= read -r name; do
+        [ -z "$name" ] && continue
+        url="$(jq -r --arg n "$name" '.network.websocketClients[]?|select(.name==$n and .enable==true)|.url' "$f" 2>/dev/null)"
+        [ -n "$url" ] && [ "$url" != "null" ] || continue
+        printf '%s  %s\n' "$(napcat_ws_client_display_name "$name")" "$url"
+    done < <(jq -r '.network.websocketClients[]?|select(.enable==true)|.name' "$f" 2>/dev/null)
+}
+
 napcat_onebot_effective_summary() {
     local qq_num="$1" ob parts="" url
     ob="$(napcat_onebot_file "$qq_num")"
@@ -278,7 +316,7 @@ napcat_sync_qq_link_ports() {
     [[ "$new_port" =~ ^[0-9]+$ ]] || return 1
     for qf in "${qq_dir}"/qq_*.json; do
         [ -f "$qf" ] || continue
-        jq -e --arg id "$fw_id" 'any(.links[]?; .framework_id==$id and .enabled==true)' "$qf" >/dev/null 2>&1 || continue
+        jq -e --arg id "$fw_id" 'any(.links[]?; .framework_id==$id and ((.enabled==true) or (.enabled=="true") or (.enabled==null)))' "$qf" >/dev/null 2>&1 || continue
         tmp="$(mktemp "${qq_dir}/.qq_sync.XXXXXX")"
         jq --arg id "$fw_id" --argjson port "$new_port" \
             '.links = [.links[]|if .framework_id==$id then .port=$port else . end]' "$qf" > "$tmp" \
@@ -408,17 +446,28 @@ napcat_apply_webui() {
 # 由 links[] 生成 onebot11（支持多框架多连接）
 napcat_write_onebot_config() {
     local qq_num="$1" links_json="$2" global_token="$3"
-    local clients='[]' link token url name id fw label root row ob tmp err
+    local clients='[]' link token url name id fw label root row ob tmp err n=0
     while IFS= read -r link; do
         [ -z "$link" ] && continue
         napcat_link_enabled "$link" || continue
-        id="$(echo "$link" | jq -r '.framework_id')"
+        id="$(echo "$link" | jq -r '.framework_id // ""')"
+        [ -n "$id" ] || {
+            NAPCAT_LAST_ERR="QQ 绑定缺少 framework_id"
+            return 1
+        }
         fw="$(napcat_get_framework "$id")"
-        [ -z "$fw" ] && continue
+        [ -n "$fw" ] || {
+            NAPCAT_LAST_ERR="未注册框架: ${id}（nt → 框架管理 → 扫描）"
+            return 1
+        }
         label="$(echo "$fw" | jq -r '.label')"
         root="$(echo "$fw" | jq -r '.root')"
-        row="$(napcat_resolve_link_endpoint "$link" "$fw")" || continue
+        row="$(napcat_resolve_link_endpoint "$link" "$fw")" || {
+            NAPCAT_LAST_ERR="无法解析框架 ${id} 的连接"
+            return 1
+        }
         url="${row#*$'\t'}"
+        url="${url//$'\n'/}"
         napcat_harden_api_key "$root" "$label" 2>/dev/null || true
         token="$(napcat_resolve_link_token "$link" "$global_token" 2>/dev/null || true)"
         name="$(echo "$label" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')"
@@ -428,7 +477,13 @@ napcat_write_onebot_config() {
                 messagePostFormat: "array", reportSelfMessage: false,
                 reconnectInterval: 5000, token: $token, debug: false, heartInterval: 30000
             }]')"
+        n=$((n + 1))
     done < <(echo "$links_json" | jq -c '.[]')
+
+    [ "$n" -gt 0 ] || {
+        NAPCAT_LAST_ERR="无有效 QQ 框架绑定（检查 framework_id / enabled）"
+        return 1
+    }
 
     ob="$(napcat_onebot_file "$qq_num")"
     mkdir -p "$NAPCAT_CONFIG_DIR" 2>/dev/null || {
@@ -468,7 +523,7 @@ napcat_prepare_runtime() {
     links="$(echo "$cfg" | jq -c '.links // []')"
     global_token="$(echo "$cfg" | jq -r '.ob_token // ""')"
 
-    n="$(echo "$links" | jq '[.[]|select(.enabled==true)]|length')"
+    n="$(napcat_count_enabled_links "$links")"
     [ "$n" -eq 0 ] && {
         NAPCAT_LAST_ERR="未启用框架连接，请在 nt 中勾选框架"
         return 1

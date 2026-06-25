@@ -133,7 +133,7 @@ nt_parse_checklist() {
 nt_pick_frameworks() {
     local __var=$1 qq="$2" items=() id label port state old=""
     [ -f "${QQ_DIR}/qq_${qq}.json" ] && \
-        old="$(jq -r '.links[]?|select(.enabled)|.framework_id' "${QQ_DIR}/qq_${qq}.json" 2>/dev/null || true)"
+        old="$(jq -r '.links[]?|select((.enabled==true) or (.enabled=="true") or (.enabled==null))|.framework_id' "${QQ_DIR}/qq_${qq}.json" 2>/dev/null || true)"
     while IFS='|' read -r id label port; do
         [ -z "$id" ] && continue
         state=off; echo "$old" | grep -qxF "$id" && state=on
@@ -159,6 +159,22 @@ nt_links_from_checklist() {
             '$a + [{framework_id:$id,enabled:true,port:$port,token:$token}]')"
     done < <(nt_parse_checklist "$raw")
     printf '%s' "$links"
+}
+
+nt_sync_onebot_cli() {
+    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json"
+    [[ -n "$qq" ]] || { echo "用法: nt --sync-onebot <QQ>"; return 1; }
+    [ -f "$qf" ] || { echo "无 $qf"; return 1; }
+    if nt_napcat_running; then
+        echo "[nt] QQ 正在运行，请先 killall qq 再同步 onebot"
+        return 1
+    fi
+    napcat_prepare_runtime "$qq" "$qf" || {
+        echo "[nt ERROR] ${NAPCAT_LAST_ERR:-同步失败}"
+        return 1
+    }
+    echo "[nt] onebot 已同步:"
+    napcat_onebot_banner_lines "$qq" | sed 's/^/  /'
 }
 
 nt_tune_link_ports() {
@@ -396,20 +412,24 @@ nt_show_status() {
 }
 
 nt_start_qq() {
-    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" url line
+    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" url line bind planned
     [[ -n "$qq" ]] || { nt_err "QQ 号为空，请重新配置"; return 1; }
     [ -f "$qf" ] || { nt_err "无配置 $qf"; return 1; }
+    bind="$(napcat_format_connection_lines "$qf" | tr '\n' ';')"
     napcat_prepare_runtime "$qq" "$qf" || {
-        nt_err "启动前同步失败\n${NAPCAT_LAST_ERR:-未知错误}\n\n请先 killall qq 后重试，或用 nt → 修改 QQ 重新保存绑定"
+        nt_log "START FAIL qq=$qq bind=${bind:-?} err=${NAPCAT_LAST_ERR:-?}"
+        nt_err "启动前同步失败\n${NAPCAT_LAST_ERR:-未知错误}\n\n绑定: ${bind:-（无）}\n\n请先 killall qq，或 nt --sync-onebot $qq"
         return 1
     }
+    planned="$(napcat_onebot_banner_lines "$qq" | tr '\n' ';')"
+    nt_log "START qq=$qq bind=${bind:-?} onebot=${planned:-?}"
     clear; killall dialog 2>/dev/null
     echo "┌─ NapCat 启动 ─────────────────"
     echo "│ QQ: $qq"
     while IFS= read -r line; do
         [ -z "$line" ] && continue
         echo "│ → $line"
-    done < <(napcat_format_connection_lines "$qf")
+    done < <(napcat_onebot_banner_lines "$qq")
     if url="$(napcat_webui_url 2>/dev/null)"; then
         echo "│ WebUI（全局）: $url"
     else
@@ -494,9 +514,15 @@ main() {
         -h|--help)
             echo "  nt              管理菜单"
             echo "  nt <QQ>         启动已配置账号"
+            echo "  nt --sync-onebot <QQ>  仅同步 onebot11（需先停 QQ）"
             echo "  nt --webui-apply  将 napcat_prefs 合并写入 webui.json（需先停 NapCat）"
+            echo "  更新脚本后请执行: source /xrk/shell_modules/update.sh && xrk_bin同步"
             echo "  日志: ${NT_LOG}"
             exit 0 ;;
+        --sync-onebot)
+            [ -n "${2:-}" ] || { echo "用法: nt --sync-onebot <QQ>"; exit 1; }
+            nt_sync_onebot_cli "$2"
+            exit $? ;;
         --webui-apply) nt_webui_apply_cli; exit $? ;;
     esac
     if [ -n "${1:-}" ]; then
