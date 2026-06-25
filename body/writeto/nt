@@ -33,6 +33,9 @@ nt_dialog_capture() {
     __out="$(cat "$tmp")"
     rm -f "$tmp"
     printf -v "$__var" '%s' "$__out"
+    if [ "$__st" -eq 1 ] || [ "$__st" -eq 255 ]; then
+        clear 2>/dev/null || tput clear 2>/dev/null || true
+    fi
     return "$__st"
 }
 
@@ -183,7 +186,7 @@ nt_save_qq() {
 }
 
 nt_qq_wizard() {
-    local __ret=$1 title="$2" old_qq="${3:-}" cf values qq ob checklist links
+    local __ret=$1 title="$2" old_qq="${3:-}" cf values wqq ob checklist links
     cf="${QQ_DIR}/qq_${old_qq}.json"
     [ -n "$old_qq" ] && [ -f "$cf" ] || cf=""
 
@@ -192,14 +195,14 @@ nt_qq_wizard() {
         "QQ 账号:" 1 1 "${old_qq:-}" 1 12 36 0 \
         "全局Token:" 2 1 "$([ -f "$cf" ] && jq -r '.ob_token' "$cf" || echo '')" 2 12 36 0 \
         || return 1
-    nt_parse_form "$values" 2 qq ob || { nt_err "QQ 表单解析失败\n${NAPCAT_LAST_ERR:-}" 10; return 1; }
-    qq="$(nt_field_trim "$qq")"
-    [[ -z "$qq" ]] && { nt_err "QQ 账号不能为空"; return 1; }
-    nt_log "QQ wizard: qq=$qq token_len=${#ob}"
+    nt_parse_form "$values" 2 wqq ob || { nt_err "QQ 表单解析失败\n${NAPCAT_LAST_ERR:-}" 10; return 1; }
+    wqq="$(nt_field_trim "$wqq")"
+    [[ -z "$wqq" ]] && { nt_err "QQ 账号不能为空"; return 1; }
+    nt_log "QQ wizard: qq=$wqq token_len=${#ob}"
 
-    nt_pick_frameworks checklist "$qq" || return 1
+    nt_pick_frameworks checklist "$wqq" || return 1
     nt_log "QQ wizard checklist raw: $(printf '%s' "$checklist" | tr '\n' '|')"
-    links="$(nt_links_from_checklist "$qq" "$checklist")"
+    links="$(nt_links_from_checklist "$wqq" "$checklist")"
     nt_log "QQ wizard links: $links"
     [ "$(echo "$links" | jq 'length')" -eq 0 ] && { nt_msg "请至少选择一个框架"; return 1; }
 
@@ -207,8 +210,10 @@ nt_qq_wizard() {
         links="$(nt_tune_link_ports "$links")" || return 1
     fi
 
-    nt_save_qq "$qq" "$links" "$ob" "$old_qq"
-    printf -v "$__ret" '%s' "$qq"
+    nt_save_qq "$wqq" "$links" "$ob" "$old_qq"
+    nt_log "QQ wizard saved: ${QQ_DIR}/qq_${wqq}.json"
+    # 勿 local 与 __ret 同名的变量，否则 printf -v 写不到调用方
+    printf -v "$__ret" '%s' "$wqq"
 }
 
 nt_show_framework_menu() {
@@ -389,7 +394,8 @@ nt_show_status() {
 
 nt_start_qq() {
     local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" cfg url
-    [ -f "$qf" ] || { echo "无配置 $qf"; exit 1; }
+    [[ -n "$qq" ]] || { nt_err "QQ 号为空，请重新配置"; return 1; }
+    [ -f "$qf" ] || { nt_err "无配置 $qf"; return 1; }
     napcat_prepare_runtime "$qq" "$qf"
     cfg="$(jq -c . "$qf")"
     clear; killall dialog 2>/dev/null
@@ -431,12 +437,13 @@ nt_main_menu() {
         st=$?
         case "$st" in
             0) ;;
-            1|255) exit 0 ;;
+            1|255) clear 2>/dev/null || true; exit 0 ;;
             *) echo "[nt] dialog 失败 (exit=$st TERM=${TERM:-?})" >&2; exit 1 ;;
         esac
         case "$sel" in
             add)
                 nt_qq_wizard qq "新增 QQ" || continue
+                [ -n "$qq" ] || continue
                 nt_yesno "立即启动 $qq？" 6 32 && nt_start_qq "$qq"
                 ;;
             edit) nt_edit_qq ;;
@@ -497,6 +504,7 @@ main() {
     if [ -n "${1:-}" ]; then
         [ -f "${QQ_DIR}/qq_${1}.json" ] || { echo "无 qq_${1}.json，请先运行 nt 配置"; exit 1; }
         nt_start_qq "$1"
+        exit $?
     else
         nt_main_menu
     fi
