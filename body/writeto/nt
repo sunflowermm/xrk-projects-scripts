@@ -19,8 +19,9 @@ nt_deps() {
 }
 
 nt_capture() {
-    local out st
-    out=$(dialog --backtitle "$NT_BACK" "$@" 2>/dev/tty)
+    local out st cmd="$1"
+    shift
+    out=$("$cmd" --backtitle "$NT_BACK" "$@" 2>/dev/tty)
     st=$?
     printf '%s' "$out"
     return $st
