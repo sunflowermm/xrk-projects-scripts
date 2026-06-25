@@ -19,10 +19,11 @@ nt_deps() {
 }
 
 nt_capture() {
-    exec 3>&1
-    local out; out=$(dialog --backtitle "$NT_BACK" "$@" 2>&1 1>&3)
-    local st=$?; exec 3>&-
-    printf '%s' "$out"; return $st
+    local out st
+    out=$(dialog --backtitle "$NT_BACK" "$@" 2>/dev/tty)
+    st=$?
+    printf '%s' "$out"
+    return $st
 }
 
 nt_yes() { case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in y|yes|1|true|是) return 0 ;; *) return 1 ;; esac; }
@@ -270,7 +271,7 @@ nt_start_qq() {
 
 # ── 主菜单 ───────────────────────────────────────
 nt_main_menu() {
-    local sel
+    local sel st
     while true; do
         sel="$(nt_capture dialog --clear --title "主菜单" --menu \
             "多 QQ · 多框架 · 安全加固" 18 58 10 \
@@ -281,7 +282,12 @@ nt_main_menu() {
             "webui"  "WebUI（地址/端口/Token）" \
             "status" "查看当前配置" \
             "audit"  "安全审计" \
-            "quit"   "退出")" || exit 0
+            "quit"   "退出")"
+        st=$?
+        [ "$st" -eq 0 ] || { [ "$st" -eq 1 ] && exit 0
+            echo "[nt] dialog 无法启动 (exit=$st TERM=${TERM:-未设置})" >&2
+            exit 1
+        }
         clear
         case "$sel" in
             add)
