@@ -206,19 +206,6 @@ napcat_count_enabled_links() {
     printf '%s' "$n"
 }
 
-napcat_ws_client_display_name() {
-    case "$1" in
-        ws-xrk-agt|xrk-agt) printf 'XRK-AGT' ;;
-        ws-xrk-yunzai|xrk-yunzai) printf 'XRK-Yunzai' ;;
-        ws-*)
-            local n="${1#ws-}"
-            n="$(printf '%s' "$n" | sed 's/-/ /g')"
-            printf '%s' "$n"
-            ;;
-        *) printf '%s' "$1" ;;
-    esac
-}
-
 # 由 qq links[] 解析连接端点（与 write_onebot 同一套规则）
 napcat_resolve_link_endpoint() {
     local link="$1" fw="${2:-}" id label ws_host port ws_path root
@@ -240,7 +227,7 @@ napcat_resolve_link_endpoint() {
 }
 
 napcat_links_expected_urls() {
-    local links_json="$1" link urls='[]' row label url
+    local links_json="$1" link urls='[]' row url
     while IFS= read -r link; do
         [ -z "$link" ] && continue
         napcat_link_enabled "$link" || continue
@@ -288,19 +275,6 @@ napcat_format_connection_lines() {
         url="${url//$'\n'/}"
         printf '%s  %s\n' "$label" "$url"
     done < <(echo "$links" | jq -c '.[]')
-}
-
-# 启动横幅：以已写入的 onebot11 为准（与 NapCat 实际加载一致）
-napcat_onebot_banner_lines() {
-    local qq_num="$1" f name url
-    f="$(napcat_onebot_file "$qq_num")"
-    [ -f "$f" ] || return 1
-    while IFS= read -r name; do
-        [ -z "$name" ] && continue
-        url="$(jq -r --arg n "$name" '.network.websocketClients[]?|select(.name==$n and .enable==true)|.url' "$f" 2>/dev/null)"
-        [ -n "$url" ] && [ "$url" != "null" ] || continue
-        printf '%s  %s\n' "$(napcat_ws_client_display_name "$name")" "$url"
-    done < <(jq -r '.network.websocketClients[]?|select(.enable==true)|.name' "$f" 2>/dev/null)
 }
 
 napcat_onebot_effective_summary() {
@@ -550,7 +524,7 @@ napcat_prepare_runtime() {
         NAPCAT_LAST_ERR="写入 napcat_${qq_num}.json 失败"
         return 1
     }
-    napcat_verify_onebot_config "$qq_num" "$links" "$global_token" || return 1
+    napcat_verify_onebot_config "$qq_num" "$links" || return 1
 
     [ "$webui_warn" -eq 1 ] && echo "[nt] WebUI 未写入（OneBot 已按 QQ 绑定同步）"
     return 0
@@ -594,6 +568,5 @@ napcat_status_text() {
     done
     shopt -u nullglob
     [ "$found" -eq 0 ] && text+="  （无）\n"
-    text+="\n  框架 default_port 仅作默认值；生效以 QQ 绑定 + onebot11 为准\n"
     printf '%b' "$text"
 }

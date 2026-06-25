@@ -14,11 +14,6 @@ source "${root}/shell_modules/napcat_security.sh"
 
 QQ_DIR="$root/body"
 NT_BACK=" XRK · NapCat 管理 "
-NT_LOG="${NT_LOG:-/tmp/nt.log}"
-
-nt_log() {
-    printf '[%s] %s\n' "$(date '+%F %T')" "$1" >> "$NT_LOG"
-}
 
 nt_deps() {
     for p in jq dialog xvfb-run; do
@@ -93,13 +88,11 @@ nt_yes() {
 }
 
 nt_msg() {
-    nt_log "INFO: $1"
     dialog --backtitle "$NT_BACK" --title "提示" --msgbox "$1" "${2:-8}" "${3:-52}" 2>/dev/null \
         || echo "[nt] $1" >&2
 }
 
 nt_err() {
-    nt_log "ERROR: $1"
     echo "[nt ERROR] $1" >&2
     dialog --backtitle "$NT_BACK" --title "错误" --msgbox "$1" "${2:-10}" "${3:-58}" 2>/dev/null \
         || echo "[nt ERROR] $1" >&2
@@ -180,7 +173,7 @@ nt_sync_onebot_cli() {
         return 1
     }
     echo "[nt] onebot 已同步:"
-    napcat_onebot_banner_lines "$qq" | sed 's/^/  /'
+    napcat_format_connection_lines "$qf" | sed 's/^/  /'
 }
 
 nt_tune_link_ports() {
@@ -318,16 +311,16 @@ nt_show_webui_menu() {
     local prefs values h p t r dp show_token st new_prefs wf eff
 
     if nt_napcat_running; then
-        nt_err "NapCat/QQ 正在运行\n\n运行中 WebUI 会按内存配置写回 webui.json\n请先 killall qq 或退出 NapCat 再改\n\n日志: $NT_LOG" 12
+        nt_err "NapCat/QQ 正在运行\n\n运行中 WebUI 会按内存配置写回 webui.json\n请先 killall qq 或退出 NapCat 再改" 12
         return 1
     fi
 
     prefs="$(napcat_load_prefs)" || true
     if [ -n "${NAPCAT_LAST_ERR:-}" ]; then
-        nt_err "加载配置时出现问题（已用默认值继续）\n${NAPCAT_LAST_ERR}\n\n日志: $NT_LOG" 10
+        nt_err "加载配置时出现问题（已用默认值继续）\n${NAPCAT_LAST_ERR}" 10
         NAPCAT_LAST_ERR=""
     fi
-    [ -z "$prefs" ] && { nt_err "无法加载 napcat_prefs.json\n日志: $NT_LOG"; return 1; }
+    [ -z "$prefs" ] && { nt_err "无法加载 napcat_prefs.json"; return 1; }
 
     eff="$(napcat_webui_effective)"
     show_token="$(echo "$eff" | jq -r '.token // ""')"
@@ -344,19 +337,19 @@ nt_show_webui_menu() {
     case $st in
         0) ;;
         1) return 0 ;;
-        *) nt_err "对话框打开失败 (exit=$st)\n${values:-请检查 Token 是否含特殊字符}\n日志: $NT_LOG" 10; return 1 ;;
+        *) nt_err "对话框打开失败 (exit=$st)\n${values:-请检查 Token 是否含特殊字符}" 10; return 1 ;;
     esac
 
     if [ -z "$(printf '%s' "$values" | tr -d '[:space:]')" ]; then
-        nt_err "未读到表单输入（dialog 返回值丢失）\n请升级 dialog 或查看 $NT_LOG" 10
+        nt_err "未读到表单输入（dialog 返回值丢失）" 10
         return 1
     fi
 
     nt_parse_form "$values" 5 h p t r dp || {
-        nt_err "WebUI 表单解析失败\n${NAPCAT_LAST_ERR:-}\n日志: $NT_LOG" 12
+        nt_err "WebUI 表单解析失败\n${NAPCAT_LAST_ERR:-}" 12
         return 1
     }
-    [[ -n "$h" ]] || { nt_err "监听地址为空\n日志: $NT_LOG" 12; return 1; }
+    [[ -n "$h" ]] || { nt_err "监听地址为空"; return 1; }
     [[ -z "$t" ]] && t="$(echo "$eff" | jq -r '.token // ""')"
     p="$(nt_field_trim "$p")"; r="$(nt_field_trim "$r")"
     [[ -z "$p" ]] && p=6099
@@ -368,16 +361,16 @@ nt_show_webui_menu() {
         --arg h "$h" --argjson p "$p" --arg t "$t" --argjson r "$r" \
         --argjson dp "$(nt_yes "$dp" && echo true || echo false)" \
         '.webui_host=$h|.webui_port=$p|.webui_token=$t|.login_rate=$r|.disable_pty=$dp' 2>&1)"; then
-        nt_err "合并配置失败\n${new_prefs}\n日志: $NT_LOG" 12
+        nt_err "合并配置失败\n${new_prefs}" 12
         return 1
     fi
     napcat_save_prefs "$new_prefs" || {
-        nt_err "保存 napcat_prefs 失败\n${NAPCAT_LAST_ERR:-$(napcat_prefs_path)}\n日志: $NT_LOG" 12
+        nt_err "保存 napcat_prefs 失败\n${NAPCAT_LAST_ERR:-$(napcat_prefs_path)}" 12
         return 1
     }
     napcat_apply_webui || {
         wf="$(napcat_webui_file)"
-        nt_err "写入 webui.json 失败\n${NAPCAT_LAST_ERR:-}\n\n目标: $wf\n日志: $NT_LOG" 14
+        nt_err "写入 webui.json 失败\n${NAPCAT_LAST_ERR:-}\n\n目标: $wf" 14
         return 1
     }
     wf="$(napcat_webui_file)"
@@ -386,27 +379,22 @@ nt_show_webui_menu() {
     eff="$(napcat_webui_effective)"
     dp_saved="$(echo "$new_prefs" | jq -r 'if .disable_pty then "yes" else "no" end')"
     if url="$(napcat_webui_url 2>/dev/null)"; then
-        nt_msg "已保存\n\nhost=$(echo "$eff"|jq -r .host)\nport=$(echo "$eff"|jq -r .port)\nloginRate=$(echo "$eff"|jq -r .loginRate)\ntoken=$(echo "$eff"|jq -r .token)\ndisable_pty=$dp_saved\n\n$url\n日志: $NT_LOG" 14
+        nt_msg "已保存\n\nhost=$(echo "$eff"|jq -r .host)\nport=$(echo "$eff"|jq -r .port)\nloginRate=$(echo "$eff"|jq -r .loginRate)\ntoken=$(echo "$eff"|jq -r .token)\ndisable_pty=$dp_saved\n\n$url" 14
     else
-        nt_msg "WebUI 已关闭（port=0）\ndisable_pty=$dp_saved\n$wf\n日志: $NT_LOG" 10
+        nt_msg "WebUI 已关闭（port=0）\ndisable_pty=$dp_saved\n$wf" 10
     fi
 }
 
 nt_webui_apply_cli() {
-    local prefs wf
     if nt_napcat_running; then
         echo "[nt] NapCat/QQ 正在运行，请先 stop 再改 WebUI" >&2
         return 1
     fi
-    prefs="$(napcat_load_prefs)" || true
-    [ -z "$prefs" ] && { echo "[nt] 无法加载 napcat_prefs" >&2; return 1; }
     napcat_apply_webui || {
         echo "[nt] ${NAPCAT_LAST_ERR:-apply failed}" >&2
         return 1
     }
-    wf="$(napcat_webui_file)"
-    echo "[nt] OK merged -> $wf"
-    jq -c '{host,port,token,loginRate,disableWebUI,hasTheme:(.theme!=null)}' "$wf"
+    echo "[nt] webui 已写入: $(napcat_webui_file)"
 }
 
 nt_show_status() {
@@ -418,25 +406,21 @@ nt_show_status() {
 }
 
 nt_start_qq() {
-    local qq="$1" qf url line bind planned
+    local qq="$1" qf url line
     qf="${QQ_DIR}/qq_${qq}.json"
     [[ -n "$qq" ]] || { nt_err "QQ 号为空，请重新配置"; return 1; }
     [ -f "$qf" ] || { nt_err "无配置 $qf"; return 1; }
-    bind="$(napcat_format_connection_lines "$qf" | tr '\n' ';')"
     napcat_prepare_runtime "$qq" "$qf" || {
-        nt_log "START FAIL qq=$qq bind=${bind:-?} err=${NAPCAT_LAST_ERR:-?}"
-        nt_err "启动前同步失败\n${NAPCAT_LAST_ERR:-未知错误}\n\n绑定: ${bind:-（无）}\n\n请先 killall qq，或 nt --sync-onebot $qq"
+        nt_err "启动前同步失败\n${NAPCAT_LAST_ERR:-未知错误}\n\n请先 killall qq，或 nt --sync-onebot $qq"
         return 1
     }
-    planned="$(napcat_onebot_banner_lines "$qq" | tr '\n' ';')"
-    nt_log "START qq=$qq bind=${bind:-?} onebot=${planned:-?}"
     clear; killall dialog 2>/dev/null
     echo "┌─ NapCat 启动 ─────────────────"
     echo "│ QQ: $qq"
     while IFS= read -r line; do
         [ -z "$line" ] && continue
         echo "│ → $line"
-    done < <(napcat_onebot_banner_lines "$qq")
+    done < <(napcat_format_connection_lines "$qf")
     if url="$(napcat_webui_url 2>/dev/null)"; then
         echo "│ WebUI（全局）: $url"
     else
@@ -482,9 +466,9 @@ nt_main_menu() {
 }
 
 nt_edit_qq() {
-    local items=() qq sel
-    for qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
-        items+=("$qq" "$(napcat_qq_links_summary "${QQ_DIR}/qq_${qq}.json")")
+    local items=() _qq sel
+    for _qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
+        items+=("$_qq" "$(napcat_qq_links_summary "${QQ_DIR}/qq_${_qq}.json")")
     done
     [ ${#items[@]} -eq 0 ] && { nt_msg "暂无 QQ 配置"; return; }
 
@@ -507,8 +491,8 @@ nt_edit_qq() {
 
 nt_pick_start() {
     local items=() sel
-    for qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
-        items+=("$qq" "启动")
+    for _qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
+        items+=("$_qq" "启动")
     done
     [ ${#items[@]} -eq 0 ] && { nt_msg "暂无 QQ"; return; }
     nt_dialog_run sel --title "启动" --menu "选择 QQ" 12 40 8 "${items[@]}" || return
@@ -523,7 +507,6 @@ main() {
             echo "  nt <QQ>         启动已配置账号"
             echo "  nt --sync-onebot <QQ>  仅同步 onebot11（需先停 QQ）"
             echo "  nt --webui-apply  将 napcat_prefs 合并写入 webui.json（需先停 NapCat）"
-            echo "  日志: ${NT_LOG}"
             exit 0 ;;
         --sync-onebot)
             [ -n "${2:-}" ] || { echo "用法: nt --sync-onebot <QQ>"; exit 1; }
