@@ -1,351 +1,354 @@
 #!/bin/bash
-# NapCat QQ 多开启动器（可复制到 /usr/local/bin/nt）
+# NapCat 管理：多 QQ · 多框架 · WebUI
 root="${XRK_ROOT:-/xrk}"
 # shellcheck source=/dev/null
 source "${root}/shell_modules/xrk_base.sh"
 xrk_加载底层 install
+# shellcheck source=/dev/null
+source "${root}/shell_modules/napcat_security.sh"
 
-BASE_DIR="$root/body"
-CONFIG_DIR="/opt/QQ/resources/app/app_launcher/napcat/config"
+QQ_DIR="$root/body"
+NT_BACK=" XRK · NapCat 管理 "
 
-check_dependencies() {
-    for pkg in jq dialog xvfb-run; do
-        if ! command -v "$pkg" &>/dev/null; then
-            if type install_pkg &>/dev/null; then
-                install_pkg "$pkg" || { echo "安装 $pkg 失败"; exit 1; }
-            else
-                echo "缺少 $pkg，请安装后再运行"; exit 1
-            fi
-        fi
+nt_deps() {
+    for p in jq dialog xvfb-run; do
+        command -v "$p" &>/dev/null || {
+            type install_pkg &>/dev/null && install_pkg "$p" || { echo "缺少 $p"; exit 1; }
+        }
     done
 }
 
-# 启动QQ并完全退出dialog
-start_qq() {
-    local qq_num="$1"
-    local config_file="${BASE_DIR}/qq_${qq_num}.json"
-    
-    if [[ -f "$config_file" ]]; then
-        local port=$(jq -r '.port // 2537' "$config_file")
-        
-        # 生成napcat配置文件
-        local napcat_config_file="${CONFIG_DIR}/napcat_${qq_num}.json"
-        cat << EOF > "$napcat_config_file"
-{
-    "fileLog": false,
-    "consoleLog": true,
-    "fileLogLevel": "debug",
-    "consoleLogLevel": "info",
-    "packetBackend": "auto",
-    "packetServer": ""
-}
-EOF
-        
-        # 生成onebot配置文件
-        local onebot_config_file="${CONFIG_DIR}/onebot11_${qq_num}.json"
-        local reverse_ws_url="ws://127.0.0.1:${port}/OneBotv11"
-        cat << EOF > "$onebot_config_file"
-{
-  "network": {
-    "httpServers": [
-      {
-        "name": "http-server",
-        "enable": false,
-        "port": 3000,
-        "host": "",
-        "enableCors": true,
-        "enableWebsocket": true,
-        "messagePostFormat": "array",
-        "token": "",
-        "debug": false
-      }
-    ],
-    "httpClients": [],
-    "websocketServers": [
-      {
-        "name": "websocket-server",
-        "enable": false,
-        "host": "",
-        "port": 3001,
-        "messagePostFormat": "array",
-        "reportSelfMessage": true,
-        "token": "",
-        "enableForcePushEvent": true,
-        "debug": false,
-        "heartInterval": 30000
-      }
-    ],
-    "websocketClients": [
-      {
-        "name": "websocket-client",
-        "enable": true,
-        "url": "${reverse_ws_url}",
-        "messagePostFormat": "array",
-        "reportSelfMessage": true,
-        "reconnectInterval": 5000,
-        "token": "",
-        "debug": false,
-        "heartInterval": 30000
-      }
-    ]
-  },
-  "musicSignUrl": "",
-  "enableLocalFile2Url": true
-}
-EOF
-        
-        # 清除所有dialog显示并关闭所有dialog进程
-        clear
-        killall dialog 2>/dev/null
-
-        # 启动QQ
-        echo "正在启动QQ: $qq_num (端口: $port)..."
-        xvfb-run -a qq --no-sandbox -q "$qq_num"
-        
-        exit 0
-    else
-        echo "错误：找不到QQ($qq_num)的配置文件"
-        exit 1
-    fi
-}
-
-# 添加或更新QQ配置
-add_update_qq() {
-    local qq_num="$1"
-    local port="$2"
-    local config_file="${BASE_DIR}/qq_${qq_num}.json"
-    
-    echo '{"qq": "'$qq_num'", "port": '$port'}' > "$config_file"
-    echo "已将QQ号 $qq_num (端口: $port) 的配置写入到 $config_file"
-}
-
-# 获取已配置的QQ列表
-get_qq_list() {
-    find "$BASE_DIR" -name "qq_*.json" -exec basename {} \; | sed 's/qq_//g' | sed 's/\.json//g'
-}
-
-# 显示主菜单
-show_main_menu() {
-    local qq_list=$(get_qq_list)
-    local menu_items=()
-    
-    if [ -n "$qq_list" ]; then
-        echo "已配置的QQ账号:"
-        for qq in $qq_list; do
-            echo "$qq"
-            menu_items+=("$qq" "启动QQ $qq")
-        done
-    else
-        echo "未找到已配置的QQ账号"
-    fi
-    
+nt_capture() {
     exec 3>&1
-    selection=$(dialog --clear --backtitle "QQ多开启动器" \
-                      --title "主菜单" \
-                      --menu "请选择操作:" 15 60 8 \
-                      "新增账号" "添加新的QQ账号配置" \
-                      "修改配置" "修改现有QQ账号配置" \
-                      "启动账号" "启动已配置的QQ账号" \
-                      "退出" "退出程序" \
-                      2>&1 1>&3)
-    exit_status=$?
-    exec 3>&-
-    
-    clear
-    if [ $exit_status -eq 0 ]; then
-        case "$selection" in
-            "新增账号") show_add_qq_menu ;;
-            "修改配置") show_modify_qq_menu ;;
-            "启动账号") show_start_qq_menu ;;
-            "退出") echo "感谢使用QQ多开启动器，再见！"; exit 0 ;;
+    local out; out=$(dialog --backtitle "$NT_BACK" "$@" 2>&1 1>&3)
+    local st=$?; exec 3>&-
+    printf '%s' "$out"; return $st
+}
+
+nt_yes() { case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in y|yes|1|true|是) return 0 ;; *) return 1 ;; esac; }
+
+nt_msg() { nt_capture dialog --title "提示" --msgbox "$1" "${2:-8}" "${3:-52}"; }
+
+# ── 框架 ─────────────────────────────────────────
+nt_framework_items() {
+    napcat_load_prefs | jq -r '.frameworks[]? | "\(.id)|\(.label)|\(.default_port)"'
+}
+
+nt_pick_frameworks() {
+    local qq="$1" items=() id label port state old
+    old="$(napcat_load_qq_config "${QQ_DIR}/qq_${qq}.json" 2>/dev/null \
+        | jq -r '.links[]?|select(.enabled)|.framework_id' 2>/dev/null || true)"
+    while IFS='|' read -r id label port; do
+        [ -z "$id" ] && continue
+        state=off; echo "$old" | grep -qxF "$id" && state=on
+        items+=("$id" "$label · :$port" "$state")
+    done < <(nt_framework_items)
+    [ ${#items[@]} -eq 0 ] && { nt_msg "请先在「框架管理」扫描或添加框架" 7; return 1; }
+    nt_capture dialog --title "连接框架" --checklist \
+        "空格切换 · 同一 QQ 可同时连接多个框架" 16 68 8 "${items[@]}"
+}
+
+nt_links_from_checklist() {
+    local qq="$1" checklist="$2" old links='[]' id checked fw port
+    old="$(napcat_load_qq_config "${QQ_DIR}/qq_${qq}.json" 2>/dev/null | jq -c '.links // []')"
+    while read -r id checked; do
+        [ -z "$id" ] || [ "$checked" != "on" ] && continue
+        fw="$(napcat_get_framework "$id")"; [ -z "$fw" ] && continue
+        port="$(echo "$old" | jq -r --arg id "$id" '.[]|select(.framework_id==$id)|.port//empty' | head -n1)"
+        [ -z "$port" ] && port="$(echo "$fw" | jq -r '.default_port')"
+        token="$(echo "$old" | jq -r --arg id "$id" '.[]|select(.framework_id==$id)|.token//""' | head -n1)"
+        links="$(jq -n --argjson a "$links" --arg id "$id" --argjson port "$port" --arg token "$token" \
+            '$a + [{framework_id:$id,enabled:true,port:$port,token:$token}]')"
+    done <<< "$checklist"
+    printf '%s' "$links"
+}
+
+nt_tune_link_ports() {
+    local links="$1" out='[]' link id fw label port new_port
+    while IFS= read -r link; do
+        [ -z "$link" ] && continue
+        id="$(echo "$link" | jq -r '.framework_id')"
+        fw="$(napcat_get_framework "$id")"
+        label="$(echo "$fw" | jq -r '.label // .id')"
+        port="$(echo "$link" | jq -r '.port')"
+        new_port="$(nt_capture dialog --inputbox "$label 监听端口" 8 50 "$port")" || return 1
+        [[ -z "$new_port" ]] && new_port="$port"
+        link="$(echo "$link" | jq --argjson port "$new_port" '.port=$port')"
+        out="$(jq -n --argjson a "$out" --argjson l "$link" '$a + [$l]')"
+    done < <(echo "$links" | jq -c '.[]')
+    printf '%s' "$out"
+}
+
+nt_save_qq() {
+    local qq="$1" links="$2" ob_token="${3:-}" old_qq="${4:-}"
+    jq -n --arg qq "$qq" --arg ob "$ob_token" --argjson links "$links" \
+        '{qq:$qq,ob_token:$ob,links:$links,console_log:true,file_log:false}' \
+        > "${QQ_DIR}/qq_${qq}.json"
+    [ -n "$old_qq" ] && [ "$old_qq" != "$qq" ] && rm -f "${QQ_DIR}/qq_${old_qq}.json"
+}
+
+nt_qq_wizard() {
+    local title="$1" old_qq="${2:-}" cf values qq ob checklist links
+    cf="${QQ_DIR}/qq_${old_qq}.json"
+    [ -n "$old_qq" ] && [ -f "$cf" ] || cf=""
+
+    values="$(nt_capture dialog --title "$title" --form "全局 Token 留空则各框架用各自 api_key" 11 58 2 \
+        "QQ 账号:" 1 1 "${old_qq:-}" 1 12 36 0 \
+        "全局Token:" 2 1 "$([ -f "$cf" ] && jq -r '.ob_token' "$cf" || echo '')" 2 12 36 0)" \
+        || return 1
+    qq=$(echo "$values" | sed -n1p | tr -d '[:space:]')
+    ob=$(echo "$values" | sed -n2p)
+    [[ -z "$qq" ]] && return 1
+
+    checklist="$(nt_pick_frameworks "$qq")" || return 1
+    links="$(nt_links_from_checklist "$qq" "$checklist")"
+    [ "$(echo "$links" | jq 'length')" -eq 0 ] && { nt_msg "请至少选择一个框架"; return 1; }
+
+    if nt_capture dialog --yesno "为每个框架确认端口？" 7 40; then
+        links="$(nt_tune_link_ports "$links")" || return 1
+    fi
+
+    nt_save_qq "$qq" "$links" "$ob" "$old_qq"
+    printf '%s' "$qq"
+}
+
+nt_show_framework_menu() {
+    napcat_refresh_frameworks >/dev/null
+    local items=() sel id label port
+    while IFS='|' read -r id label port; do
+        [ -z "$id" ] && continue
+        items+=("$id" "$label :$port")
+    done < <(nt_framework_items)
+
+    if [ ${#items[@]} -eq 0 ]; then
+        sel="$(nt_capture dialog --title "框架" --menu "未扫描到框架" 10 50 3 \
+            "scan" "扫描磁盘" "add" "手动添加" "back" "返回")" || return
+        case "$sel" in scan) napcat_refresh_frameworks; nt_msg "扫描完成" 5 ;; add) nt_add_framework ;; esac
+        nt_show_framework_menu; return
+    fi
+
+    sel="$(nt_capture dialog --title "框架管理" --menu "已注册框架" 16 64 10 \
+        "scan" "重新扫描" "add" "添加目录" "port" "改默认端口" "del" "移除框架" "back" "返回主菜单" \
+        "${items[@]}")" || return
+
+    case "$sel" in
+        scan) napcat_refresh_frameworks; nt_msg "扫描完成" 5; nt_show_framework_menu ;;
+        add) nt_add_framework ;;
+        port) nt_edit_framework_port ;;
+        del) nt_del_framework ;;
+        back) return ;;
+        *)
+            nt_msg "$(napcat_get_framework "$sel" | jq -r \
+                '"名称: \(.label)\n目录: \(.root)\n端口: \(.default_port)\n密钥: \(.root)/config/server_config/api_key.json")' 10 60)
+            nt_show_framework_menu ;;
+    esac
+}
+
+nt_add_framework() {
+    local path port label id prefs fw
+    path="$(nt_capture dialog --inputbox "框架根目录" 10 58 "$HOME")" || return
+    [ -d "$path" ] || return
+    port="$(nt_capture dialog --inputbox "默认端口" 8 42 "$(napcat_guess_framework_port "$path")")" || return
+    label="$(napcat_framework_label "$path")"
+    id="$(napcat_framework_id_from_root "$path")"
+    fw="$(jq -n --arg id "$id" --arg label "$label" --arg root "$path" --argjson port "$port" \
+        '{id:$id,label:$label,root:$root,default_port:$port,ws_host:"127.0.0.1",ws_path:"OneBotv11"}')"
+    prefs="$(napcat_load_prefs)"
+    napcat_save_prefs "$(echo "$prefs" | jq --argjson fw "$fw" \
+        '.frameworks = ([.frameworks[]|select(.root!=$fw.root)] + [$fw])')"
+    nt_msg "已添加 $label" 6
+    nt_show_framework_menu
+}
+
+nt_edit_framework_port() {
+    local items=() id sel port prefs
+    while IFS='|' read -r id label p; do items+=("$id" "$label"); done < <(nt_framework_items)
+    id="$(nt_capture dialog --title "改端口" --menu "选择框架" 12 50 6 "${items[@]}")" || return
+    port="$(nt_capture dialog --inputbox "新默认端口" 8 42 \
+        "$(napcat_get_framework "$id" | jq -r '.default_port')")" || return
+    prefs="$(napcat_load_prefs)"
+    napcat_save_prefs "$(echo "$prefs" | jq --arg id "$id" --argjson port "$port" \
+        '.frameworks = [.frameworks[]|if .id==$id then .default_port=$port else . end]')"
+    nt_show_framework_menu
+}
+
+nt_del_framework() {
+    local items=() id sel prefs
+    while IFS='|' read -r id label _; do items+=("$id" "$label"); done < <(nt_framework_items)
+    id="$(nt_capture dialog --title "移除" --menu "选择框架" 12 50 6 "${items[@]}")" || return
+    nt_capture dialog --yesno "确认移除？" 6 30 || return
+    prefs="$(napcat_load_prefs)"
+    napcat_save_prefs "$(echo "$prefs" | jq --arg id "$id" '.frameworks = [.frameworks[]|select(.id!=$id)]')"
+    nt_show_framework_menu
+}
+
+# ── WebUI ─────────────────────────────────────────
+nt_show_webui_menu() {
+    local prefs webui values h p t r dp show_token
+    prefs="$(napcat_load_prefs)"
+    webui="$(napcat_read_webui_file)"
+    show_token="$(echo "$prefs" | jq -r '.webui_token // ""')"
+    [ -z "$show_token" ] && show_token="$(echo "$webui" | jq -r '.token // ""')"
+
+    values="$(nt_capture dialog --title "WebUI" --form \
+        "端口 0=关闭 · Token 留空则由 NapCat 启动时生成" 18 68 5 \
+        "监听地址:" 1 1 "$(echo "$prefs" | jq -r '.webui_host')" 1 14 44 0 \
+        "端口:"     2 1 "$(echo "$prefs" | jq -r '.webui_port')" 2 14 44 0 \
+        "Token:"    3 1 "$show_token" 3 14 44 0 \
+        "限速/分:"  4 1 "$(echo "$prefs" | jq -r '.login_rate')" 4 14 44 0 \
+        "禁用pty:"  5 1 "$(echo "$prefs" | jq 'if .disable_pty then "yes" else "no" end' -r)" 5 14 44 0)" \
+        || return
+
+    h=$(echo "$values" | sed -n1p | tr -d '[:space:]')
+    p=$(echo "$values" | sed -n2p | tr -d '[:space:]')
+    t=$(echo "$values" | sed -n3p)
+    r=$(echo "$values" | sed -n4p | tr -d '[:space:]')
+    dp=$(echo "$values" | sed -n5p)
+    [[ -z "$h" ]] && h="127.0.0.1"
+    [[ -z "$p" ]] && p=6099
+    [[ -z "$r" ]] && r=3
+
+    napcat_save_prefs "$(echo "$prefs" | jq \
+        --arg h "$h" --argjson p "$p" --arg t "$t" --argjson r "$r" \
+        --argjson dp "$(nt_yes "$dp" && echo true || echo false)" \
+        '.webui_host=$h|.webui_port=$p|.webui_token=$t|.login_rate=$r|.disable_pty=$dp')"
+    napcat_apply_webui
+    nt_msg "WebUI 已写入 webui.json\nhttp://${h}:${p}/webui" 8
+}
+
+# ── 状态总览 ─────────────────────────────────────
+nt_show_status() {
+    local text prefs wf qq
+    prefs="$(napcat_load_prefs)"
+    text="══ NapCat 状态 ══\n\n[ WebUI ]\n"
+    text+="  $(echo "$prefs" | jq -r '.webui_host'):$(echo "$prefs" | jq -r '.webui_port')"
+    text+="$(echo "$prefs" | jq -r 'if .webui_token!="" then " token=已设" else " token=自动" end')\n"
+    text+="\n[ 框架 $(echo "$prefs" | jq '.frameworks|length') 个 ]\n"
+    while IFS= read -r fw; do
+        text+="  · $(echo "$fw" | jq -r '.label') :$(echo "$fw" | jq -r '.default_port')\n"
+        text+="    $(echo "$fw" | jq -r '.root')\n"
+    done < <(echo "$prefs" | jq -c '.frameworks[]?')
+    text+="\n[ QQ 账号 ]\n"
+    for qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
+        text+="  $qq → "
+        text+="$(jq -r '.links[]|select(.enabled)|.framework_id' "${QQ_DIR}/qq_${qq}.json" | tr '\n' ',' | sed 's/,$//')\n"
+    done
+    nt_capture dialog --title "状态" --textbox - 22 68 <<< "$(printf '%b' "$text")"
+}
+
+# ── 启动 ─────────────────────────────────────────
+nt_start_qq() {
+    local qq="$1" qf="${QQ_DIR}/qq_${qq}.json" cfg prefs
+    [ -f "$qf" ] || { echo "无配置 $qf"; exit 1; }
+    napcat_prepare_runtime "$qq" "$qf"
+    cfg="$(napcat_load_qq_config "$qf")"
+    prefs="$(napcat_load_prefs)"
+    clear; killall dialog 2>/dev/null
+    echo "┌─ NapCat 启动 ─────────────────"
+    echo "│ QQ: $qq"
+    while IFS= read -r link; do
+        [ -z "$link" ] && continue
+        local id fw lbl h p path
+        id="$(echo "$link" | jq -r '.framework_id')"
+        fw="$(napcat_get_framework "$id")"
+        lbl="$(echo "$fw" | jq -r '.label // .id')"
+        h="$(echo "$fw" | jq -r '.ws_host')"
+        p="$(echo "$link" | jq -r '.port')"
+        path="$(echo "$fw" | jq -r '.ws_path' | sed 's#^/##')"
+        echo "│ → $lbl  ws://${h}:${p}/${path}"
+    done < <(echo "$cfg" | jq -c '.links[]|select(.enabled==true)')
+  if [ "$(echo "$prefs" | jq -r '.webui_port')" = "0" ]; then
+        echo "│ WebUI: 关闭"
+    else
+        echo "│ WebUI: http://$(echo "$prefs" | jq -r '.webui_host'):$(echo "$prefs" | jq -r '.webui_port')/webui"
+    fi
+    echo "└──────────────────────────────"
+    xvfb-run -a qq --no-sandbox -q "$qq"
+    exit 0
+}
+
+# ── 主菜单 ───────────────────────────────────────
+nt_main_menu() {
+    local sel
+    while true; do
+        sel="$(nt_capture dialog --clear --title "主菜单" --menu \
+            "多 QQ · 多框架 · 安全加固" 18 58 10 \
+            "add"    "新增 QQ（可多选框架）" \
+            "edit"   "修改 / 删除 QQ" \
+            "start"  "启动 QQ" \
+            "fw"     "框架管理" \
+            "webui"  "WebUI（地址/端口/Token）" \
+            "status" "查看当前配置" \
+            "audit"  "安全审计" \
+            "quit"   "退出")" || exit 0
+        clear
+        case "$sel" in
+            add)
+                local qq; qq="$(nt_qq_wizard "新增 QQ")" || continue
+                nt_capture dialog --yesno "立即启动 $qq？" 6 32 && nt_start_qq "$qq"
+                ;;
+            edit) nt_edit_qq ;;
+            start) nt_pick_start ;;
+            fw) nt_show_framework_menu ;;
+            webui) nt_show_webui_menu ;;
+            status) nt_show_status ;;
+            audit) napcat_security_audit; read -r -p "回车继续…" _ ;;
+            quit) exit 0 ;;
         esac
-    else
-        echo "已取消操作，再见！"
-        exit 0
-    fi
-}
-
-# 显示添加QQ菜单
-show_add_qq_menu() {
-    exec 3>&1
-    values=$(dialog --ok-label "确定" \
-                   --backtitle "QQ多开启动器" \
-                   --title "添加新QQ账号" \
-                   --form "请输入QQ账号和端口信息:" \
-                   15 50 2 \
-                   "QQ账号:" 1 1 "" 1 10 30 0 \
-                   "端口:" 2 1 "2537" 2 10 30 0 \
-                   2>&1 1>&3)
-    exit_status=$?
-    exec 3>&-
-    
-    clear
-    if [ $exit_status -eq 0 ]; then
-        qq_num=$(echo "$values" | sed -n 1p)
-        port=$(echo "$values" | sed -n 2p)
-        
-        if [[ -z "$qq_num" ]]; then
-            echo "错误：QQ账号不能为空！"
-            show_main_menu
-            return
-        fi
-        
-        if [[ -z "$port" ]]; then
-            port=2537
-        fi
-        
-        add_update_qq "$qq_num" "$port"
-        
-        exec 3>&1
-        start_now=$(dialog --backtitle "QQ多开启动器" \
-                         --title "立即启动" \
-                         --yesno "是否立即启动QQ($qq_num)？" \
-                         7 50 \
-                         2>&1 1>&3)
-        start_status=$?
-        exec 3>&-
-        
-        clear
-        if [ $start_status -eq 0 ]; then
-            start_qq "$qq_num"
-        fi
-    else
-        echo "已取消添加操作"
-    fi
-    
-    show_main_menu
-}
-
-# 显示修改QQ配置菜单
-show_modify_qq_menu() {
-    local qq_list=$(get_qq_list)
-    
-    if [ -z "$qq_list" ]; then
-        dialog --backtitle "QQ多开启动器" \
-              --title "错误" \
-              --msgbox "没有找到已配置的QQ账号！" \
-              7 50
-        clear
-        show_main_menu
-        return
-    fi
-    
-    local menu_items=()
-    for qq in $qq_list; do
-        local config_file="${BASE_DIR}/qq_${qq}.json"
-        local port=$(jq -r '.port // 2537' "$config_file")
-        menu_items+=("$qq" "端口: $port")
     done
-    
-    exec 3>&1
-    selected_qq=$(dialog --backtitle "QQ多开启动器" \
-                       --title "选择要修改的QQ账号" \
-                       --menu "请选择:" \
-                       15 50 8 \
-                       "${menu_items[@]}" \
-                       2>&1 1>&3)
-    exit_status=$?
-    exec 3>&-
-    
-    clear
-    if [ $exit_status -eq 0 ]; then
-        local config_file="${BASE_DIR}/qq_${selected_qq}.json"
-        local current_port=$(jq -r '.port // 2537' "$config_file")
-        
-        exec 3>&1
-        values=$(dialog --ok-label "确定" \
-                      --backtitle "QQ多开启动器" \
-                      --title "修改QQ配置" \
-                      --form "修改QQ($selected_qq)的配置:" \
-                      15 50 2 \
-                      "QQ账号:" 1 1 "$selected_qq" 1 10 30 0 \
-                      "端口:" 2 1 "$current_port" 2 10 30 0 \
-                      2>&1 1>&3)
-        modify_status=$?
-        exec 3>&-
-        
-        clear
-        if [ $modify_status -eq 0 ]; then
-            new_qq=$(echo "$values" | sed -n 1p)
-            new_port=$(echo "$values" | sed -n 2p)
-            
-            if [[ -z "$new_qq" ]]; then
-                echo "错误：QQ账号不能为空！"
-                show_main_menu
-                return
-            fi
-            
-            if [[ -z "$new_port" ]]; then
-                new_port=2537
-            fi
-            
-            if [[ "$selected_qq" != "$new_qq" ]]; then
-                rm -f "$config_file"
-            fi
-            
-            add_update_qq "$new_qq" "$new_port"
-            echo "QQ配置已更新！"
-        else
-            echo "已取消修改操作"
-        fi
-    else
-        echo "已取消选择操作"
-    fi
-    
-    show_main_menu
 }
 
-# 显示启动QQ菜单
-show_start_qq_menu() {
-    local qq_list=$(get_qq_list)
-    
-    if [ -z "$qq_list" ]; then
-        dialog --backtitle "QQ多开启动器" \
-              --title "错误" \
-              --msgbox "没有找到已配置的QQ账号！" \
-              7 50
-        clear
-        show_main_menu
-        return
-    fi
-    
-    local menu_items=()
-    for qq in $qq_list; do
-        menu_items+=("$qq" "启动QQ $qq")
+nt_edit_qq() {
+    local items=() qq sel
+    for qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
+        items+=("$qq" "$(jq -r '.links[]|select(.enabled)|.framework_id' "${QQ_DIR}/qq_${qq}.json" | paste -sd, -)")
     done
-    
-    exec 3>&1
-    selected_qq=$(dialog --backtitle "QQ多开启动器" \
-                       --title "选择要启动的QQ账号" \
-                       --menu "请选择:" \
-                       15 50 8 \
-                       "${menu_items[@]}" \
-                       2>&1 1>&3)
-    exit_status=$?
-    exec 3>&-
-    
-    clear
-    if [ $exit_status -eq 0 ]; then
-        start_qq "$selected_qq"
-    else
-        echo "已取消启动操作"
-        show_main_menu
-    fi
+    [ ${#items[@]} -eq 0 ] && { nt_msg "暂无 QQ 配置"; return; }
+
+    sel="$(nt_capture dialog --title "编辑 QQ" --menu "选择操作" 14 55 8 \
+        "_edit" "修改配置" "_del" "删除账号" "_back" "返回")" || return
+    case "$sel" in
+        _back) return ;;
+        _del)
+            sel="$(nt_capture dialog --title "删除" --menu "选择 QQ" 12 45 6 "${items[@]}")" || return
+            nt_capture dialog --yesno "删除 qq_${sel}.json？" 6 34 || return
+            rm -f "${QQ_DIR}/qq_${sel}.json"; nt_msg "已删除" 5
+            ;;
+        _edit)
+            sel="$(nt_capture dialog --title "修改" --menu "选择 QQ" 14 55 8 "${items[@]}")" || return
+            nt_qq_wizard "修改 $sel" "$sel" || return
+            nt_msg "已保存" 5
+            ;;
+    esac
 }
 
-# 主程序入口
+nt_pick_start() {
+    local items=() sel
+    for qq in $(find "$QQ_DIR" -maxdepth 1 -name 'qq_*.json' -exec basename {} \; | sed 's/^qq_//;s/.json$//'); do
+        items+=("$qq" "启动")
+    done
+    [ ${#items[@]} -eq 0 ] && { nt_msg "暂无 QQ"; return; }
+    sel="$(nt_capture dialog --title "启动" --menu "选择 QQ" 12 40 8 "${items[@]}")" || return
+    nt_start_qq "$sel"
+}
+
 main() {
-    check_dependencies
-    
-    if [[ -n "$1" ]]; then
-        local qq_num="$1"
-        local port="${2:-2537}"
-        add_update_qq "$qq_num" "$port"
-        start_qq "$qq_num"
+    nt_deps
+    case "${1:-}" in
+        --audit|-a) napcat_security_audit; exit $? ;;
+        -h|--help)
+            echo "  nt           管理菜单"
+            echo "  nt <QQ>      启动已配置账号"
+            echo "  nt --audit   安全审计"
+            exit 0 ;;
+    esac
+    if [ -n "${1:-}" ]; then
+        [ -f "${QQ_DIR}/qq_${1}.json" ] || { echo "无 qq_${1}.json，请先运行 nt 配置"; exit 1; }
+        nt_start_qq "$1"
     else
-        show_main_menu
+        clear
+        nt_main_menu
     fi
 }
 
-# 执行主程序
 main "$@"

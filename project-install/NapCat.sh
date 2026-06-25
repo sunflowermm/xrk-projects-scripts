@@ -404,8 +404,17 @@ function install_napcat() {
         log "移动文件成功"
     fi
 
-    chmod -R 777 "${TARGET_FOLDER}/napcat/"
-    
+    chmod -R +x "${TARGET_FOLDER}/napcat/"
+    _napcat_mod="${_script_dir}/../shell_modules/napcat_security.sh"
+    if [ -f "$_napcat_mod" ]; then
+        # shellcheck source=/dev/null
+        source "$_napcat_mod"
+        NAPCAT_CONFIG_DIR="${TARGET_FOLDER}/napcat/config"
+        napcat_refresh_frameworks >/dev/null
+        napcat_apply_webui
+        log "已扫描框架写入 napcat_prefs.json，用 nt → 框架管理 查看"
+    fi
+
     log "正在修补文件..."
     echo "(async () => {await import('file:///${TARGET_FOLDER}/napcat/napcat.mjs');})();" > /opt/QQ/resources/app/loadNapCat.js
     if [ $? -ne 0 ]; then
@@ -439,10 +448,9 @@ function modify_qq_config() {
 
 function show_main_info() {
     log "\n================== NapCat安装完成 =================="
-    log "此为向日葵借鉴缩减的版本，原作者是NapCat官方"
-    log "WEBUI_TOKEN 请查看: ${TARGET_FOLDER}/napcat/config/webui.json"
-    log "启动 QQ 客户端请使用: nt"
-    log "脚本将默认使用 tmux 以及相关配置"
+    log "WebUI: http://127.0.0.1:6099/webui （Token 见启动日志或 ${TARGET_FOLDER}/napcat/config/webui.json）"
+    log "启动: nt [QQ号] [框架端口]  例: nt 123456789 2537"
+    log "安全: WebUI 已限本机；OneBot 服务端若启用请务必配置 token"
     log "===================================================="
 }
 
