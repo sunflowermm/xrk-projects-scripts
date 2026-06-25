@@ -448,9 +448,8 @@ function modify_qq_config() {
 
 function show_main_info() {
     log "\n================== NapCat安装完成 =================="
-    log "WebUI: http://127.0.0.1:6099/webui （Token 见启动日志或 ${TARGET_FOLDER}/napcat/config/webui.json）"
-    log "启动: nt [QQ号] [框架端口]  例: nt 123456789 2537"
-    log "安全: WebUI 已限本机；OneBot 服务端若启用请务必配置 token"
+    log "WebUI: http://<本机IP>:4071/webui （Token 见 webui.json 或 napcat_prefs）"
+    log "启动: nt [QQ号]  例: nt 123456789"
     log "===================================================="
 }
 

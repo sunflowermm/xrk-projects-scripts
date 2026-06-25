@@ -83,9 +83,7 @@ tail -5 /tmp/nt.log
 
 | 现象 | 原因 | 处理 |
 |------|------|------|
-| 勾了框架仍报「至少选一个」 | checklist 按 `tag on` 解析，dialog 只回 tag | `--separate-output` + `nt_parse_checklist` |
-| 保存后启动报 `qq_.json` | wizard 内 `local qq` 使 `printf -v` 写不到主菜单 | 内部用 `wqq`，勿 local 与返回变量同名 |
-| Cancel 后界面残留 | dialog 退出未清屏 | `nt_dialog_capture` 在 exit 1/255 时 `clear` |
+| 改任何值保存后仍是旧 host/port | form 返回值丢失 | 用 `nt_dialog_capture` |
 | 监听地址改为 `::` 报「为空」 | form 首行在 `$()`+`exec 3>&1` 捕获时丢失 | `nt_dialog_capture` + `nt_parse_form` + `nt_field_trim`（勿对 host 用 `tr -d`） |
 | webui.json 变回 `host:"::"` 大文件 | NapCat 运行中覆盖 | 先停 qq 再改 |
 | 无报错回菜单 | dialog 失败被 `\|\| return` 吞掉 | `nt_err` + `/tmp/nt.log` |

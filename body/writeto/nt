@@ -198,12 +198,9 @@ nt_qq_wizard() {
     nt_parse_form "$values" 2 wqq ob || { nt_err "QQ 表单解析失败\n${NAPCAT_LAST_ERR:-}" 10; return 1; }
     wqq="$(nt_field_trim "$wqq")"
     [[ -z "$wqq" ]] && { nt_err "QQ 账号不能为空"; return 1; }
-    nt_log "QQ wizard: qq=$wqq token_len=${#ob}"
 
     nt_pick_frameworks checklist "$wqq" || return 1
-    nt_log "QQ wizard checklist raw: $(printf '%s' "$checklist" | tr '\n' '|')"
     links="$(nt_links_from_checklist "$wqq" "$checklist")"
-    nt_log "QQ wizard links: $links"
     [ "$(echo "$links" | jq 'length')" -eq 0 ] && { nt_msg "请至少选择一个框架"; return 1; }
 
     if nt_yesno "为每个框架确认端口？" 7 40; then
@@ -211,8 +208,6 @@ nt_qq_wizard() {
     fi
 
     nt_save_qq "$wqq" "$links" "$ob" "$old_qq"
-    nt_log "QQ wizard saved: ${QQ_DIR}/qq_${wqq}.json"
-    # 勿 local 与 __ret 同名的变量，否则 printf -v 写不到调用方
     printf -v "$__ret" '%s' "$wqq"
 }
 
@@ -325,13 +320,11 @@ nt_show_webui_menu() {
         return 1
     fi
 
-    nt_log "WEBUI save raw: $(printf '%s' "$values" | tr '\n' '|')"
     nt_parse_form "$values" 5 h p t r dp || {
         nt_err "WebUI 表单解析失败\n${NAPCAT_LAST_ERR:-}\n日志: $NT_LOG" 12
         return 1
     }
-    nt_log "WEBUI save: h=[$h] p=[$p] r=[$r] dp=[$dp] token_len=${#t}"
-    [[ -n "$h" ]] || { nt_err "监听地址为空\n原始: $(printf '%s' "$values" | tr '\n' '|')\n日志: $NT_LOG" 12; return 1; }
+    [[ -n "$h" ]] || { nt_err "监听地址为空\n日志: $NT_LOG" 12; return 1; }
     [[ -z "$t" ]] && t="$(echo "$eff" | jq -r '.token // ""')"
     p="$(nt_field_trim "$p")"; r="$(nt_field_trim "$r")"
     [[ -z "$p" ]] && p=6099

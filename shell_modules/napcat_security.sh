@@ -77,7 +77,7 @@ napcat_load_prefs() {
     local f defaults err
     f="$(napcat_prefs_path)"
     defaults="$(jq -n '{
-        webui_host:"127.0.0.1",webui_port:6099,webui_token:"",
+        webui_host:"0.0.0.0",webui_port:4071,webui_token:"",
         login_rate:3,disable_pty:true,frameworks:[]
     }')"
     if [ -f "$f" ]; then
@@ -196,7 +196,7 @@ napcat_webui_file() {
 
 napcat_read_webui() {
     local wf; wf="$(napcat_webui_file)"
-    [ -f "$wf" ] && jq -c . "$wf" 2>/dev/null || jq -n '{host:"127.0.0.1",port:6099,token:"",loginRate:3}'
+    [ -f "$wf" ] && jq -c . "$wf" 2>/dev/null || jq -n '{host:"0.0.0.0",port:4071,token:"",loginRate:3}'
 }
 
 # 表单/状态展示：以 webui.json 为准（NapCat 运行后会写回完整 schema）
@@ -209,8 +209,8 @@ napcat_webui_effective() {
         --argjson w "$w" \
         --argjson p "$prefs" \
         '{
-            host: ($w.host // $p.webui_host // "127.0.0.1"),
-            port: ($w.port // $p.webui_port // 6099),
+            host: ($w.host // $p.webui_host // "0.0.0.0"),
+            port: ($w.port // $p.webui_port // 4071),
             token: ($w.token // $p.webui_token // ""),
             loginRate: ($w.loginRate // $p.login_rate // 3)
         }'
@@ -230,8 +230,8 @@ napcat_apply_webui() {
     prefs="$(napcat_load_prefs)" || true
     [ -z "$prefs" ] && { NAPCAT_LAST_ERR="无法加载 napcat_prefs"; return 1; }
 
-    host="$(echo "$prefs" | jq -r '.webui_host // "127.0.0.1"')"
-    port="$(echo "$prefs" | jq -r '.webui_port // 6099')"
+    host="$(echo "$prefs" | jq -r '.webui_host // "0.0.0.0"')"
+    port="$(echo "$prefs" | jq -r '.webui_port // 4071')"
     rate="$(echo "$prefs" | jq -r '.login_rate // 3')"
     disable_pty="$(echo "$prefs" | jq -r '.disable_pty // true')"
     token="$(echo "$prefs" | jq -r '.webui_token // ""' | tr -d '\r\n')"
@@ -351,9 +351,6 @@ napcat_prepare_runtime() {
 
     n="$(echo "$links" | jq '[.[]|select(.enabled==true)]|length')"
     [ "$n" -eq 0 ] && echo "[nt] 未启用框架连接，请在 nt 中勾选框架"
-
-    host="$(napcat_webui_effective | jq -r '.host')"
-    case "$host" in 0.0.0.0|::) echo "[nt] WebUI 公网监听，请设强 token 并限制防火墙" ;; esac
 }
 
 # 供 nt 状态页展示
