@@ -9,6 +9,11 @@ source "${root}/shell_modules/napcat_security.sh"
 
 QQ_DIR="$root/body"
 NT_BACK=" XRK · NapCat 管理 "
+NT_LOG="${NT_LOG:-/tmp/nt.log}"
+
+nt_log() {
+    printf '[%s] %s\n' "$(date '+%F %T')" "$1" >> "$NT_LOG"
+}
 
 nt_deps() {
     for p in jq dialog xvfb-run; do
@@ -42,11 +47,22 @@ nt_dialog_input_run() {
 nt_yes() { case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in y|yes|1|true|是) return 0 ;; *) return 1 ;; esac; }
 
 nt_msg() {
-    dialog --backtitle "$NT_BACK" --title "提示" --msgbox "$1" "${2:-8}" "${3:-52}"
+    nt_log "INFO: $1"
+    dialog --backtitle "$NT_BACK" --title "提示" --msgbox "$1" "${2:-8}" "${3:-52}" 2>/dev/null \
+        || echo "[nt] $1" >&2
 }
 
 nt_err() {
-    dialog --backtitle "$NT_BACK" --title "错误" --msgbox "$1" "${2:-10}" "${3:-58}"
+    nt_log "ERROR: $1"
+    echo "[nt ERROR] $1" >&2
+    dialog --backtitle "$NT_BACK" --title "错误" --msgbox "$1" "${2:-10}" "${3:-58}" 2>/dev/null \
+        || echo "[nt ERROR] $1" >&2
+}
+
+nt_napcat_running() {
+    pgrep -f '[q]q --no-sandbox' >/dev/null 2>&1 \
+        || pgrep -f '[N]apCat' >/dev/null 2>&1 \
+        || pgrep -f '/opt/QQ/' >/dev/null 2>&1
 }
 
 # dialog --form 默认值不能含换行/双引号，否则对话框直接失败且 stderr 被吞
@@ -215,31 +231,36 @@ nt_del_framework() {
 }
 
 nt_show_webui_menu() {
-    local prefs values h p t r dp show_token st new_prefs err wf
+    local prefs values h p t r dp show_token st new_prefs wf eff
+
+    if nt_napcat_running; then
+        nt_err "NapCat/QQ 正在运行\n\n运行中 WebUI 会按内存配置写回 webui.json\n请先 killall qq 或退出 NapCat 再改\n\n日志: $NT_LOG" 12
+        return 1
+    fi
 
     prefs="$(napcat_load_prefs)" || true
     if [ -n "${NAPCAT_LAST_ERR:-}" ]; then
-        nt_err "加载配置时出现问题（已用默认值继续）\n${NAPCAT_LAST_ERR}" 10
+        nt_err "加载配置时出现问题（已用默认值继续）\n${NAPCAT_LAST_ERR}\n\n日志: $NT_LOG" 10
         NAPCAT_LAST_ERR=""
     fi
-    [ -z "$prefs" ] && { nt_err "无法加载 napcat_prefs.json"; return 1; }
+    [ -z "$prefs" ] && { nt_err "无法加载 napcat_prefs.json\n日志: $NT_LOG"; return 1; }
 
-    show_token="$(echo "$prefs" | jq -r '.webui_token // ""')"
-    [ -z "$show_token" ] && show_token="$(napcat_read_webui 2>/dev/null | jq -r '.token // ""')"
+    eff="$(napcat_webui_effective)"
+    show_token="$(echo "$eff" | jq -r '.token // ""')"
     show_token="$(nt_form_default "$show_token")"
 
     nt_dialog_run values --title "WebUI（全局）" --form \
-        "所有 QQ 共用 · 端口 0=关闭 · Token 留空则保留现有" 18 68 5 \
-        "监听地址:" 1 1 "$(nt_form_default "$(echo "$prefs" | jq -r '.webui_host // "127.0.0.1"')")" 1 14 44 0 \
-        "端口:"     2 1 "$(nt_form_default "$(echo "$prefs" | jq -r '.webui_port // 6099')")" 2 14 44 0 \
+        "读取 webui.json · 仅改 host/port/token/loginRate · 保留 theme 等" 18 68 5 \
+        "监听地址:" 1 1 "$(nt_form_default "$(echo "$eff" | jq -r '.host')")" 1 14 44 0 \
+        "端口:"     2 1 "$(nt_form_default "$(echo "$eff" | jq -r '.port')")" 2 14 44 0 \
         "Token:"    3 1 "$show_token" 3 14 44 0 \
-        "限速/分:"  4 1 "$(nt_form_default "$(echo "$prefs" | jq -r '.login_rate // 3')")" 4 14 44 0 \
+        "限速/分:"  4 1 "$(nt_form_default "$(echo "$eff" | jq -r '.loginRate')")" 4 14 44 0 \
         "禁用pty:"  5 1 "$(nt_form_default "$(echo "$prefs" | jq 'if .disable_pty then "yes" else "no" end' -r)")" 5 14 44 0
     st=$?
     case $st in
         0) ;;
         1) return 0 ;;
-        *) nt_err "对话框打开失败 (exit=$st)\n${values:-请检查 Token 是否含特殊字符}" 10; return 1 ;;
+        *) nt_err "对话框打开失败 (exit=$st)\n${values:-请检查 Token 是否含特殊字符}\n日志: $NT_LOG" 10; return 1 ;;
     esac
 
     h=$(echo "$values" | sed -n1p | tr -d '[:space:]')
@@ -253,27 +274,45 @@ nt_show_webui_menu() {
     [[ "$p" =~ ^[0-9]+$ ]] || { nt_err "端口须为数字：$p"; return 1; }
     [[ "$r" =~ ^[0-9]+$ ]] || { nt_err "限速须为数字：$r"; return 1; }
 
-    new_prefs="$(echo "$prefs" | jq \
+    if ! new_prefs="$(echo "$prefs" | jq \
         --arg h "$h" --argjson p "$p" --arg t "$t" --argjson r "$r" \
         --argjson dp "$(nt_yes "$dp" && echo true || echo false)" \
-        '.webui_host=$h|.webui_port=$p|.webui_token=$t|.login_rate=$r|.disable_pty=$dp' 2>&1)" || {
-        nt_err "合并配置失败\n${new_prefs}" 12
+        '.webui_host=$h|.webui_port=$p|.webui_token=$t|.login_rate=$r|.disable_pty=$dp' 2>&1)"; then
+        nt_err "合并配置失败\n${new_prefs}\n日志: $NT_LOG" 12
         return 1
-    }
+    fi
     napcat_save_prefs "$new_prefs" || {
-        nt_err "保存 napcat_prefs 失败\n${NAPCAT_LAST_ERR:-$(napcat_prefs_path)}" 12
+        nt_err "保存 napcat_prefs 失败\n${NAPCAT_LAST_ERR:-$(napcat_prefs_path)}\n日志: $NT_LOG" 12
         return 1
     }
     napcat_apply_webui || {
         wf="$(napcat_webui_file)"
-        nt_err "写入 webui.json 失败\n${NAPCAT_LAST_ERR:-}\n\n目标: $wf" 14
+        nt_err "写入 webui.json 失败\n${NAPCAT_LAST_ERR:-}\n\n目标: $wf\n日志: $NT_LOG" 14
         return 1
     }
+    wf="$(napcat_webui_file)"
     if url="$(napcat_webui_url 2>/dev/null)"; then
-        nt_msg "WebUI 已写入（全局）\n${url}\n\n$(napcat_webui_file)" 10
+        nt_msg "WebUI 已合并写入\n${url}\n\n保留 theme 等字段\n文件: $wf\n日志: $NT_LOG" 12
     else
-        nt_msg "WebUI 已关闭（port=0）\n$(napcat_webui_file)" 8
+        nt_msg "WebUI 已关闭（port=0）\n$wf\n日志: $NT_LOG" 8
     fi
+}
+
+nt_webui_apply_cli() {
+    local prefs wf
+    if nt_napcat_running; then
+        echo "[nt] NapCat/QQ 正在运行，请先 stop 再改 WebUI" >&2
+        return 1
+    fi
+    prefs="$(napcat_load_prefs)" || true
+    [ -z "$prefs" ] && { echo "[nt] 无法加载 napcat_prefs" >&2; return 1; }
+    napcat_apply_webui || {
+        echo "[nt] ${NAPCAT_LAST_ERR:-apply failed}" >&2
+        return 1
+    }
+    wf="$(napcat_webui_file)"
+    echo "[nt] OK merged -> $wf"
+    jq -c '{host,port,token,loginRate,disableWebUI,hasTheme:(.theme!=null)}' "$wf"
 }
 
 nt_show_status() {
@@ -384,9 +423,12 @@ main() {
     nt_deps
     case "${1:-}" in
         -h|--help)
-            echo "  nt         管理菜单"
-            echo "  nt <QQ>    启动已配置账号"
+            echo "  nt              管理菜单"
+            echo "  nt <QQ>         启动已配置账号"
+            echo "  nt --webui-apply  将 napcat_prefs 合并写入 webui.json（需先停 NapCat）"
+            echo "  日志: ${NT_LOG}"
             exit 0 ;;
+        --webui-apply) nt_webui_apply_cli; exit $? ;;
     esac
     if [ -n "${1:-}" ]; then
         [ -f "${QQ_DIR}/qq_${1}.json" ] || { echo "无 qq_${1}.json，请先运行 nt 配置"; exit 1; }

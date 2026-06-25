@@ -1,6 +1,15 @@
 {
   "host": "127.0.0.1",
   "port": 6099,
-  "token": "test-token-abc",
-  "loginRate": 5
+  "token": "d1904dd866f7",
+  "loginRate": 3,
+  "autoLoginAccount": "",
+  "theme": {
+    "fontMode": "system",
+    "dark": {
+      "--heroui-primary": "339.2 90.36% 51.18%"
+    }
+  },
+  "disableWebUI": false,
+  "accessControlMode": "none"
 }

@@ -63,4 +63,13 @@ loaded="$(napcat_load_prefs)"
 echo "$loaded" | jq -e '.webui_token=="keep-me" and .webui_port==7000 and .login_rate==9' >/dev/null \
   || fail "load_prefs 合并仍覆盖用户值: $(echo "$loaded"|jq -c '{webui_token,webui_port,login_rate}')"
 
+# 7) 合并写入：保留 NapCat 完整 schema（theme 等）
+cat > "$wf" <<'EOF'
+{"host":"::","port":6099,"token":"oldtok","loginRate":10,"autoLoginAccount":"","theme":{"fontMode":"system","dark":{"--heroui-primary":"339.2 90.36% 51.18%"}},"disableWebUI":false,"accessControlMode":"none"}
+EOF
+napcat_save_prefs '{"webui_host":"127.0.0.1","webui_port":6099,"webui_token":"d1904dd866f7","login_rate":3,"disable_pty":true,"frameworks":[]}'
+napcat_apply_webui || fail "merge apply: ${NAPCAT_LAST_ERR:-?}"
+jq -e '.host=="127.0.0.1" and .port==6099 and .token=="d1904dd866f7" and .loginRate==3 and .theme.fontMode=="system"' "$wf" >/dev/null \
+  || fail "theme 丢失或字段未更新: $(jq -c '{host,port,token,loginRate,theme}' "$wf")"
+
 ok "全部通过"

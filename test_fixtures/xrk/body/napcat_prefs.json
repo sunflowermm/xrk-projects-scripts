@@ -1,1 +1,1 @@
-{"webui_host":"10.0.0.1","webui_port":7000,"webui_token":"keep-me","login_rate":9,"disable_pty":false,"frameworks":[]}
+{"webui_host":"127.0.0.1","webui_port":6099,"webui_token":"d1904dd866f7","login_rate":3,"disable_pty":true,"frameworks":[]}

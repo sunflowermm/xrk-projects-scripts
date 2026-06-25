@@ -196,7 +196,24 @@ napcat_webui_file() {
 
 napcat_read_webui() {
     local wf; wf="$(napcat_webui_file)"
-    [ -f "$wf" ] && jq -c . "$wf" || jq -n '{host:"127.0.0.1",port:6099,token:"",loginRate:3}'
+    [ -f "$wf" ] && jq -c . "$wf" 2>/dev/null || jq -n '{host:"127.0.0.1",port:6099,token:"",loginRate:3}'
+}
+
+# 表单/状态展示：以 webui.json 为准（NapCat 运行后会写回完整 schema）
+napcat_webui_effective() {
+    local w prefs
+    w="$(napcat_read_webui)"
+    prefs="$(napcat_load_prefs 2>/dev/null || true)"
+    [ -z "$prefs" ] && prefs='{}'
+    jq -n \
+        --argjson w "$w" \
+        --argjson p "$prefs" \
+        '{
+            host: ($w.host // $p.webui_host // "127.0.0.1"),
+            port: ($w.port // $p.webui_port // 6099),
+            token: ($w.token // $p.webui_token // ""),
+            loginRate: ($w.loginRate // $p.login_rate // 3)
+        }'
 }
 
 napcat_webui_url() {
@@ -209,7 +226,7 @@ napcat_webui_url() {
 }
 
 napcat_apply_webui() {
-    local prefs host port rate token disable_pty wf tmp err
+    local prefs host port rate token disable_pty wf tmp err base has_token
     prefs="$(napcat_load_prefs)" || true
     [ -z "$prefs" ] && { NAPCAT_LAST_ERR="无法加载 napcat_prefs"; return 1; }
 
@@ -218,7 +235,9 @@ napcat_apply_webui() {
     rate="$(echo "$prefs" | jq -r '.login_rate // 3')"
     disable_pty="$(echo "$prefs" | jq -r '.disable_pty // true')"
     token="$(echo "$prefs" | jq -r '.webui_token // ""' | tr -d '\r\n')"
-    [ -z "$token" ] && token="$(napcat_read_webui 2>/dev/null | jq -r '.token // ""' | tr -d '\r\n')"
+    has_token=false
+    [ -n "$token" ] && has_token=true
+    [ "$has_token" = false ] && token="$(napcat_read_webui 2>/dev/null | jq -r '.token // ""' | tr -d '\r\n')"
 
     [[ "$port" =~ ^[0-9]+$ ]] || { NAPCAT_LAST_ERR="无效端口: $port"; return 1; }
     [[ "$rate" =~ ^[0-9]+$ ]] || { NAPCAT_LAST_ERR="无效限速: $rate"; return 1; }
@@ -229,17 +248,42 @@ napcat_apply_webui() {
         NAPCAT_LAST_ERR="无法创建目录: $NAPCAT_CONFIG_DIR"
         return 1
     }
+
+    if [ -f "$wf" ] && jq -e . "$wf" >/dev/null 2>&1; then
+        base="$(cat "$wf")"
+    else
+        base='{}'
+    fi
+
     tmp="$(mktemp "${TMPDIR:-/tmp}/napcat_webui.XXXXXX")"
-    if ! jq -n --arg host "$host" --argjson port "$port" --arg token "$token" --argjson rate "$rate" \
-        '{host:$host,port:$port,token:$token,loginRate:$rate}' > "$tmp" 2>"${tmp}.err"; then
-        NAPCAT_LAST_ERR="生成 webui.json 失败: $(tr -d '\n' < "${tmp}.err" 2>/dev/null)"
+    if ! jq \
+        --arg host "$host" \
+        --argjson port "$port" \
+        --arg token "$token" \
+        --argjson rate "$rate" \
+        --argjson set_token "$has_token" \
+        '.host=$host
+         | .port=$port
+         | .loginRate=$rate
+         | .disableWebUI=($port==0)
+         | if $set_token then .token=$token else . end' \
+        <<< "$base" > "$tmp" 2>"${tmp}.err"; then
+        NAPCAT_LAST_ERR="合并 webui.json 失败: $(tr -d '\n' < "${tmp}.err" 2>/dev/null)"
         rm -f "$tmp" "${tmp}.err"
         return 1
     fi
     rm -f "${tmp}.err"
+
     if ! err="$(mv "$tmp" "$wf" 2>&1)"; then
         NAPCAT_LAST_ERR="写入 $wf 失败: ${err:-需要 root 权限}\n请用 root 运行 nt"
         rm -f "$tmp"
+        return 1
+    fi
+
+    # 写后校验（防止 NapCat 进程或其它进程立刻改回）
+    if ! jq -e --arg h "$host" --argjson p "$port" --argjson r "$rate" \
+        '.host==$h and .port==$p and .loginRate==$r' "$wf" >/dev/null 2>&1; then
+        NAPCAT_LAST_ERR="写入后校验失败（文件已被改写）\n请先停止 NapCat/QQ 再改 WebUI\n当前: $(jq -c '{host,port,loginRate,token}' "$wf" 2>/dev/null)"
         return 1
     fi
 
