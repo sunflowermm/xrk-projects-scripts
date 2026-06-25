@@ -8,7 +8,7 @@ needed=(
     "[[ -f $XRK_ROOT/.init ]] && source $XRK_ROOT/.init"
     "export PUPPETEER_SKIP_DOWNLOAD='true'"
 )
-tmux_hook_marker="# xrk: tmux attach-or-restore"
+tmux_hook_marker="# xrk: tmux wrapper"
 tmux_hook_line='[ -f "$XRK_ROOT/body/modules/tmux_profile.sh" ] && . "$XRK_ROOT/body/modules/tmux_profile.sh"'
 [ -f "$profile" ] || touch "$profile"
 for line in "${needed[@]}"; do

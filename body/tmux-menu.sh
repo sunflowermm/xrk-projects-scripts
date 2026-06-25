@@ -75,11 +75,6 @@ _xrk_emit_mouse_bind() {
     _xrk_emit_items "${items[@]}"
 }
 
-_xrk_all_pane_menu_items() {
-    local -a all=("${_xrk_pane_items[@]}" "${_xrk_sys_items[@]}")
-    printf '%s\0' "${all[@]}"
-}
-
 _xrk_show_menu() {
     local title="$1" target="$2" pos_x="$3" pos_y="$4"
     shift 4
@@ -114,7 +109,7 @@ Alt+hjkl 切窗格 | v/s 分割 | [ y 复制 | Alt+0~5 切窗口"
             "${_xrk_pane_items[@]}" "${_xrk_sys_items[@]}"
         ;;
     *)
-        echo "用法: tmux-menu.sh help|pane|session|window|system|--emit-mouse-binds" >&2
+        echo "用法: tmux-menu.sh help|pane|--emit-mouse-binds" >&2
         exit 1
         ;;
 esac

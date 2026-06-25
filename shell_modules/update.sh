@@ -49,7 +49,6 @@ xrk_bin同步() {
         ["$XRK_BIN/xyzlogin"]="$XRK_ROOT/body/writeto/xrk/xyzlogin"
         ["$XRK_BIN/xag"]="$XRK_ROOT/body/writeto/xrk/xag"
         ["$XRK_BIN/xrk-tmux"]="$XRK_ROOT/body/tmux.sh"
-        ["$XRK_BIN/xrk-tmux-setup"]="$XRK_ROOT/body/modules/tmux.sh"
     )
     local dest src n=0 missing=()
     mkdir -p "$XRK_BIN" 2>/dev/null || true

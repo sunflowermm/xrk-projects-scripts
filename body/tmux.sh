@@ -37,26 +37,14 @@ _tmux_ensure_env() {
     }
 }
 
-_tmux_start_server() {
+_tmux_ensure_server() {
+    tmux info &>/dev/null && return 0
     [ -f "$TMUX_CONF" ] || return 1
-    tmux info &>/dev/null || tmux -f "$TMUX_CONF" start-server 2>/dev/null || return 1
-    tmux source-file "$TMUX_CONF" 2>/dev/null
+    tmux -f "$TMUX_CONF" start-server 2>/dev/null
 }
 
-_tmux_apply_window_names() {
-    local session="$1" i
-    tmux has-session -t "$session" 2>/dev/null || return 0
-    for i in "${!XRK_TMUX_WINDOWS[@]}"; do
-        tmux rename-window -t "$session:$i" "${XRK_TMUX_WINDOWS[$i]}" 2>/dev/null || true
-    done
-}
-
-_tmux_ensure_session() {
+_tmux_create_session() {
     local s="$SESSION_NAME"
-    if tmux has-session -t "$s" 2>/dev/null; then
-        _tmux_apply_window_names "$s"
-        return 0
-    fi
     tmux new-session -d -s "$s" -n "${XRK_TMUX_WINDOWS[0]}"
     tmux split-window -v -t "$s:0"
     tmux new-window -t "$s:1" -n "${XRK_TMUX_WINDOWS[1]}"
@@ -64,7 +52,6 @@ _tmux_ensure_session() {
     tmux new-window -t "$s:2" -n "${XRK_TMUX_WINDOWS[2]}"
     tmux split-window -h -t "$s:2"
     tmux select-window -t "$s:0"
-    _tmux_apply_window_names "$s"
 }
 
 _tmux_status() {
@@ -83,8 +70,8 @@ _tmux_enter() {
         *) export LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8 ;;
     esac
     _tmux_ensure_env || exit 1
-    _tmux_start_server || true
-    _tmux_ensure_session || exit 1
+    _tmux_ensure_server || true
+    tmux has-session -t "$SESSION_NAME" 2>/dev/null || _tmux_create_session || exit 1
 
     if [ -n "$TMUX" ]; then
         [ "$(tmux display-message -p '#S' 2>/dev/null)" = "$SESSION_NAME" ] \
