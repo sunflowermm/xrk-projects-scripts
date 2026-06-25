@@ -139,7 +139,8 @@ nt_show_framework_menu() {
         back) return ;;
         *)
             nt_msg "$(napcat_get_framework "$sel" | jq -r \
-                '"名称: \(.label)\n目录: \(.root)\n端口: \(.default_port)\n密钥: \(.root)/config/server_config/api_key.json")' 10 60)
+                '"名称: \(.label)\n目录: \(.root)\n端口: \(.default_port)\n密钥: \(.root)/config/server_config/api_key.json"')" \
+                10 60
             nt_show_framework_menu ;;
     esac
 }
