@@ -86,7 +86,7 @@ napcat_load_prefs() {
             echo "$defaults" | jq --argjson fw "$(napcat_scan_frameworks_json)" '.frameworks = $fw'
             return 1
         fi
-        err="$(jq -s '.[0] * .[1]' <(cat "$f") <(echo "$defaults") \
+        err="$(jq -s '.[1] * .[0]' <(cat "$f") <(echo "$defaults") \
             | jq --argjson scanned "$(napcat_scan_frameworks_json)" \
                 '.frameworks = (
                     (.frameworks // []) as $saved |
