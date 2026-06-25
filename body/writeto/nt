@@ -23,24 +23,50 @@ nt_deps() {
     done
 }
 
-# dialog 结果在 stderr；用 2>&1 >/dev/tty 才能既显示 UI 又捕获返回值（与 jsdialog 一致）
-# 禁止 exec 3>&1 + 1>&3：form 输出会丢，保存时永远落回默认值
-nt_dialog_run() {
+# dialog 结果写 stderr；UI 走 stdout/tty。用临时文件捕获，禁止 exec 3>&1+$() 与对 host 用 tr 删空白
+nt_dialog_capture() {
     local __var=$1; shift
-    local __out __st
-    __out=$(dialog --backtitle "$NT_BACK" "$@" 2>&1 >/dev/tty)
-    __st=$?
+    local tmp __out __st
+    tmp="$(mktemp "${TMPDIR:-/tmp}/nt_dialog.XXXXXX")"
+    __st=0
+    dialog --backtitle "$NT_BACK" "$@" 2>"$tmp" >/dev/tty || __st=$?
+    __out="$(cat "$tmp")"
+    rm -f "$tmp"
     printf -v "$__var" '%s' "$__out"
     return "$__st"
 }
 
-nt_dialog_input_run() {
-    local __var=$1; shift
-    local __out __st
-    __out=$(dialog --backtitle "$NT_BACK" "$@" 2>&1 >/dev/tty)
-    __st=$?
-    printf -v "$__var" '%s' "$__out"
-    return "$__st"
+nt_dialog_run() { nt_dialog_capture "$@"; }
+nt_dialog_input_run() { nt_dialog_capture "$@"; }
+
+# 去首尾空白，保留 IPv6（::）与地址内部的空格
+nt_field_trim() {
+    local s="$1"
+    s="${s//$'\r'/}"
+    s="${s#"${s%%[![:space:]]*}"}"
+    s="${s%"${s##*[![:space:]]}"}"
+    printf '%s' "$s"
+}
+
+# 解析 dialog --form 输出：每行一字段，跳过空行
+nt_parse_form() {
+    local values="$1" expect="$2"
+    shift 2
+    local -a names=("$@") fields=() line i=0 n=0
+    mapfile -t fields <<< "$values"
+    local -a out=()
+    for line in "${fields[@]}"; do
+        line="$(nt_field_trim "$line")"
+        out+=("$line")
+    done
+    n="${#out[@]}"
+    if [ "$n" -lt "$expect" ]; then
+        NAPCAT_LAST_ERR="表单字段不足(期望${expect}行,实际${n}): $(printf '%s|' "${out[@]}")"
+        return 1
+    fi
+    for i in $(seq 0 $((expect - 1)) 2>/dev/null || awk "BEGIN{for(i=0;i<$expect;i++)print i}"); do
+        printf -v "${names[$i]}" '%s' "${out[$i]}"
+    done
 }
 
 nt_yes() {
@@ -144,8 +170,8 @@ nt_qq_wizard() {
         "QQ 账号:" 1 1 "${old_qq:-}" 1 12 36 0 \
         "全局Token:" 2 1 "$([ -f "$cf" ] && jq -r '.ob_token' "$cf" || echo '')" 2 12 36 0 \
         || return 1
-    qq=$(echo "$values" | sed -n1p | tr -d '[:space:]')
-    ob=$(echo "$values" | sed -n2p)
+    nt_parse_form "$values" 2 qq ob || { nt_err "QQ 表单解析失败\n${NAPCAT_LAST_ERR:-}" 10; return 1; }
+    qq="$(nt_field_trim "$qq")"
     [[ -z "$qq" ]] && return 1
 
     nt_pick_frameworks checklist "$qq" || return 1
@@ -269,15 +295,15 @@ nt_show_webui_menu() {
         return 1
     fi
 
-    h=$(echo "$values" | sed -n1p | tr -d '[:space:]')
-    p=$(echo "$values" | sed -n2p | tr -d '[:space:]')
-    t=$(echo "$values" | sed -n3p | tr -d '\r\n')
-    r=$(echo "$values" | sed -n4p | tr -d '[:space:]')
-    dp=$(echo "$values" | sed -n5p | tr -d '\r\n')
     nt_log "WEBUI save raw: $(printf '%s' "$values" | tr '\n' '|')"
-    nt_log "WEBUI save: h=$h p=$p r=$r dp=$dp token_len=${#t}"
-    [[ -n "$h" ]] || { nt_err "监听地址为空"; return 1; }
+    nt_parse_form "$values" 5 h p t r dp || {
+        nt_err "WebUI 表单解析失败\n${NAPCAT_LAST_ERR:-}\n日志: $NT_LOG" 12
+        return 1
+    }
+    nt_log "WEBUI save: h=[$h] p=[$p] r=[$r] dp=[$dp] token_len=${#t}"
+    [[ -n "$h" ]] || { nt_err "监听地址为空\n原始: $(printf '%s' "$values" | tr '\n' '|')\n日志: $NT_LOG" 12; return 1; }
     [[ -z "$t" ]] && t="$(echo "$eff" | jq -r '.token // ""')"
+    p="$(nt_field_trim "$p")"; r="$(nt_field_trim "$r")"
     [[ -z "$p" ]] && p=6099
     [[ -z "$r" ]] && r=3
     [[ "$p" =~ ^[0-9]+$ ]] || { nt_err "端口须为数字：$p"; return 1; }
