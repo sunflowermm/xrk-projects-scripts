@@ -45,6 +45,15 @@ nt_msg() {
     dialog --backtitle "$NT_BACK" --title "提示" --msgbox "$1" "${2:-8}" "${3:-52}"
 }
 
+nt_err() {
+    dialog --backtitle "$NT_BACK" --title "错误" --msgbox "$1" "${2:-10}" "${3:-58}"
+}
+
+# dialog --form 默认值不能含换行/双引号，否则对话框直接失败且 stderr 被吞
+nt_form_default() {
+    printf '%s' "$1" | tr -d '\r\n' | tr '"' "'"
+}
+
 nt_yesno() {
     nt_dialog_run _nt_yesno_dummy --yesno "$1" "${2:-7}" "${3:-40}"
 }
@@ -206,38 +215,64 @@ nt_del_framework() {
 }
 
 nt_show_webui_menu() {
-    local prefs values h p t r dp show_token
-    prefs="$(napcat_load_prefs)"
+    local prefs values h p t r dp show_token st new_prefs err wf
+
+    prefs="$(napcat_load_prefs)" || true
+    if [ -n "${NAPCAT_LAST_ERR:-}" ]; then
+        nt_err "加载配置时出现问题（已用默认值继续）\n${NAPCAT_LAST_ERR}" 10
+        NAPCAT_LAST_ERR=""
+    fi
+    [ -z "$prefs" ] && { nt_err "无法加载 napcat_prefs.json"; return 1; }
+
     show_token="$(echo "$prefs" | jq -r '.webui_token // ""')"
-    [ -z "$show_token" ] && show_token="$(napcat_read_webui | jq -r '.token // ""')"
+    [ -z "$show_token" ] && show_token="$(napcat_read_webui 2>/dev/null | jq -r '.token // ""')"
+    show_token="$(nt_form_default "$show_token")"
 
     nt_dialog_run values --title "WebUI（全局）" --form \
-        "所有 QQ 共用 · 端口 0=关闭 · Token 留空则启动时生成" 18 68 5 \
-        "监听地址:" 1 1 "$(echo "$prefs" | jq -r '.webui_host')" 1 14 44 0 \
-        "端口:"     2 1 "$(echo "$prefs" | jq -r '.webui_port')" 2 14 44 0 \
+        "所有 QQ 共用 · 端口 0=关闭 · Token 留空则保留现有" 18 68 5 \
+        "监听地址:" 1 1 "$(nt_form_default "$(echo "$prefs" | jq -r '.webui_host // "127.0.0.1"')")" 1 14 44 0 \
+        "端口:"     2 1 "$(nt_form_default "$(echo "$prefs" | jq -r '.webui_port // 6099')")" 2 14 44 0 \
         "Token:"    3 1 "$show_token" 3 14 44 0 \
-        "限速/分:"  4 1 "$(echo "$prefs" | jq -r '.login_rate')" 4 14 44 0 \
-        "禁用pty:"  5 1 "$(echo "$prefs" | jq 'if .disable_pty then "yes" else "no" end' -r)" 5 14 44 0 \
-        || return
+        "限速/分:"  4 1 "$(nt_form_default "$(echo "$prefs" | jq -r '.login_rate // 3')")" 4 14 44 0 \
+        "禁用pty:"  5 1 "$(nt_form_default "$(echo "$prefs" | jq 'if .disable_pty then "yes" else "no" end' -r)")" 5 14 44 0
+    st=$?
+    case $st in
+        0) ;;
+        1) return 0 ;;
+        *) nt_err "对话框打开失败 (exit=$st)\n${values:-请检查 Token 是否含特殊字符}" 10; return 1 ;;
+    esac
 
     h=$(echo "$values" | sed -n1p | tr -d '[:space:]')
     p=$(echo "$values" | sed -n2p | tr -d '[:space:]')
-    t=$(echo "$values" | sed -n3p)
+    t=$(echo "$values" | sed -n3p | tr -d '\r\n')
     r=$(echo "$values" | sed -n4p | tr -d '[:space:]')
     dp=$(echo "$values" | sed -n5p)
     [[ -z "$h" ]] && h="127.0.0.1"
     [[ -z "$p" ]] && p=6099
     [[ -z "$r" ]] && r=3
+    [[ "$p" =~ ^[0-9]+$ ]] || { nt_err "端口须为数字：$p"; return 1; }
+    [[ "$r" =~ ^[0-9]+$ ]] || { nt_err "限速须为数字：$r"; return 1; }
 
-    napcat_save_prefs "$(echo "$prefs" | jq \
+    new_prefs="$(echo "$prefs" | jq \
         --arg h "$h" --argjson p "$p" --arg t "$t" --argjson r "$r" \
         --argjson dp "$(nt_yes "$dp" && echo true || echo false)" \
-        '.webui_host=$h|.webui_port=$p|.webui_token=$t|.login_rate=$r|.disable_pty=$dp')"
-    napcat_apply_webui
+        '.webui_host=$h|.webui_port=$p|.webui_token=$t|.login_rate=$r|.disable_pty=$dp' 2>&1)" || {
+        nt_err "合并配置失败\n${new_prefs}" 12
+        return 1
+    }
+    napcat_save_prefs "$new_prefs" || {
+        nt_err "保存 napcat_prefs 失败\n${NAPCAT_LAST_ERR:-$(napcat_prefs_path)}" 12
+        return 1
+    }
+    napcat_apply_webui || {
+        wf="$(napcat_webui_file)"
+        nt_err "写入 webui.json 失败\n${NAPCAT_LAST_ERR:-}\n\n目标: $wf" 14
+        return 1
+    }
     if url="$(napcat_webui_url 2>/dev/null)"; then
-        nt_msg "WebUI 已写入（全局）\n${url}" 8
+        nt_msg "WebUI 已写入（全局）\n${url}\n\n$(napcat_webui_file)" 10
     else
-        nt_msg "WebUI 已关闭（port=0）" 6
+        nt_msg "WebUI 已关闭（port=0）\n$(napcat_webui_file)" 8
     fi
 }
 

@@ -3,6 +3,7 @@
 # NapCat 反向 WS: Authorization: Bearer <token>, X-Self-ID, User-Agent: OneBot/11
 
 NAPCAT_CONFIG_DIR="${NAPCAT_CONFIG_DIR:-/opt/QQ/resources/app/app_launcher/napcat/config}"
+NAPCAT_LAST_ERR=""
 
 napcat_prefs_path() {
     printf '%s' "${NAPCAT_PREFS_FILE:-${XRK_ROOT:-/xrk}/body/napcat_prefs.json}"
@@ -73,27 +74,55 @@ napcat_scan_frameworks_json() {
 }
 
 napcat_load_prefs() {
-    local f defaults
+    local f defaults err
     f="$(napcat_prefs_path)"
     defaults="$(jq -n '{
         webui_host:"127.0.0.1",webui_port:6099,webui_token:"",
         login_rate:3,disable_pty:true,frameworks:[]
     }')"
     if [ -f "$f" ]; then
-        jq -s '.[0] * .[1]' <(cat "$f") <(echo "$defaults") \
+        if ! jq -e . "$f" >/dev/null 2>&1; then
+            NAPCAT_LAST_ERR="napcat_prefs.json 损坏: $f"
+            echo "$defaults" | jq --argjson fw "$(napcat_scan_frameworks_json)" '.frameworks = $fw'
+            return 1
+        fi
+        err="$(jq -s '.[0] * .[1]' <(cat "$f") <(echo "$defaults") \
             | jq --argjson scanned "$(napcat_scan_frameworks_json)" \
                 '.frameworks = (
                     (.frameworks // []) as $saved |
                     reduce $scanned[] as $item ($saved;
                         if any($saved[]; .root == $item.root) then . else . + [$item] end)
-                )'
-    else
-        echo "$defaults" | jq --argjson fw "$(napcat_scan_frameworks_json)" '.frameworks = $fw'
+                )' 2>&1)" || {
+            NAPCAT_LAST_ERR="读取 napcat_prefs 失败: ${err:-未知错误}"
+            echo "$defaults" | jq --argjson fw "$(napcat_scan_frameworks_json)" '.frameworks = $fw'
+            return 1
+        }
+        printf '%s' "$err"
+        return 0
     fi
+    echo "$defaults" | jq --argjson fw "$(napcat_scan_frameworks_json)" '.frameworks = $fw'
 }
 
 napcat_save_prefs() {
-    printf '%s\n' "$1" > "$(napcat_prefs_path)"
+    local json="$1" f dir tmp err
+    f="$(napcat_prefs_path)"
+    dir="$(dirname "$f")"
+    mkdir -p "$dir" 2>/dev/null || { NAPCAT_LAST_ERR="无法创建目录: $dir"; return 1; }
+    err="$(echo "$json" | jq -e . 2>&1)" || {
+        NAPCAT_LAST_ERR="prefs 不是合法 JSON: ${err:-$json}"
+        return 1
+    }
+    tmp="$(mktemp "${dir}/.napcat_prefs.XXXXXX")"
+    printf '%s\n' "$json" > "$tmp" 2>/dev/null || {
+        NAPCAT_LAST_ERR="写入临时文件失败: $tmp"
+        rm -f "$tmp"
+        return 1
+    }
+    mv "$tmp" "$f" 2>/dev/null || {
+        NAPCAT_LAST_ERR="写入失败: $f（检查权限）"
+        rm -f "$tmp"
+        return 1
+    }
 }
 
 napcat_refresh_frameworks() {
@@ -180,22 +209,43 @@ napcat_webui_url() {
 }
 
 napcat_apply_webui() {
-    local prefs host port rate token disable_pty wf
-    prefs="$(napcat_load_prefs)"
-    host="$(echo "$prefs" | jq -r '.webui_host')"
-    port="$(echo "$prefs" | jq -r '.webui_port')"
-    rate="$(echo "$prefs" | jq -r '.login_rate')"
-    disable_pty="$(echo "$prefs" | jq -r '.disable_pty')"
-    token="$(echo "$prefs" | jq -r '.webui_token // ""')"
-    [ -z "$token" ] && token="$(napcat_read_webui | jq -r '.token // ""')"
+    local prefs host port rate token disable_pty wf tmp err
+    prefs="$(napcat_load_prefs)" || true
+    [ -z "$prefs" ] && { NAPCAT_LAST_ERR="无法加载 napcat_prefs"; return 1; }
+
+    host="$(echo "$prefs" | jq -r '.webui_host // "127.0.0.1"')"
+    port="$(echo "$prefs" | jq -r '.webui_port // 6099')"
+    rate="$(echo "$prefs" | jq -r '.login_rate // 3')"
+    disable_pty="$(echo "$prefs" | jq -r '.disable_pty // true')"
+    token="$(echo "$prefs" | jq -r '.webui_token // ""' | tr -d '\r\n')"
+    [ -z "$token" ] && token="$(napcat_read_webui 2>/dev/null | jq -r '.token // ""' | tr -d '\r\n')"
+
+    [[ "$port" =~ ^[0-9]+$ ]] || { NAPCAT_LAST_ERR="无效端口: $port"; return 1; }
+    [[ "$rate" =~ ^[0-9]+$ ]] || { NAPCAT_LAST_ERR="无效限速: $rate"; return 1; }
+    [ -n "$host" ] || { NAPCAT_LAST_ERR="监听地址不能为空"; return 1; }
 
     wf="$(napcat_webui_file)"
-    mkdir -p "$NAPCAT_CONFIG_DIR"
-    jq -n --arg host "$host" --argjson port "$port" --arg token "$token" --argjson rate "$rate" \
-        '{host:$host,port:$port,token:$token,loginRate:$rate}' > "$wf"
+    mkdir -p "$NAPCAT_CONFIG_DIR" 2>/dev/null || {
+        NAPCAT_LAST_ERR="无法创建目录: $NAPCAT_CONFIG_DIR"
+        return 1
+    }
+    tmp="$(mktemp "${TMPDIR:-/tmp}/napcat_webui.XXXXXX")"
+    if ! jq -n --arg host "$host" --argjson port "$port" --arg token "$token" --argjson rate "$rate" \
+        '{host:$host,port:$port,token:$token,loginRate:$rate}' > "$tmp" 2>"${tmp}.err"; then
+        NAPCAT_LAST_ERR="生成 webui.json 失败: $(tr -d '\n' < "${tmp}.err" 2>/dev/null)"
+        rm -f "$tmp" "${tmp}.err"
+        return 1
+    fi
+    rm -f "${tmp}.err"
+    if ! err="$(mv "$tmp" "$wf" 2>&1)"; then
+        NAPCAT_LAST_ERR="写入 $wf 失败: ${err:-需要 root 权限}\n请用 root 运行 nt"
+        rm -f "$tmp"
+        return 1
+    fi
 
     [ "$disable_pty" = "true" ] && [ -d "${NAPCAT_CONFIG_DIR%/config}/pty" ] \
         && rm -rf "${NAPCAT_CONFIG_DIR%/config}/pty"
+    return 0
 }
 
 # 由 links[] 生成 onebot11（支持多框架多连接）
