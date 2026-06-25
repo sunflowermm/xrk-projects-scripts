@@ -18,24 +18,25 @@ nt_deps() {
     done
 }
 
-# 菜单/表单：与旧 nt、jsdialog 主菜单相同（exec 3>&1 + 2>&1 1>&3）
-nt_dialog() {
-    local out st
+# 菜单/表单：必须在当前 shell 直接调用，禁止 $(nt_dialog_run ...)
+nt_dialog_run() {
+    local __var=$1; shift
     exec 3>&1
-    out=$(dialog --backtitle "$NT_BACK" "$@" 2>&1 1>&3)
-    st=$?
+    local __out __st
+    __out=$(dialog --backtitle "$NT_BACK" "$@" 2>&1 1>&3)
+    __st=$?
     exec 3>&-
-    printf '%s' "$out"
-    return $st
+    printf -v "$__var" '%s' "$__out"
+    return "$__st"
 }
 
-# 输入框/多选：与 jsdialog 插件安装相同（2>&1 >/dev/tty）
-nt_dialog_input() {
-    local out st
-    out=$(dialog --backtitle "$NT_BACK" "$@" 2>&1 >/dev/tty)
-    st=$?
-    printf '%s' "$out"
-    return $st
+nt_dialog_input_run() {
+    local __var=$1; shift
+    local __out __st
+    __out=$(dialog --backtitle "$NT_BACK" "$@" 2>&1 >/dev/tty)
+    __st=$?
+    printf -v "$__var" '%s' "$__out"
+    return "$__st"
 }
 
 nt_yes() { case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in y|yes|1|true|是) return 0 ;; *) return 1 ;; esac; }
@@ -45,7 +46,7 @@ nt_msg() {
 }
 
 nt_yesno() {
-    nt_dialog --yesno "$1" "${2:-7}" "${3:-40}"
+    nt_dialog_run _nt_yesno_dummy --yesno "$1" "${2:-7}" "${3:-40}"
 }
 
 # ── 框架 ─────────────────────────────────────────
@@ -63,8 +64,9 @@ nt_pick_frameworks() {
         items+=("$id" "$label · :$port" "$state")
     done < <(nt_framework_items)
     [ ${#items[@]} -eq 0 ] && { nt_msg "请先在「框架管理」扫描或添加框架" 7; return 1; }
-    nt_dialog_input --title "连接框架" --checklist \
-        "空格切换 · 同一 QQ 可同时连接多个框架" 16 68 8 "${items[@]}"
+    nt_dialog_input_run checklist --title "连接框架" --checklist \
+        "空格切换 · 同一 QQ 可同时连接多个框架" 16 68 8 "${items[@]}" || return 1
+    printf '%s' "$checklist"
 }
 
 nt_links_from_checklist() {
@@ -90,7 +92,7 @@ nt_tune_link_ports() {
         fw="$(napcat_get_framework "$id")"
         label="$(echo "$fw" | jq -r '.label // .id')"
         port="$(echo "$link" | jq -r '.port')"
-        new_port="$(nt_dialog_input --inputbox "$label 监听端口" 8 50 "$port")" || return 1
+        nt_dialog_input_run new_port --inputbox "$label 监听端口" 8 50 "$port" || return 1
         [[ -z "$new_port" ]] && new_port="$port"
         link="$(echo "$link" | jq --argjson port "$new_port" '.port=$port')"
         out="$(jq -n --argjson a "$out" --argjson l "$link" '$a + [$l]')"
@@ -107,13 +109,13 @@ nt_save_qq() {
 }
 
 nt_qq_wizard() {
-    local title="$1" old_qq="${2:-}" cf values qq ob checklist links
+    local __ret=$1 title="$2" old_qq="${3:-}" cf values qq ob checklist links
     cf="${QQ_DIR}/qq_${old_qq}.json"
     [ -n "$old_qq" ] && [ -f "$cf" ] || cf=""
 
-    values="$(nt_dialog --title "$title" --form "全局 Token 留空则各框架用各自 api_key" 11 58 2 \
+    nt_dialog_run values --title "$title" --form "全局 Token 留空则各框架用各自 api_key" 11 58 2 \
         "QQ 账号:" 1 1 "${old_qq:-}" 1 12 36 0 \
-        "全局Token:" 2 1 "$([ -f "$cf" ] && jq -r '.ob_token' "$cf" || echo '')" 2 12 36 0)" \
+        "全局Token:" 2 1 "$([ -f "$cf" ] && jq -r '.ob_token' "$cf" || echo '')" 2 12 36 0 \
         || return 1
     qq=$(echo "$values" | sed -n1p | tr -d '[:space:]')
     ob=$(echo "$values" | sed -n2p)
@@ -128,7 +130,7 @@ nt_qq_wizard() {
     fi
 
     nt_save_qq "$qq" "$links" "$ob" "$old_qq"
-    printf '%s' "$qq"
+    printf -v "$__ret" '%s' "$qq"
 }
 
 nt_show_framework_menu() {
@@ -140,15 +142,15 @@ nt_show_framework_menu() {
     done < <(nt_framework_items)
 
     if [ ${#items[@]} -eq 0 ]; then
-        sel="$(nt_dialog --title "框架" --menu "未扫描到框架" 10 50 3 \
-            "scan" "扫描磁盘" "add" "手动添加" "back" "返回")" || return
+        nt_dialog_run sel --title "框架" --menu "未扫描到框架" 10 50 3 \
+            "scan" "扫描磁盘" "add" "手动添加" "back" "返回" || return
         case "$sel" in scan) napcat_refresh_frameworks; nt_msg "扫描完成" 5 ;; add) nt_add_framework ;; esac
         nt_show_framework_menu; return
     fi
 
-    sel="$(nt_dialog --title "框架管理" --menu "已注册框架" 16 64 10 \
+    nt_dialog_run sel --title "框架管理" --menu "已注册框架" 16 64 10 \
         "scan" "重新扫描" "add" "添加目录" "port" "改默认端口" "del" "移除框架" "back" "返回主菜单" \
-        "${items[@]}")" || return
+        "${items[@]}" || return
 
     case "$sel" in
         scan) napcat_refresh_frameworks; nt_msg "扫描完成" 5; nt_show_framework_menu ;;
@@ -166,9 +168,9 @@ nt_show_framework_menu() {
 
 nt_add_framework() {
     local path port label id prefs fw
-    path="$(nt_dialog_input --inputbox "框架根目录" 10 58 "$HOME")" || return
+    nt_dialog_input_run path --inputbox "框架根目录" 10 58 "$HOME" || return
     [ -d "$path" ] || return
-    port="$(nt_dialog_input --inputbox "默认端口" 8 42 "$(napcat_guess_framework_port "$path")")" || return
+    nt_dialog_input_run port --inputbox "默认端口" 8 42 "$(napcat_guess_framework_port "$path")" || return
     label="$(napcat_framework_label "$path")"
     id="$(napcat_framework_id_from_root "$path")"
     fw="$(jq -n --arg id "$id" --arg label "$label" --arg root "$path" --argjson port "$port" \
@@ -183,9 +185,9 @@ nt_add_framework() {
 nt_edit_framework_port() {
     local items=() id sel port prefs
     while IFS='|' read -r id label p; do items+=("$id" "$label"); done < <(nt_framework_items)
-    id="$(nt_dialog --title "改端口" --menu "选择框架" 12 50 6 "${items[@]}")" || return
-    port="$(nt_dialog_input --inputbox "新默认端口" 8 42 \
-        "$(napcat_get_framework "$id" | jq -r '.default_port')")" || return
+    nt_dialog_run id --title "改端口" --menu "选择框架" 12 50 6 "${items[@]}" || return
+    nt_dialog_input_run port --inputbox "新默认端口" 8 42 \
+        "$(napcat_get_framework "$id" | jq -r '.default_port')" || return
     prefs="$(napcat_load_prefs)"
     napcat_save_prefs "$(echo "$prefs" | jq --arg id "$id" --argjson port "$port" \
         '.frameworks = [.frameworks[]|if .id==$id then .default_port=$port else . end]')"
@@ -195,7 +197,7 @@ nt_edit_framework_port() {
 nt_del_framework() {
     local items=() id sel prefs
     while IFS='|' read -r id label _; do items+=("$id" "$label"); done < <(nt_framework_items)
-    id="$(nt_dialog --title "移除" --menu "选择框架" 12 50 6 "${items[@]}")" || return
+    nt_dialog_run id --title "移除" --menu "选择框架" 12 50 6 "${items[@]}" || return
     nt_yesno "确认移除？" 6 30 || return
     prefs="$(napcat_load_prefs)"
     napcat_save_prefs "$(echo "$prefs" | jq --arg id "$id" '.frameworks = [.frameworks[]|select(.id!=$id)]')"
@@ -210,13 +212,13 @@ nt_show_webui_menu() {
     show_token="$(echo "$prefs" | jq -r '.webui_token // ""')"
     [ -z "$show_token" ] && show_token="$(echo "$webui" | jq -r '.token // ""')"
 
-    values="$(nt_dialog --title "WebUI" --form \
+    nt_dialog_run values --title "WebUI" --form \
         "端口 0=关闭 · Token 留空则由 NapCat 启动时生成" 18 68 5 \
         "监听地址:" 1 1 "$(echo "$prefs" | jq -r '.webui_host')" 1 14 44 0 \
         "端口:"     2 1 "$(echo "$prefs" | jq -r '.webui_port')" 2 14 44 0 \
         "Token:"    3 1 "$show_token" 3 14 44 0 \
         "限速/分:"  4 1 "$(echo "$prefs" | jq -r '.login_rate')" 4 14 44 0 \
-        "禁用pty:"  5 1 "$(echo "$prefs" | jq 'if .disable_pty then "yes" else "no" end' -r)" 5 14 44 0)" \
+        "禁用pty:"  5 1 "$(echo "$prefs" | jq 'if .disable_pty then "yes" else "no" end' -r)" 5 14 44 0 \
         || return
 
     h=$(echo "$values" | sed -n1p | tr -d '[:space:]')
@@ -253,7 +255,7 @@ nt_show_status() {
         text+="  $qq → "
         text+="$(jq -r '.links[]|select(.enabled)|.framework_id' "${QQ_DIR}/qq_${qq}.json" | tr '\n' ',' | sed 's/,$//')\n"
     done
-    nt_dialog --title "状态" --textbox - 22 68 <<< "$(printf '%b' "$text")"
+    dialog --backtitle "$NT_BACK" --title "状态" --textbox - 22 68 <<< "$(printf '%b' "$text")"
 }
 
 # ── 启动 ─────────────────────────────────────────
@@ -277,7 +279,7 @@ nt_start_qq() {
         path="$(echo "$fw" | jq -r '.ws_path' | sed 's#^/##')"
         echo "│ → $lbl  ws://${h}:${p}/${path}"
     done < <(echo "$cfg" | jq -c '.links[]|select(.enabled==true)')
-  if [ "$(echo "$prefs" | jq -r '.webui_port')" = "0" ]; then
+    if [ "$(echo "$prefs" | jq -r '.webui_port')" = "0" ]; then
         echo "│ WebUI: 关闭"
     else
         echo "│ WebUI: http://$(echo "$prefs" | jq -r '.webui_host'):$(echo "$prefs" | jq -r '.webui_port')/webui"
@@ -289,9 +291,9 @@ nt_start_qq() {
 
 # ── 主菜单 ───────────────────────────────────────
 nt_main_menu() {
-    local sel st
+    local sel st qq
     while true; do
-        sel="$(nt_dialog --clear --title "主菜单" --menu \
+        nt_dialog_run sel --clear --title "主菜单" --menu \
             "多 QQ · 多框架 · 安全加固" 18 58 10 \
             "add"    "新增 QQ（可多选框架）" \
             "edit"   "修改 / 删除 QQ" \
@@ -300,7 +302,7 @@ nt_main_menu() {
             "webui"  "WebUI（地址/端口/Token）" \
             "status" "查看当前配置" \
             "audit"  "安全审计" \
-            "quit"   "退出")"
+            "quit"   "退出"
         st=$?
         case "$st" in
             0) ;;
@@ -310,7 +312,7 @@ nt_main_menu() {
         clear
         case "$sel" in
             add)
-                local qq; qq="$(nt_qq_wizard "新增 QQ")" || continue
+                nt_qq_wizard qq "新增 QQ" || continue
                 nt_yesno "立即启动 $qq？" 6 32 && nt_start_qq "$qq"
                 ;;
             edit) nt_edit_qq ;;
@@ -331,18 +333,18 @@ nt_edit_qq() {
     done
     [ ${#items[@]} -eq 0 ] && { nt_msg "暂无 QQ 配置"; return; }
 
-    sel="$(nt_dialog --title "编辑 QQ" --menu "选择操作" 14 55 8 \
-        "_edit" "修改配置" "_del" "删除账号" "_back" "返回")" || return
+    nt_dialog_run sel --title "编辑 QQ" --menu "选择操作" 14 55 8 \
+        "_edit" "修改配置" "_del" "删除账号" "_back" "返回" || return
     case "$sel" in
         _back) return ;;
         _del)
-            sel="$(nt_dialog --title "删除" --menu "选择 QQ" 12 45 6 "${items[@]}")" || return
+            nt_dialog_run sel --title "删除" --menu "选择 QQ" 12 45 6 "${items[@]}" || return
             nt_yesno "删除 qq_${sel}.json？" 6 34 || return
             rm -f "${QQ_DIR}/qq_${sel}.json"; nt_msg "已删除" 5
             ;;
         _edit)
-            sel="$(nt_dialog --title "修改" --menu "选择 QQ" 14 55 8 "${items[@]}")" || return
-            nt_qq_wizard "修改 $sel" "$sel" || return
+            nt_dialog_run sel --title "修改" --menu "选择 QQ" 14 55 8 "${items[@]}" || return
+            nt_qq_wizard _qq_dummy "修改 $sel" "$sel" || return
             nt_msg "已保存" 5
             ;;
     esac
@@ -354,7 +356,7 @@ nt_pick_start() {
         items+=("$qq" "启动")
     done
     [ ${#items[@]} -eq 0 ] && { nt_msg "暂无 QQ"; return; }
-    sel="$(nt_dialog --title "启动" --menu "选择 QQ" 12 40 8 "${items[@]}")" || return
+    nt_dialog_run sel --title "启动" --menu "选择 QQ" 12 40 8 "${items[@]}" || return
     nt_start_qq "$sel"
 }
 
