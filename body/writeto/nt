@@ -114,8 +114,21 @@ nt_framework_items() {
     napcat_load_prefs | jq -r '.frameworks[]? | "\(.id)|\(.label)|\(.default_port)"'
 }
 
+# 解析 dialog --checklist：stderr 为选中 tag（--separate-output 每行一个，否则空格分隔）
+nt_parse_checklist() {
+    local raw="$1" line id
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="$(nt_field_trim "$line")"
+        [ -z "$line" ] && continue
+        for id in $line; do
+            id="$(nt_field_trim "$id")"
+            [ -n "$id" ] && printf '%s\n' "$id"
+        done
+    done <<< "$raw"
+}
+
 nt_pick_frameworks() {
-    local __var=$1 qq="$2" items=() id label port state old="" checklist
+    local __var=$1 qq="$2" items=() id label port state old=""
     [ -f "${QQ_DIR}/qq_${qq}.json" ] && \
         old="$(jq -r '.links[]?|select(.enabled)|.framework_id' "${QQ_DIR}/qq_${qq}.json" 2>/dev/null || true)"
     while IFS='|' read -r id label port; do
@@ -124,23 +137,24 @@ nt_pick_frameworks() {
         items+=("$id" "$label · :$port" "$state")
     done < <(nt_framework_items)
     [ ${#items[@]} -eq 0 ] && { nt_msg "请先在「框架管理」扫描或添加框架" 7; return 1; }
-    nt_dialog_run "$__var" --title "连接框架" --checklist \
+    nt_dialog_run "$__var" --separate-output --title "连接框架" --checklist \
         "空格切换 · 回车确认 · 可同时选多个框架" 16 68 8 "${items[@]}" || return 1
 }
 
 nt_links_from_checklist() {
-    local qq="$1" checklist="$2" old links='[]' id checked fw port token
+    local qq="$1" raw="$2" old links='[]' id fw port token
     old='[]'
     [ -f "${QQ_DIR}/qq_${qq}.json" ] && old="$(jq -c '.links // []' "${QQ_DIR}/qq_${qq}.json")"
-    while read -r id checked; do
-        [ -z "$id" ] || [ "$checked" != "on" ] && continue
-        fw="$(napcat_get_framework "$id")"; [ -z "$fw" ] && continue
+    while IFS= read -r id; do
+        [ -z "$id" ] && continue
+        fw="$(napcat_get_framework "$id")"
+        [ -z "$fw" ] && continue
         port="$(echo "$old" | jq -r --arg id "$id" '.[]|select(.framework_id==$id)|.port//empty' | head -n1)"
         [ -z "$port" ] && port="$(echo "$fw" | jq -r '.default_port')"
         token="$(echo "$old" | jq -r --arg id "$id" '.[]|select(.framework_id==$id)|.token//""' | head -n1)"
         links="$(jq -n --argjson a "$links" --arg id "$id" --argjson port "$port" --arg token "$token" \
             '$a + [{framework_id:$id,enabled:true,port:$port,token:$token}]')"
-    done <<< "$checklist"
+    done < <(nt_parse_checklist "$raw")
     printf '%s' "$links"
 }
 
@@ -184,7 +198,9 @@ nt_qq_wizard() {
     nt_log "QQ wizard: qq=$qq token_len=${#ob}"
 
     nt_pick_frameworks checklist "$qq" || return 1
+    nt_log "QQ wizard checklist raw: $(printf '%s' "$checklist" | tr '\n' '|')"
     links="$(nt_links_from_checklist "$qq" "$checklist")"
+    nt_log "QQ wizard links: $links"
     [ "$(echo "$links" | jq 'length')" -eq 0 ] && { nt_msg "请至少选择一个框架"; return 1; }
 
     if nt_yesno "为每个框架确认端口？" 7 40; then

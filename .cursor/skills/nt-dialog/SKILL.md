@@ -25,7 +25,8 @@ rm -f "$tmp"
 |------|------|------|
 | `--menu` / `--yesno` | `nt_dialog_capture` | `exec 3>&1` 包在 `$()` 里 |
 | `--form` | `nt_dialog_capture` + `nt_parse_form` | `sed -n1p` + `tr -d '[:space:]'` 解析 host |
-| `--inputbox` / `--checklist` | `nt_dialog_capture` | 与 menu 混用不同捕获方式 |
+| `--inputbox` | `nt_dialog_capture` | 与 menu 混用不同捕获方式 |
+| `--checklist` | `nt_dialog_capture` + `--separate-output` + `nt_parse_checklist` | 按 `id on` 两行解析（dialog 从不输出 on） |
 
 ## 解析 `--form`
 
@@ -82,7 +83,8 @@ tail -5 /tmp/nt.log
 
 | 现象 | 原因 | 处理 |
 |------|------|------|
-| 新增 QQ 报「表单字段不足 实际1」 | Token 留空时 dialog 不输出第二行 | `nt_parse_form` 补齐尾部空字段 |
+| 勾了框架仍报「至少选一个」 | checklist 按 `tag on` 解析，dialog 只回 tag | `--separate-output` + `nt_parse_checklist` |
+| 新增 QQ Token 留空报字段不足 | 尾部空字段无换行 | `nt_parse_form` 补齐 |
 | 监听地址改为 `::` 报「为空」 | form 首行在 `$()`+`exec 3>&1` 捕获时丢失 | `nt_dialog_capture` + `nt_parse_form` + `nt_field_trim`（勿对 host 用 `tr -d`） |
 | webui.json 变回 `host:"::"` 大文件 | NapCat 运行中覆盖 | 先停 qq 再改 |
 | 无报错回菜单 | dialog 失败被 `\|\| return` 吞掉 | `nt_err` + `/tmp/nt.log` |
