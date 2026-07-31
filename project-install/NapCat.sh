@@ -234,6 +234,87 @@ function check_linuxqq(){
     fi
 }
 
+# 拉取 GitHub API（国内自动走加速代理）
+function _fetch_github_api() {
+    local url="$1" body proxy=""
+    body=$(curl -fsSL --connect-timeout 10 --max-time 30 -H "User-Agent: xrk-napcat" "$url" 2>/dev/null) || true
+    if [ -n "$body" ]; then
+        printf '%s' "$body"
+        return 0
+    fi
+    if type _xrk_pick_github_proxy &>/dev/null; then
+        proxy="$(_xrk_pick_github_proxy 2>/dev/null)" || true
+    fi
+    if [ -n "$proxy" ] && [ "$proxy" != "https://gitclone.com/github.com" ]; then
+        body=$(curl -fsSL --connect-timeout 10 --max-time 30 -H "User-Agent: xrk-napcat" "${proxy}/${url}" 2>/dev/null) || true
+        if [ -n "$body" ]; then
+            printf '%s' "$body"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# 按 NapCat 最低版本，从 zydou/QQ-Linux 自动解析可用包（腾讯 CDN 旧包已 404）
+# 优先同主版本 X.Y.Z，否则取更新的发行版
+function resolve_linuxqq_download_url() {
+    local required_base selected_tag tag tag_base pkg_ext arch_suffix json
+    local -a tags=()
+
+    qq_download_url=""
+    required_base="${linuxqq_target_version%%-*}"
+    get_system_arch
+
+    case "${package_installer}" in
+        dpkg) pkg_ext="deb" ;;
+        rpm)  pkg_ext="rpm" ;;
+        *) return 1 ;;
+    esac
+    case "${system_arch}" in
+        amd64|arm64) arch_suffix="${system_arch}" ;;
+        *) return 1 ;;
+    esac
+
+    log "正在从镜像源解析 LinuxQQ 版本 (最低 ${linuxqq_target_version})..."
+    json="$(_fetch_github_api "https://api.github.com/repos/zydou/QQ-Linux/releases?per_page=50")" || {
+        log "无法获取 QQ 镜像版本列表。"
+        return 1
+    }
+
+    mapfile -t tags < <(printf '%s' "$json" | jq -r '.[].tag_name | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]+$"))')
+    if [ ${#tags[@]} -eq 0 ]; then
+        log "镜像源未返回有效版本标签。"
+        return 1
+    fi
+
+    for tag in "${tags[@]}"; do
+        tag_base="${tag%%-*}"
+        if [ "$tag_base" = "$required_base" ]; then
+            selected_tag="$tag"
+            break
+        fi
+    done
+
+    if [ -z "${selected_tag:-}" ]; then
+        for tag in "${tags[@]}"; do
+            tag_base="${tag%%-*}"
+            if printf '%s\n%s\n' "$required_base" "$tag_base" | sort -C -V 2>/dev/null; then
+                selected_tag="$tag"
+                break
+            fi
+        done
+    fi
+
+    if [ -z "${selected_tag:-}" ]; then
+        log "未找到满足最低版本 ${required_base} 的镜像包。"
+        return 1
+    fi
+
+    qq_download_url="https://github.com/zydou/QQ-Linux/releases/download/${selected_tag}/QQ-${selected_tag}-${arch_suffix}.${pkg_ext}"
+    log "已选择镜像版本: ${selected_tag}"
+    return 0
+}
+
 function install_linuxqq() {
     # 先卸载旧版本QQ
     log "卸载旧版本LinuxQQ..."
@@ -242,27 +323,12 @@ function install_linuxqq() {
     elif [ "${package_installer}" = "dpkg" ]; then
         apt-get remove -y -qq linuxqq 2>/dev/null || true
     fi
-    
-    base_url="https://dldir1.qq.com/qqfile/qq/QQNT/${linuxqq_target_verhash}/linuxqq_${linuxqq_target_version}"
-    get_system_arch
-    log "安装LinuxQQ..."
-    
-    if [ "${system_arch}" = "amd64" ]; then
-        if [ "${package_installer}" = "rpm" ]; then
-            qq_download_url="${base_url}_x86_64.rpm"
-        elif [ "${package_installer}" = "dpkg" ]; then
-            qq_download_url="${base_url}_amd64.deb"
-        fi
-    elif [ "${system_arch}" = "arm64" ]; then
-        if [ "${package_installer}" = "rpm" ]; then
-            qq_download_url="${base_url}_aarch64.rpm"
-        elif [ "${package_installer}" = "dpkg" ]; then
-            qq_download_url="${base_url}_arm64.deb"
-        fi
-    fi
 
+    log "安装LinuxQQ..."
+    qq_download_url=""
     if ! [[ -f "QQ.deb" || -f "QQ.rpm" ]]; then
-        if [ "${qq_download_url}" = "" ]; then
+        resolve_linuxqq_download_url || true
+        if [ -z "${qq_download_url}" ]; then
             log "获取QQ下载链接失败, 请检查错误, 或者手动下载QQ安装包并重命名为QQ.deb或QQ.rpm(注意自己的系统架构)放到脚本同目录下。"
             exit 1
         fi
@@ -280,6 +346,7 @@ function install_linuxqq() {
 
         run_cmd "dnf localinstall -y ./QQ.rpm" "安装QQ"
         rm -f QQ.rpm
+        linuxqq_installed_version=$(rpm -q --queryformat '%{VERSION}' linuxqq 2>/dev/null || echo "${linuxqq_target_version}")
     elif [ "${package_manager}" = "apt-get" ]; then
         if ! [ -f "QQ.deb" ]; then
             xrk_download "${qq_download_url}" "QQ.deb" 3 || { log "文件下载失败, 请检查错误。"; exit 1; }
@@ -307,8 +374,9 @@ function install_linuxqq() {
             fi
         fi
         rm -f QQ.deb
+        linuxqq_installed_version=$(dpkg -l | grep "^ii" | grep "linuxqq" | awk '{print $3}' || echo "${linuxqq_target_version}")
     fi
-    update_linuxqq_config "${linuxqq_target_version}" "${linuxqq_target_build}"
+    update_linuxqq_config "${linuxqq_installed_version}" "${linuxqq_installed_version##*-}"
 }
 
 function update_linuxqq_config() {
